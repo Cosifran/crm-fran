@@ -91,7 +91,7 @@ DB Layer         Server Layer      UI Layer
 
 #### T1.1 Add `$default()` on `roleId` column
 
-- [ ] T1.1 — Add `$default(() => "role-caller")` to the `roleId` column definition in `packages/db/src/schema/auth.ts`
+- [x] T1.1 — Add `$default(() => "role-caller")` to the `roleId` column definition in `packages/db/src/schema/auth.ts`
   - **Files**: `packages/db/src/schema/auth.ts`
   - **Change**: Insert `.$default(() => "role-caller")` between `references(() => roles.id)` and `.notNull()` on the `roleId` column
   - **Acceptance**: After change, `user.roleId` has `$default(() => "role-caller")` in Drizzle schema. New inserts without `roleId` get `"role-caller"`.
@@ -100,7 +100,7 @@ DB Layer         Server Layer      UI Layer
 
 #### T1.2 Export `Permission` and `ResolvedRole` types
 
-- [ ] T1.2 — Add the `Permission` union type and `ResolvedRole` interface at the top of `packages/db/src/schema/auth.ts` (before table definitions)
+- [x] T1.2 — Add the `Permission` union type and `ResolvedRole` interface at the top of `packages/db/src/schema/auth.ts` (before table definitions)
   - **Files**: `packages/db/src/schema/auth.ts`
   - **Change**: Add `Permission` union (16 variants + wildcards) and `ResolvedRole` interface
   - **Acceptance**: Both types are exported from `@crm-fran/db/schema/auth`. TypeScript `--noEmit` passes when importing either type.
@@ -109,7 +109,7 @@ DB Layer         Server Layer      UI Layer
 
 #### T1.3 Add `rolesRelations` inverse relationship
 
-- [ ] T1.3 — Define `rolesRelations` in `packages/db/src/schema/auth.ts` to provide the inverse relation from `roles` → `users`
+- [x] T1.3 — Define `rolesRelations` in `packages/db/src/schema/auth.ts` to provide the inverse relation from `roles` → `users`
   - **Files**: `packages/db/src/schema/auth.ts`
   - **Change**: Add `export const rolesRelations = relations(roles, ({ many }) => ({ users: many(user) }));` after the existing `userRelations` block
   - **Acceptance**: `rolesRelations` is exported and TypeScript resolves `db.query.roles.findMany({ with: { users: true } })` without error.
