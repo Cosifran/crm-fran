@@ -118,10 +118,10 @@ DB Layer         Server Layer      UI Layer
 
 #### T1.4 Create seed script
 
-- [ ] T1.4 — Create `packages/db/src/seed.ts` with seed data for the three roles: `role-caller`, `role-closer`, `role-admin`
-  - **Files**: `packages/db/src/seed.ts` (NEW)
+- [ ] T1.4 — Create `packages/db/src/seed/auth/authSeed.ts` with seed data for the three roles: `role-caller`, `role-closer`, `role-admin`
+  - **Files**: `packages/db/src/seed/auth/authSeed.ts` (NEW)
   - **Content**: Use `db.insert(roles).values(...).onConflictDoNothing()` to insert the three roles with their exact permission sets from the spec
-  - **Acceptance**: Running `pnpm --filter @crm-fran/db tsx src/seed.ts` inserts exactly 3 rows into the `roles` table. Idempotent: running it twice does not create duplicates.
+  - **Acceptance**: Running `pnpm --filter @crm-fran/db exec pnpm dlx tsx src/seed/auth/authSeed.ts` inserts exactly 3 rows into the `roles` table. Idempotent: running it twice does not create duplicates.
   - **Est. lines**: ~50
   - **Depends on**: T1.1, T1.2
 
