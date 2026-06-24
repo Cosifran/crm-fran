@@ -34,7 +34,7 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
           email: value.email,
           password: value.password,
           name: value.name,
-          role: value.role as "caller" | "admin" | "closer"
+          roleId: value.role
         },
         {
           onSuccess: () => {
@@ -135,9 +135,9 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
                     <SelectValue placeholder="Select a role" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="caller">Caller</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="closer">Close</SelectItem>
+                    <SelectItem value="role-caller">Caller</SelectItem>
+                    <SelectItem value="role-admin">Admin</SelectItem>
+                    <SelectItem value="role-closer">Close</SelectItem>
                   </SelectContent>
                 </Select>
                 {field.state.meta.errors.map((error) => (
