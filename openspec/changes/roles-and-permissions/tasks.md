@@ -118,7 +118,7 @@ DB Layer         Server Layer      UI Layer
 
 #### T1.4 Create seed script
 
-- [ ] T1.4 — Create `packages/db/src/seed/auth/authSeed.ts` with seed data for the three roles: `role-caller`, `role-closer`, `role-admin`
+- [x] T1.4 — Create `packages/db/src/seed/auth/authSeed.ts` with seed data for the three roles: `role-caller`, `role-closer`, `role-admin`
   - **Files**: `packages/db/src/seed/auth/authSeed.ts` (NEW)
   - **Content**: Use `db.insert(roles).values(...).onConflictDoNothing()` to insert the three roles with their exact permission sets from the spec
   - **Acceptance**: Running `pnpm --filter @crm-fran/db exec pnpm dlx tsx src/seed/auth/authSeed.ts` inserts exactly 3 rows into the `roles` table. Idempotent: running it twice does not create duplicates.
@@ -127,7 +127,7 @@ DB Layer         Server Layer      UI Layer
 
 #### T1.5 Generate and customize Drizzle migration
 
-- [ ] T1.5 — Run `drizzle-kit generate` to produce migration 0002, then customise it to ensure seed + backfill happen before column drop
+- [x] T1.5 — Run `drizzle-kit generate` to produce migration 0002, then customise it to ensure seed + backfill happen before column drop
   - **Files**: `packages/db/src/migrations/0002_<generated_tag>.sql` (generated + hand-edited), `packages/db/src/migrations/meta/0002_snapshot.json` (generated)
   - **Steps**:
     1. Run `pnpm --filter @crm-fran/db exec drizzle-kit generate` to capture schema diff (creates `roles` table, adds `role_id`, drops `role`)
@@ -152,7 +152,7 @@ DB Layer         Server Layer      UI Layer
 
 #### T2.1 Update Better Auth `additionalFields` for `roleId`
 
-- [ ] T2.1 — Update `packages/auth/src/index.ts` to add `required: false` and `defaultValue: "role-caller"` to the `roleId` additional field config
+- [x] T2.1 — Update `packages/auth/src/index.ts` to add `required: false` and `defaultValue: "role-caller"` to the `roleId` additional field config
   - **Files**: `packages/auth/src/index.ts`
   - **Change**: Update the `roleId` block in `additionalFields` from `{ type: "string", input: true }` to `{ type: "string", input: true, required: false, defaultValue: "role-caller" }`
   - **Acceptance**: Sign-up without sending `roleId` gets the server-side default. Sign-up with `roleId: "role-closer"` uses that value. `session.user.roleId` is always a string.
@@ -161,7 +161,7 @@ DB Layer         Server Layer      UI Layer
 
 #### T3.1 Enhance tRPC context with role/permission resolution
 
-- [ ] T3.1 — Modify `packages/api/src/context.ts` to resolve the user's `ResolvedRole` and `Permission[]` from the database, adding `role` and `permissions` to the context
+- [x] T3.1 — Modify `packages/api/src/context.ts` to resolve the user's `ResolvedRole` and `Permission[]` from the database, adding `role` and `permissions` to the context
   - **Files**: `packages/api/src/context.ts`
   - **Changes**:
     1. Import `db` from `@crm-fran/db` (singleton)

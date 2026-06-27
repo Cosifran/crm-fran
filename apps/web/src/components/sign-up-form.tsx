@@ -17,7 +17,7 @@ import { authClient } from "@/lib/auth-client";
 
 import Loader from "./loader";
 
-export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () => void }) {
+export default function SignUpForm() {
   const router = useRouter();
   const { isPending } = authClient.useSession();
 
@@ -194,7 +194,7 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
       <div className="mt-4 text-center">
         <Button
           variant="link"
-          onClick={onSwitchToSignIn}
+          onClick={() => router.push("/login")}
           className="text-indigo-600 hover:text-indigo-800"
         >
           Already have an account? Sign In
