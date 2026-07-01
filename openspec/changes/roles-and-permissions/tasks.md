@@ -178,7 +178,7 @@ DB Layer         Server Layer      UI Layer
 
 #### T4.1 Create permission middleware
 
-- [ ] T4.1 — Create `packages/api/src/permissions.ts` with `requirePermissions()` middleware factory and `permittedProcedure()` convenience builder
+- [x] T4.1 — Create `packages/api/src/permissions.ts` with `requirePermissions()` middleware factory and `permittedProcedure()` convenience builder
   - **Files**: `packages/api/src/permissions.ts` (NEW)
   - **Content**:
     - `requirePermissions(...required: Permission[])` returning a `t.middleware` that:
@@ -197,7 +197,7 @@ DB Layer         Server Layer      UI Layer
 
 #### T5.1 Create leads router with permission gates
 
-- [ ] T5.1 — Create `packages/api/src/routers/leads.ts` with 5 procedures (list, getById, create, update, delete) each using `permittedProcedure()` with appropriate permissions
+- [x] T5.1 — Create `packages/api/src/routers/leads.ts` with 5 procedures (list, getById, create, update, delete) each using `permittedProcedure()` with appropriate permissions
   - **Files**: `packages/api/src/routers/leads.ts` (NEW)
   - **Content**: 5 procedures:
     - `list`: `permittedProcedure(["leads:read"])` → returns `[]` (stub)

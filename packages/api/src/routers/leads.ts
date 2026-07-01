@@ -1,0 +1,43 @@
+import { z } from "zod";
+import { router } from "../index";
+import { permittedProcedure } from "@crm-fran/api/trpc/trpc";
+
+const idInput = z.object({ id: z.string() });
+const createLeadInput = z.object({
+  name: z.string(),
+  email: z.email(),
+  phone: z.string(),
+});
+const updateLeadInput = createLeadInput.partial().extend({ id: z.string() });
+
+export const leadsRouter = router({
+  list: permittedProcedure(["leads:read"]).query(async () => {
+    return [];
+  }),
+
+  getById: permittedProcedure(["leads:read"])
+    .input(idInput)
+    .query(async ({ input }) => {
+      console.log(`[stub] getById called with id: ${input.id}`);
+      return null;
+    }),
+
+  create: permittedProcedure(["leads:write"])
+    .input(createLeadInput)
+    .mutation(async ({ input }) => {
+      return { id: "stub", ...input };
+    }),
+
+  update: permittedProcedure(["leads:write"])
+    .input(updateLeadInput)
+    .mutation(async ({ input }) => {
+      const { id, ...rest } = input;
+      return { id, ...rest };
+    }),
+
+  delete: permittedProcedure(["leads:delete"])
+    .input(idInput)
+    .mutation(async ({ input }) => {
+      return { success: true, id: input.id };
+    }),
+});

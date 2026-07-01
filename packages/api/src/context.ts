@@ -1,7 +1,7 @@
 import { db } from "@crm-fran/db";
 import { auth } from "@crm-fran/auth";
 import type { NextRequest } from "next/server";
-import type { Permission } from "@crm-fran/db/schema/auth";
+import type { ResolvedRole } from "@crm-fran/db/schema/auth";
 
 export async function createContext(req: NextRequest) {
   const session = await auth.api.getSession({
@@ -11,7 +11,8 @@ export async function createContext(req: NextRequest) {
   const obj = {
     auth: null,
     session: null,
-    permissions: null,
+    role: null,
+    permissions: [],
   };
 
   if (!session) {
@@ -21,19 +22,21 @@ export async function createContext(req: NextRequest) {
   if (!session.user.roleId) {
     return {
       ...obj,
+      session
     };
   }
 
-  const permissions = (
+  const role = (
     await db.query.roles.findFirst({
       where: (roles, { eq }) => eq(roles.id, session.user.roleId),
     })
-  )?.permissions as Permission[];
+  ) as ResolvedRole | null;
 
   return {
     ...obj,
+    role,
     session,
-    permissions,
+    permissions: role?.permissions ?? []
   };
 }
 

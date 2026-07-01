@@ -3,7 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { hasPermission } from "../permissions";
 import type { Permission } from "@crm-fran/db/schema/auth";
 
-export const protectedPermissionProcedure = (
+export const permittedProcedure = (
   permissionRequired: Permission[],
 ) => {
   return t.procedure.use(({ ctx, next }) => {
