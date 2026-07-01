@@ -211,7 +211,7 @@ DB Layer         Server Layer      UI Layer
 
 #### T5.2 Create auth router with `getMyPermissions` procedure
 
-- [ ] T5.2 — Create `packages/api/src/routers/auth.ts` with a `getMyPermissions` procedure that returns the current user's role and permissions
+- [x] T5.2 — Create `packages/api/src/routers/auth.ts` with a `getMyPermissions` procedure that returns the current user's role and permissions
   - **Files**: `packages/api/src/routers/auth.ts` (NEW)
   - **Content**:
     - `getMyPermissions`: `permittedProcedure([])` → returns `{ role: ctx.role, permissions: ctx.permissions }`
@@ -222,7 +222,7 @@ DB Layer         Server Layer      UI Layer
 
 #### T5.3 Update router index to register new routers and upgrade privateData
 
-- [ ] T5.3 — Update `packages/api/src/routers/index.ts` to register `leadsRouter` and `authRouter`, and upgrade `privateData` to use `permittedProcedure(["profile:read"])`
+- [x] T5.3 — Update `packages/api/src/routers/index.ts` to register `leadsRouter` and `authRouter`, and upgrade `privateData` to use `permittedProcedure(["profile:read"])`
   - **Files**: `packages/api/src/routers/index.ts`
   - **Changes**:
     1. Import `leadsRouter`, `authRouter`, `permittedProcedure`
