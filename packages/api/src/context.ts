@@ -9,7 +9,6 @@ export async function createContext(req: NextRequest) {
   });
 
   const obj = {
-    auth: null,
     session: null,
     role: null,
     permissions: [],
@@ -22,21 +21,19 @@ export async function createContext(req: NextRequest) {
   if (!session.user.roleId) {
     return {
       ...obj,
-      session
+      session,
     };
   }
 
-  const role = (
-    await db.query.roles.findFirst({
-      where: (roles, { eq }) => eq(roles.id, session.user.roleId),
-    })
-  ) as ResolvedRole | null;
+  const role = (await db.query.roles.findFirst({
+    where: (roles, { eq }) => eq(roles.id, session.user.roleId),
+  })) as ResolvedRole | null;
 
   return {
     ...obj,
     role,
     session,
-    permissions: role?.permissions ?? []
+    permissions: role?.permissions ?? [],
   };
 }
 

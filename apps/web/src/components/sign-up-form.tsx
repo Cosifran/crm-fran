@@ -1,5 +1,5 @@
 import { Button } from "@crm-fran/ui/components/button";
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -26,7 +26,7 @@ export default function SignUpForm() {
       email: "",
       password: "",
       name: "",
-      role: ""
+      role: "",
     },
     onSubmit: async ({ value }) => {
       await authClient.signUp.email(
@@ -34,7 +34,7 @@ export default function SignUpForm() {
           email: value.email,
           password: value.password,
           name: value.name,
-          roleId: value.role
+          roleId: value.role,
         },
         {
           onSuccess: () => {
@@ -128,7 +128,7 @@ export default function SignUpForm() {
                   name={field.name}
                   value={field.state.value}
                   onValueChange={(value) =>
-                    field.handleChange(value ?? "caller")
+                    field.handleChange(value ?? "role-caller")
                   }
                 >
                   <SelectTrigger className="w-full">

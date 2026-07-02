@@ -12,14 +12,14 @@ export const appRouter = router({
       message: "This is private",
       role: ctx.role,
       user: ctx.session.user,
-      permission: ctx.permissions,
+      permissions: ctx.permissions,
     };
   }),
   createUser: permittedProcedure(["users:create"]).query(({ ctx }) => {
     return {
       message: "This is create user",
       user: ctx.session.user,
-      permission: ctx.permissions,
+      permissions: ctx.permissions,
     };
   }),
   auth: authRouter,

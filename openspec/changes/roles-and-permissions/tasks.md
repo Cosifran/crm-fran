@@ -152,12 +152,13 @@ DB Layer         Server Layer      UI Layer
 
 #### T2.1 Update Better Auth `additionalFields` for `roleId`
 
-- [x] T2.1 — Update `packages/auth/src/index.ts` to add `required: false` and `defaultValue: "role-caller"` to the `roleId` additional field config
+- [x] T2.1 — Update `packages/auth/src/index.ts` to add `required: true` and `defaultValue: "role-caller"` to the `roleId` additional field config (defense in depth at API boundary)
   - **Files**: `packages/auth/src/index.ts`
-  - **Change**: Update the `roleId` block in `additionalFields` from `{ type: "string", input: true }` to `{ type: "string", input: true, required: false, defaultValue: "role-caller" }`
-  - **Acceptance**: Sign-up without sending `roleId` gets the server-side default. Sign-up with `roleId: "role-closer"` uses that value. `session.user.roleId` is always a string.
+  - **Change**: Update the `roleId` block in `additionalFields` from `{ type: "string", input: true }` to `{ type: "string", input: true, required: true, defaultValue: "role-caller" }`
+  - **Acceptance**: Sign-up without `roleId` is rejected by Better Auth (defense in depth at API boundary). Sign-up with `roleId: "role-closer"` uses that value. `session.user.roleId` is always a string. Frontend form (`sign-up-form.tsx`) sends `roleId` from the role selector.
   - **Est. lines**: ~5 changed
   - **Depends on**: PR 1 (types and schema must exist)
+  - **Note**: Decision A — server as strict gatekeeper. `required: true` enforces at the API boundary; `defaultValue` is a DB safety net for direct inserts/migrations.
 
 #### T3.1 Enhance tRPC context with role/permission resolution
 
@@ -178,22 +179,25 @@ DB Layer         Server Layer      UI Layer
 
 #### T4.1 Create permission middleware
 
-- [x] T4.1 — Create `packages/api/src/permissions.ts` with `requirePermissions()` middleware factory and `permittedProcedure()` convenience builder
-  - **Files**: `packages/api/src/permissions.ts` (NEW)
+- [x] T4.1 — Implement permission enforcement in `packages/api/src/trpc/trpc.ts` (decision A: keep middleware co-located with `protectedProcedure`; `packages/api/src/permissions.ts` stays as a pure-helper file with only `hasPermission`)
+  - **Files**: `packages/api/src/trpc/trpc.ts` (modify), `packages/api/src/permissions.ts` (existing)
   - **Content**:
-    - `requirePermissions(...required: Permission[])` returning a `t.middleware` that:
+    - `packages/api/src/permissions.ts` exports `hasPermission(userPerms: Permission[], required: Permission): boolean` pure helper that handles admin wildcard (`"*"`), direct match, and domain wildcard (`"domain:*"`)
+    - `packages/api/src/trpc/trpc.ts` defines `permittedProcedure(permissions: Permission[])` middleware that:
       - Throws `UNAUTHORIZED` if `!ctx.session`
-      - Skips check if `ctx.permissions` includes `"*"` (admin wildcard)
-      - For each required permission: checks direct match, then domain wildcard (`"domain:*"`), throws `FORBIDDEN` if any missing
-    - `permittedProcedure(permissions: Permission[])` returning `t.procedure.use(requirePermissions(...permissions))`
+      - Throws `FORBIDDEN` if `!ctx.permissions` (defensive: server as strict gatekeeper; never silently pass through with empty permissions)
+      - Skips per-permission check if `ctx.permissions` includes `"*"` (admin wildcard)
+      - For each required permission: calls `hasPermission(ctx.permissions, required)`, throws `FORBIDDEN` if any missing
   - **Acceptance**:
     - User with matching permission → passes
     - User without matching permission → `FORBIDDEN`
+    - User with empty `ctx.permissions` (e.g. session exists but no `roleId`) → `FORBIDDEN` (defensive)
     - User with `"*"` → any check passes
     - User with `"leads:*"` → `leads:read`, `leads:write`, `leads:delete` pass
     - Unauthenticated → `UNAUTHORIZED`
   - **Est. lines**: ~80
   - **Depends on**: T3.1 (needs `ctx.permissions` and `ctx.session`)
+  - **Note**: Decision A — server as strict gatekeeper across all layers. Co-located with `protectedProcedure` to keep auth middleware together; pure helper stays separate for testability.
 
 #### T5.1 Create leads router with permission gates
 
