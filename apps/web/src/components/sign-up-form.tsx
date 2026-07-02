@@ -1,5 +1,5 @@
 import { Button } from "@crm-fran/ui/components/button";
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -17,7 +17,7 @@ import { authClient } from "@/lib/auth-client";
 
 import Loader from "./loader";
 
-export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () => void }) {
+export default function SignUpForm() {
   const router = useRouter();
   const { isPending } = authClient.useSession();
 
@@ -26,7 +26,7 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
       email: "",
       password: "",
       name: "",
-      role: ""
+      role: "",
     },
     onSubmit: async ({ value }) => {
       await authClient.signUp.email(
@@ -34,7 +34,7 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
           email: value.email,
           password: value.password,
           name: value.name,
-          role: value.role as "caller" | "admin" | "closer"
+          roleId: value.role,
         },
         {
           onSuccess: () => {
@@ -128,16 +128,16 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
                   name={field.name}
                   value={field.state.value}
                   onValueChange={(value) =>
-                    field.handleChange(value ?? "caller")
+                    field.handleChange(value ?? "role-caller")
                   }
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select a role" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="caller">Caller</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="closer">Close</SelectItem>
+                    <SelectItem value="role-caller">Caller</SelectItem>
+                    <SelectItem value="role-admin">Admin</SelectItem>
+                    <SelectItem value="role-closer">Close</SelectItem>
                   </SelectContent>
                 </Select>
                 {field.state.meta.errors.map((error) => (
@@ -194,7 +194,7 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
       <div className="mt-4 text-center">
         <Button
           variant="link"
-          onClick={onSwitchToSignIn}
+          onClick={() => router.push("/login")}
           className="text-indigo-600 hover:text-indigo-800"
         >
           Already have an account? Sign In

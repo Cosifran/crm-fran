@@ -1,5 +1,42 @@
 import { relations } from "drizzle-orm";
-import { pgTable, text, timestamp, boolean, index, integer, json } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  timestamp,
+  boolean,
+  index,
+  integer,
+  json,
+} from "drizzle-orm/pg-core";
+
+export type Permission =
+  | "leads:read"
+  | "leads:write"
+  | "leads:delete"
+  | "leads:*"
+  | "reports:read"
+  | "users:*"
+  | "users:read"
+  | "users:write"
+  | "users:delete"
+  | "users:create"
+  | "users:update"
+  | "profile:read"
+  | "profile:write"
+  | "profile:*"
+  | "alerts:read"
+  | "alerts:write"
+  | "alerts:delete"
+  | "alerts:*"
+  | "settings:read"
+  | "settings:write"
+  | "*";
+
+export type ResolvedRole = {
+  id: string;
+  name: string;
+  permissions: Permission[];
+};
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -7,7 +44,10 @@ export const user = pgTable("user", {
   email: text("email").notNull().unique(),
   emailVerified: boolean("email_verified").default(false).notNull(),
   image: text("image"),
-  roleId: text("role_id").references(() => roles.id).notNull(),
+  roleId: text("role_id")
+    .references(() => roles.id)
+    .$default(() => "role-caller")
+    .notNull(),
   leadActive: text("lead_active"),
   scoring: integer("scoring"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -108,4 +148,8 @@ export const accountRelations = relations(account, ({ one }) => ({
     fields: [account.userId],
     references: [user.id],
   }),
+}));
+
+export const rolesRelations = relations(roles, ({ many }) => ({
+  users: many(user),
 }));

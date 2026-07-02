@@ -91,7 +91,7 @@ DB Layer         Server Layer      UI Layer
 
 #### T1.1 Add `$default()` on `roleId` column
 
-- [ ] T1.1 — Add `$default(() => "role-caller")` to the `roleId` column definition in `packages/db/src/schema/auth.ts`
+- [x] T1.1 — Add `$default(() => "role-caller")` to the `roleId` column definition in `packages/db/src/schema/auth.ts`
   - **Files**: `packages/db/src/schema/auth.ts`
   - **Change**: Insert `.$default(() => "role-caller")` between `references(() => roles.id)` and `.notNull()` on the `roleId` column
   - **Acceptance**: After change, `user.roleId` has `$default(() => "role-caller")` in Drizzle schema. New inserts without `roleId` get `"role-caller"`.
@@ -100,7 +100,7 @@ DB Layer         Server Layer      UI Layer
 
 #### T1.2 Export `Permission` and `ResolvedRole` types
 
-- [ ] T1.2 — Add the `Permission` union type and `ResolvedRole` interface at the top of `packages/db/src/schema/auth.ts` (before table definitions)
+- [x] T1.2 — Add the `Permission` union type and `ResolvedRole` interface at the top of `packages/db/src/schema/auth.ts` (before table definitions)
   - **Files**: `packages/db/src/schema/auth.ts`
   - **Change**: Add `Permission` union (16 variants + wildcards) and `ResolvedRole` interface
   - **Acceptance**: Both types are exported from `@crm-fran/db/schema/auth`. TypeScript `--noEmit` passes when importing either type.
@@ -109,7 +109,7 @@ DB Layer         Server Layer      UI Layer
 
 #### T1.3 Add `rolesRelations` inverse relationship
 
-- [ ] T1.3 — Define `rolesRelations` in `packages/db/src/schema/auth.ts` to provide the inverse relation from `roles` → `users`
+- [x] T1.3 — Define `rolesRelations` in `packages/db/src/schema/auth.ts` to provide the inverse relation from `roles` → `users`
   - **Files**: `packages/db/src/schema/auth.ts`
   - **Change**: Add `export const rolesRelations = relations(roles, ({ many }) => ({ users: many(user) }));` after the existing `userRelations` block
   - **Acceptance**: `rolesRelations` is exported and TypeScript resolves `db.query.roles.findMany({ with: { users: true } })` without error.
@@ -118,16 +118,16 @@ DB Layer         Server Layer      UI Layer
 
 #### T1.4 Create seed script
 
-- [ ] T1.4 — Create `packages/db/src/seed.ts` with seed data for the three roles: `role-caller`, `role-closer`, `role-admin`
-  - **Files**: `packages/db/src/seed.ts` (NEW)
+- [x] T1.4 — Create `packages/db/src/seed/auth/authSeed.ts` with seed data for the three roles: `role-caller`, `role-closer`, `role-admin`
+  - **Files**: `packages/db/src/seed/auth/authSeed.ts` (NEW)
   - **Content**: Use `db.insert(roles).values(...).onConflictDoNothing()` to insert the three roles with their exact permission sets from the spec
-  - **Acceptance**: Running `pnpm --filter @crm-fran/db tsx src/seed.ts` inserts exactly 3 rows into the `roles` table. Idempotent: running it twice does not create duplicates.
+  - **Acceptance**: Running `pnpm --filter @crm-fran/db exec pnpm dlx tsx src/seed/auth/authSeed.ts` inserts exactly 3 rows into the `roles` table. Idempotent: running it twice does not create duplicates.
   - **Est. lines**: ~50
   - **Depends on**: T1.1, T1.2
 
 #### T1.5 Generate and customize Drizzle migration
 
-- [ ] T1.5 — Run `drizzle-kit generate` to produce migration 0002, then customise it to ensure seed + backfill happen before column drop
+- [x] T1.5 — Run `drizzle-kit generate` to produce migration 0002, then customise it to ensure seed + backfill happen before column drop
   - **Files**: `packages/db/src/migrations/0002_<generated_tag>.sql` (generated + hand-edited), `packages/db/src/migrations/meta/0002_snapshot.json` (generated)
   - **Steps**:
     1. Run `pnpm --filter @crm-fran/db exec drizzle-kit generate` to capture schema diff (creates `roles` table, adds `role_id`, drops `role`)
@@ -152,16 +152,17 @@ DB Layer         Server Layer      UI Layer
 
 #### T2.1 Update Better Auth `additionalFields` for `roleId`
 
-- [ ] T2.1 — Update `packages/auth/src/index.ts` to add `required: false` and `defaultValue: "role-caller"` to the `roleId` additional field config
+- [x] T2.1 — Update `packages/auth/src/index.ts` to add `required: true` and `defaultValue: "role-caller"` to the `roleId` additional field config (defense in depth at API boundary)
   - **Files**: `packages/auth/src/index.ts`
-  - **Change**: Update the `roleId` block in `additionalFields` from `{ type: "string", input: true }` to `{ type: "string", input: true, required: false, defaultValue: "role-caller" }`
-  - **Acceptance**: Sign-up without sending `roleId` gets the server-side default. Sign-up with `roleId: "role-closer"` uses that value. `session.user.roleId` is always a string.
+  - **Change**: Update the `roleId` block in `additionalFields` from `{ type: "string", input: true }` to `{ type: "string", input: true, required: true, defaultValue: "role-caller" }`
+  - **Acceptance**: Sign-up without `roleId` is rejected by Better Auth (defense in depth at API boundary). Sign-up with `roleId: "role-closer"` uses that value. `session.user.roleId` is always a string. Frontend form (`sign-up-form.tsx`) sends `roleId` from the role selector.
   - **Est. lines**: ~5 changed
   - **Depends on**: PR 1 (types and schema must exist)
+  - **Note**: Decision A — server as strict gatekeeper. `required: true` enforces at the API boundary; `defaultValue` is a DB safety net for direct inserts/migrations.
 
 #### T3.1 Enhance tRPC context with role/permission resolution
 
-- [ ] T3.1 — Modify `packages/api/src/context.ts` to resolve the user's `ResolvedRole` and `Permission[]` from the database, adding `role` and `permissions` to the context
+- [x] T3.1 — Modify `packages/api/src/context.ts` to resolve the user's `ResolvedRole` and `Permission[]` from the database, adding `role` and `permissions` to the context
   - **Files**: `packages/api/src/context.ts`
   - **Changes**:
     1. Import `db` from `@crm-fran/db` (singleton)
@@ -178,26 +179,29 @@ DB Layer         Server Layer      UI Layer
 
 #### T4.1 Create permission middleware
 
-- [ ] T4.1 — Create `packages/api/src/permissions.ts` with `requirePermissions()` middleware factory and `permittedProcedure()` convenience builder
-  - **Files**: `packages/api/src/permissions.ts` (NEW)
+- [x] T4.1 — Implement permission enforcement in `packages/api/src/trpc/trpc.ts` (decision A: keep middleware co-located with `protectedProcedure`; `packages/api/src/permissions.ts` stays as a pure-helper file with only `hasPermission`)
+  - **Files**: `packages/api/src/trpc/trpc.ts` (modify), `packages/api/src/permissions.ts` (existing)
   - **Content**:
-    - `requirePermissions(...required: Permission[])` returning a `t.middleware` that:
+    - `packages/api/src/permissions.ts` exports `hasPermission(userPerms: Permission[], required: Permission): boolean` pure helper that handles admin wildcard (`"*"`), direct match, and domain wildcard (`"domain:*"`)
+    - `packages/api/src/trpc/trpc.ts` defines `permittedProcedure(permissions: Permission[])` middleware that:
       - Throws `UNAUTHORIZED` if `!ctx.session`
-      - Skips check if `ctx.permissions` includes `"*"` (admin wildcard)
-      - For each required permission: checks direct match, then domain wildcard (`"domain:*"`), throws `FORBIDDEN` if any missing
-    - `permittedProcedure(permissions: Permission[])` returning `t.procedure.use(requirePermissions(...permissions))`
+      - Throws `FORBIDDEN` if `!ctx.permissions` (defensive: server as strict gatekeeper; never silently pass through with empty permissions)
+      - Skips per-permission check if `ctx.permissions` includes `"*"` (admin wildcard)
+      - For each required permission: calls `hasPermission(ctx.permissions, required)`, throws `FORBIDDEN` if any missing
   - **Acceptance**:
     - User with matching permission → passes
     - User without matching permission → `FORBIDDEN`
+    - User with empty `ctx.permissions` (e.g. session exists but no `roleId`) → `FORBIDDEN` (defensive)
     - User with `"*"` → any check passes
     - User with `"leads:*"` → `leads:read`, `leads:write`, `leads:delete` pass
     - Unauthenticated → `UNAUTHORIZED`
   - **Est. lines**: ~80
   - **Depends on**: T3.1 (needs `ctx.permissions` and `ctx.session`)
+  - **Note**: Decision A — server as strict gatekeeper across all layers. Co-located with `protectedProcedure` to keep auth middleware together; pure helper stays separate for testability.
 
 #### T5.1 Create leads router with permission gates
 
-- [ ] T5.1 — Create `packages/api/src/routers/leads.ts` with 5 procedures (list, getById, create, update, delete) each using `permittedProcedure()` with appropriate permissions
+- [x] T5.1 — Create `packages/api/src/routers/leads.ts` with 5 procedures (list, getById, create, update, delete) each using `permittedProcedure()` with appropriate permissions
   - **Files**: `packages/api/src/routers/leads.ts` (NEW)
   - **Content**: 5 procedures:
     - `list`: `permittedProcedure(["leads:read"])` → returns `[]` (stub)
@@ -211,7 +215,7 @@ DB Layer         Server Layer      UI Layer
 
 #### T5.2 Create auth router with `getMyPermissions` procedure
 
-- [ ] T5.2 — Create `packages/api/src/routers/auth.ts` with a `getMyPermissions` procedure that returns the current user's role and permissions
+- [x] T5.2 — Create `packages/api/src/routers/auth.ts` with a `getMyPermissions` procedure that returns the current user's role and permissions
   - **Files**: `packages/api/src/routers/auth.ts` (NEW)
   - **Content**:
     - `getMyPermissions`: `permittedProcedure([])` → returns `{ role: ctx.role, permissions: ctx.permissions }`
@@ -222,7 +226,7 @@ DB Layer         Server Layer      UI Layer
 
 #### T5.3 Update router index to register new routers and upgrade privateData
 
-- [ ] T5.3 — Update `packages/api/src/routers/index.ts` to register `leadsRouter` and `authRouter`, and upgrade `privateData` to use `permittedProcedure(["profile:read"])`
+- [x] T5.3 — Update `packages/api/src/routers/index.ts` to register `leadsRouter` and `authRouter`, and upgrade `privateData` to use `permittedProcedure(["profile:read"])`
   - **Files**: `packages/api/src/routers/index.ts`
   - **Changes**:
     1. Import `leadsRouter`, `authRouter`, `permittedProcedure`

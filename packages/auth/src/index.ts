@@ -19,6 +19,8 @@ export function createAuth() {
         roleId: {
           type: "string",
           input: true,
+          required: true,
+          defaultValue: "role-caller",
         },
         leadActive: {
           type: "string",

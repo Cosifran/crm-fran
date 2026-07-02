@@ -7,6 +7,8 @@ import { trpc } from "@/utils/trpc";
 export default function Dashboard({ session }: { session: typeof authClient.$Infer.Session }) {
   const privateData = useQuery(trpc.privateData.queryOptions());
 
+  console.log(privateData);
+
   return (
     <>
       <p>API: {privateData.data?.message}</p>
