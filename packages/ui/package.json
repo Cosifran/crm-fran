@@ -8,6 +8,8 @@
     "./lib/*": "./src/lib/*.ts",
     "./components/*": "./src/components/*.tsx",
     "./hooks/*": "./src/hooks/*.ts",
+    "./permissions": "./src/permissions/index.ts",
+    "./permissions/*": "./src/permissions/*.tsx",
     "./postcss.config": "./postcss.config.mjs"
   },
   "scripts": {
@@ -16,6 +18,7 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.0.0",
+    "@crm-fran/db": "workspace:*",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "catalog:",

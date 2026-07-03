@@ -291,6 +291,9 @@ importers:
       '@base-ui/react':
         specifier: ^1.0.0
         version: 1.5.0(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@crm-fran/db':
+        specifier: workspace:*
+        version: link:../db
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1

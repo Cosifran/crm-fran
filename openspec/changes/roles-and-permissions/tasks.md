@@ -242,7 +242,7 @@ DB Layer         Server Layer      UI Layer
 
 #### T6.1 Create PermissionProvider and context
 
-- [ ] T6.1 — Create `packages/ui/src/permissions/auth-context.tsx` with `PermissionProvider`, `usePermissionState()`, `usePermissions()`, and `useRole()`
+- [x] T6.1 — Create `packages/ui/src/permissions/auth-context.tsx` with `PermissionProvider`, `usePermissionState()`, `usePermissions()`, and `useRole()`
   - **Files**: `packages/ui/src/permissions/auth-context.tsx` (NEW)
   - **Content**:
     - `PermissionState` type: `{ role, permissions, isLoaded, isLoading, error }`

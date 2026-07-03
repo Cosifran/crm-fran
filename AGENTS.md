@@ -13,26 +13,6 @@ Tu rol es ser mi **mentor técnico exigente**, no un asistente que resuelve prob
 
 ---
 
-## 📐 Reglas de comportamiento
-
-1. **Nunca** me des la solución completa directamente.
-2. Divide cada problema en fases pequeñas y avanza una por una.
-3. Antes de responder, hazme **una pregunta clave** que me obligue a pensar.
-4. Si cometo un error, no lo corrijas tú — señálalo y pregúntame cómo lo corregiría yo.
-5. Aumenta la dificultad gradualmente según mi desempeño.
-6. Cuando veas malas prácticas, dímelo con el mismo tono de un code review profesional.
-7. Prioriza enseñarme **el porqué**, no solo el cómo.
-
----
-
-## 🔍 Formato de tus respuestas
-
-- **Code review**: señala línea por línea con ✅ bueno / ⚠️ mejorable / ❌ incorrecto.
-- **Conceptos nuevos**: explícalos con una analogía simple antes del código.
-- **Siguientes pasos**: termina siempre con una pregunta o un reto para mí.
-
----
-
 ## 🚫 Anti-patrones que debes evitar
 
 - No me des bloques de código completos sin que yo lo haya intentado antes.
@@ -61,6 +41,7 @@ Tu rol es ser mi **mentor técnico exigente**, no un asistente que resuelve prob
 ## 📂 Estructura clave
 
 ### Apps
+
 - `apps/web/` — Aplicación Next.js fullstack (única app desplegable).
   - `src/app/` — App Router: `layout.tsx`, `page.tsx`, `dashboard/`, `login/`.
   - `src/app/api/auth/[...all]/route.ts` — Handler de Better Auth.
@@ -70,6 +51,7 @@ Tu rol es ser mi **mentor técnico exigente**, no un asistente que resuelve prob
   - `src/utils/trpc.ts` — Cliente tRPC con `createTRPCOptionsProxy` + QueryClient.
 
 ### Packages
+
 - `packages/api/` (`@crm-fran/api`) — Routers tRPC, context, procedures (public/protected).
 - `packages/auth/` (`@crm-fran/auth`) — Instancia de Better Auth + singleton `auth`.
 - `packages/db/` (`@crm-fran/db`) — Schema Drizzle, migrations, `createDb()` + singleton `db`.
@@ -79,6 +61,7 @@ Tu rol es ser mi **mentor técnico exigente**, no un asistente que resuelve prob
 - `packages/tests/` — Placeholder para tests de integración cross-package.
 
 ### Aliases
+
 - `@/*` → `apps/web/src/*`
 - `@crm-fran/ui/*` → `packages/ui/src/*`
 
@@ -87,18 +70,21 @@ Tu rol es ser mi **mentor técnico exigente**, no un asistente que resuelve prob
 ## 🚀 Comandos de desarrollo
 
 **Root (Turborepo)**:
+
 - `pnpm dev` — Dev paralelo de todos los packages.
 - `pnpm dev:web` — Solo la app Next.js.
 - `pnpm build` — Build de producción.
 - `pnpm check-types` — Typecheck project-wide (`tsc --noEmit`).
 
 **Base de datos**:
+
 - `pnpm db:push` — Push schema a DB (dev rápido).
 - `pnpm db:generate` — Generar migration SQL.
 - `pnpm db:migrate` — Correr migrations.
 - `pnpm db:studio` — Drizzle Studio (UI para DB).
 
 **Testing**:
+
 - `pnpm -r test` — Correr tests en todos los packages (Vitest).
 - **No hay tests escritos aún**. Config existe (`vitest.workspace.ts` + `passWithNoTests`).
 
@@ -140,6 +126,7 @@ Tu rol es ser mi **mentor técnico exigente**, no un asistente que resuelve prob
 **Location**: `apps/web/.env`
 
 **Server-side** (validadas en `packages/env/src/server.ts`):
+
 - `DATABASE_URL` — PostgreSQL connection string.
 - `BETTER_AUTH_SECRET` — Min 32 chars.
 - `BETTER_AUTH_URL` — Base URL (dev: `http://localhost:3001`).
@@ -186,3 +173,4 @@ Si querés agregar tests, preguntá primero qué preferís: Vitest + Testing Lib
 ---
 
 **Última actualización**: 2026-06-16
+
