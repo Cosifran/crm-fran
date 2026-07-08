@@ -26,7 +26,7 @@ export default function SignUpForm() {
       email: "",
       password: "",
       name: "",
-      role: "",
+      roleId: "",
     },
     onSubmit: async ({ value }) => {
       await authClient.signUp.email(
@@ -34,7 +34,7 @@ export default function SignUpForm() {
           email: value.email,
           password: value.password,
           name: value.name,
-          roleId: value.role,
+          roleId: value.roleId,
         },
         {
           onSuccess: () => {
@@ -52,7 +52,7 @@ export default function SignUpForm() {
         name: z.string().min(2, "Name must be at least 2 characters"),
         email: z.email("Invalid email address"),
         password: z.string().min(8, "Password must be at least 8 characters"),
-        role: z.string().min(1, "Role is required"),
+        roleId: z.string().min(1, "Role is required"),
       }),
     },
   });
@@ -119,7 +119,7 @@ export default function SignUpForm() {
         </div>
 
         <div>
-          <form.Field name="role">
+          <form.Field name="roleId">
             {(field) => (
               <div className="space-y-2">
                 <Label htmlFor={field.name}>Role</Label>

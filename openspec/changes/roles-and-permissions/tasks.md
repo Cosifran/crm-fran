@@ -255,7 +255,7 @@ DB Layer         Server Layer      UI Layer
 
 #### T6.2 Create `<Can>` conditional render component
 
-- [ ] T6.2 — Create `packages/ui/src/permissions/can.tsx` with the `<Can>` component
+- [x] T6.2 — Create `packages/ui/src/permissions/can.tsx` with the `<Can>` component
   - **Files**: `packages/ui/src/permissions/can.tsx` (NEW)
   - **Content**:
     - Props: `{ permission: Permission, fallback?: React.ReactNode, children: React.ReactNode }`
@@ -270,28 +270,28 @@ DB Layer         Server Layer      UI Layer
 
 #### T6.3 Create `use-permissions.ts` re-export
 
-- [ ] T6.3 — Create `packages/ui/src/permissions/use-permissions.ts` that re-exports `usePermissions` from `auth-context.tsx` for clean imports
+- [x] T6.3 — Create `packages/ui/src/permissions/use-permissions.ts` that re-exports `usePermissions` from `auth-context.tsx` for clean imports
   - **Files**: `packages/ui/src/permissions/use-permissions.ts` (NEW)
   - **Est. lines**: ~5
   - **Depends on**: T6.1
 
 #### T6.4 Create `use-role.ts` re-export
 
-- [ ] T6.4 — Create `packages/ui/src/permissions/use-role.ts` that re-exports `useRole` from `auth-context.tsx` for clean imports
+- [x] T6.4 — Create `packages/ui/src/permissions/use-role.ts` that re-exports `useRole` from `auth-context.tsx` for clean imports
   - **Files**: `packages/ui/src/permissions/use-role.ts` (NEW)
   - **Est. lines**: ~5
   - **Depends on**: T6.1
 
 #### T6.5 Create permissions barrel export
 
-- [ ] T6.5 — Create `packages/ui/src/permissions/index.ts` that re-exports `PermissionProvider`, `usePermissionState`, `usePermissions`, `useRole`, `Can`, and `PermissionState`
+- [x] T6.5 — Create `packages/ui/src/permissions/index.ts` that re-exports `PermissionProvider`, `usePermissionState`, `usePermissions`, `useRole`, `Can`, and `PermissionState`
   - **Files**: `packages/ui/src/permissions/index.ts` (NEW)
   - **Est. lines**: ~10
   - **Depends on**: T6.1, T6.2, T6.3, T6.4
 
 #### T6.6 Update app providers to include PermissionProvider
 
-- [ ] T6.6 — Update `apps/web/src/components/providers.tsx` to wrap the app with `PermissionProvider`
+- [x] T6.6 — Update `apps/web/src/components/providers.tsx` to wrap the app with `PermissionProvider`
   - **Files**: `apps/web/src/components/providers.tsx`
   - **Changes**:
     1. Import `PermissionProvider` from `@crm-fran/ui/permissions`
@@ -304,7 +304,7 @@ DB Layer         Server Layer      UI Layer
 
 #### T6.7 Update sign-up form to send `roleId` instead of `role`
 
-- [ ] T6.7 — Update `apps/web/src/components/sign-up-form.tsx` to use `roleId` field name and send `roleId` instead of `role` in the auth client call
+- [x] T6.7 — Update `apps/web/src/components/sign-up-form.tsx` to use `roleId` field name and send `roleId` instead of `role` in the auth client call
   - **Files**: `apps/web/src/components/sign-up-form.tsx`
   - **Changes**:
     1. Rename form field `role` → `roleId` throughout (defaultValues, field name, validator, authClient call)
@@ -316,7 +316,7 @@ DB Layer         Server Layer      UI Layer
 
 #### T6.8 Export raw tRPC client for PermissionProvider
 
-- [ ] T6.8 — Update `apps/web/src/lib/auth-client.ts` or `apps/web/src/utils/trpc.ts` to export the raw `trpcClient` so that `PermissionProvider` can call the `auth.getMyPermissions` procedure directly (not via OptionsProxy)
+- [x] T6.8 — Update `apps/web/src/lib/auth-client.ts` or `apps/web/src/utils/trpc.ts` to export the raw `trpcClient` so that `PermissionProvider` can call the `auth.getMyPermissions` procedure directly (not via OptionsProxy)
   - **Files**: `apps/web/src/utils/trpc.ts`
   - **Changes**: Add `export { trpcClient };` at the bottom (the raw client already exists in the file)
   - **Acceptance**: `import { trpcClient } from "@/utils/trpc"` resolves and `trpcClient.auth.getMyPermissions.query()` returns a promise.
