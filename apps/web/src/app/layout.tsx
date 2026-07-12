@@ -4,9 +4,10 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "../index.css";
 import Header from "@/components/header";
 import Providers from "@/components/providers";
+import { ActiveTitle } from "@/components/active-title";
 
 import { SiteHeader } from "@crm-fran/ui/components/site-header";
-import { AppSidebar } from "@crm-fran/ui/components/app-sidebar";
+import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider } from "@crm-fran/ui/components/sidebar";
 
 const geistSans = Geist({
@@ -45,7 +46,9 @@ export default function RootLayout({
           >
             <AppSidebar variant="inset" />
             <SidebarInset>
-              <SiteHeader />
+              <SiteHeader>
+                <ActiveTitle />
+              </SiteHeader>
               <div className="flex flex-1 flex-col"> {children}</div>
             </SidebarInset>
           </SidebarProvider>
