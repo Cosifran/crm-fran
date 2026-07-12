@@ -22,6 +22,20 @@
       "when": 1782190215348,
       "tag": "0002_same_tusk",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1783745090103,
+      "tag": "0003_unusual_ink",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1783814649745,
+      "tag": "0004_marvelous_blizzard",
+      "breakpoints": true
     }
   ]
 }

@@ -8,6 +8,7 @@ import {
   integer,
   json,
 } from "drizzle-orm/pg-core";
+import { leads } from "./leads";
 
 export type Permission =
   | "leads:read"
@@ -134,6 +135,8 @@ export const userRelations = relations(user, ({ many, one }) => ({
     fields: [user.roleId],
     references: [roles.id],
   }),
+  leadsAsCaller: many(leads, { relationName: "caller" }),
+  leadsAsCloser: many(leads, { relationName: "closer" }),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({

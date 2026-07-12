@@ -12,6 +12,7 @@
   "scripts": {
     "test": "vitest run",
     "db:push": "drizzle-kit push",
+    "db:seed": "tsx scripts/seed.ts",
     "db:generate": "drizzle-kit generate",
     "db:studio": "drizzle-kit studio",
     "db:migrate": "drizzle-kit migrate"
@@ -25,8 +26,10 @@
   },
   "devDependencies": {
     "@crm-fran/config": "workspace:*",
+    "@faker-js/faker": "^10.5.0",
     "@types/pg": "^8.16.0",
     "drizzle-kit": "^0.31.8",
+    "tsx": "^4.23.0",
     "typescript": "catalog:"
   }
 }

@@ -22,6 +22,15 @@ export const leadsRouter = router({
       return null;
     }),
 
+  assignLeadToUser: permittedProcedure(["leads:write"])
+    .input(z.object({ id: z.string(), userId: z.string() }))
+    .mutation(async ({ input }) => {
+      console.log(
+        `[stub] assignLeadToUser called with id: ${input.id} and userId: ${input.userId}`,
+      );
+      return { id: "stub", userId: input.userId };
+    }),
+
   create: permittedProcedure(["leads:write"])
     .input(createLeadInput)
     .mutation(async ({ input }) => {
