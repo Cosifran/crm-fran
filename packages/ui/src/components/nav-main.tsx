@@ -12,17 +12,21 @@ import { CirclePlusIcon, MailIcon } from "lucide-react"
 
 export function NavMain({
   items,
+  LinkComponent = "a",
+  currentPathname,
 }: {
   items: {
     title: string
     url: string
     icon?: React.ReactNode
   }[]
+  LinkComponent?: React.ComponentType<any> | string
+  currentPathname?: string
 }) {
   return (
     <SidebarGroup>
       <SidebarGroupContent className="flex flex-col gap-2">
-        <SidebarMenu>
+        {/* <SidebarMenu>
           <SidebarMenuItem className="flex items-center gap-2">
             <SidebarMenuButton
               tooltip="Quick Create"
@@ -42,16 +46,26 @@ export function NavMain({
               <span className="sr-only">Inbox</span>
             </Button>
           </SidebarMenuItem>
-        </SidebarMenu>
+        </SidebarMenu> */}
         <SidebarMenu>
-          {items.map((item) => (
-            <SidebarMenuItem key={item.title}>
-              <SidebarMenuButton tooltip={item.title}>
-                {item.icon}
-                <span>{item.title}</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
+          {items.map((item) => {
+            const isActive =
+              currentPathname === item.url ||
+              (item.url !== "/" && currentPathname?.startsWith(item.url))
+            return (
+              <SidebarMenuItem key={item.title}>
+                <SidebarMenuButton
+                  tooltip={item.title}
+                  render={<LinkComponent href={item.url} />}
+                  isActive={isActive}
+                  className={isActive ? "bg-blue-100 text-blue-700 font-bold" : ""}
+                >
+                  {item.icon}
+                  <span>{item.title}</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )
+          })}
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>

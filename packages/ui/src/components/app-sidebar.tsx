@@ -15,7 +15,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@crm-fran/ui/components/sidebar"
-import { LayoutDashboardIcon, ListIcon, ChartBarIcon, FolderIcon, UsersIcon, CameraIcon, FileTextIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, CommandIcon } from "lucide-react"
+import { HouseIcon, ChartBarIcon, FlameIcon, CalendarIcon, TrophyIcon, MessageSquareIcon, ChartColumnIcon, UsersIcon, CameraIcon, FileTextIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, CommandIcon } from "lucide-react"
 
 const data = {
   user: {
@@ -26,41 +26,65 @@ const data = {
   navMain: [
     {
       title: "Dashboard",
-      url: "#",
+      url: "/",
       icon: (
-        <LayoutDashboardIcon
+        <HouseIcon
         />
       ),
     },
     {
-      title: "Lifecycle",
-      url: "#",
+      title: "Usuarios",
+      url: "/users",
       icon: (
-        <ListIcon
+        <UsersIcon
         />
       ),
     },
     {
-      title: "Analytics",
-      url: "#",
+      title: "Leads",
+      url: "/leads",
       icon: (
         <ChartBarIcon
         />
       ),
     },
     {
-      title: "Projects",
-      url: "#",
+      title: "Analitica",
+      url: "/analytical",
       icon: (
-        <FolderIcon
+        <ChartColumnIcon
         />
       ),
     },
     {
-      title: "Team",
-      url: "#",
+      title: "Campañas",
+      url: "/campaigns",
       icon: (
-        <UsersIcon
+        <FlameIcon
+        />
+      ),
+    },
+    {
+      title: "Calendario",
+      url: "/calendar",
+      icon: (
+        <CalendarIcon
+        />
+      ),
+    },
+    {
+      title: "Ranking",
+      url: "/ranking",
+      icon: (
+        <TrophyIcon
+        />
+      ),
+    },
+    {
+      title: "Tickets",
+      url: "/tickets",
+      icon: (
+        <MessageSquareIcon
         />
       ),
     },
@@ -175,7 +199,14 @@ const data = {
     },
   ],
 }
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export function AppSidebar({
+  LinkComponent = "a",
+  currentPathname,
+  ...props
+}: React.ComponentProps<typeof Sidebar> & {
+  LinkComponent?: React.ComponentType<any> | string
+  currentPathname?: string
+}) {
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -183,7 +214,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenuItem>
             <SidebarMenuButton
               className="data-[slot=sidebar-menu-button]:p-1.5!"
-              render={<a href="#" />}
+              render={<LinkComponent href="#" />}
             >
               <CommandIcon className="size-5!" />
               <span className="text-base font-semibold">CRM-FRAN</span>
@@ -192,9 +223,19 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
+        <NavMain
+          items={data.navMain}
+          LinkComponent={LinkComponent}
+          currentPathname={currentPathname}
+        />
         {/* <NavDocuments items={data.documents} /> */}
-        <NavSecondary items={data.navSecondary} className="mt-auto" />
+
+        <NavSecondary
+          items={data.navSecondary}
+          LinkComponent={LinkComponent}
+          currentPathname={currentPathname}
+          className="mt-auto"
+        />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={data.user} />

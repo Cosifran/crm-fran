@@ -18,9 +18,9 @@ export default function SignUpPage() {
     return <Loader />;
   }
 
-  if (!hasPermission(data?.permissions || [], ["users:create"])) {
-    redirect("/login");
-  }
+ // if (!hasPermission(data?.permissions || [], ["users:create"])) {
+ //   redirect("/login");
+  //}
 
   return <SignUpForm />;
 }
