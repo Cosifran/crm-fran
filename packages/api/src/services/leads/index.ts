@@ -1,5 +1,7 @@
+import { getAll } from "./get-all";
 import { getWithoutAssigned } from "./get-without-assigned";
 
-export  {
+export {
+  getAll,
   getWithoutAssigned,
 };

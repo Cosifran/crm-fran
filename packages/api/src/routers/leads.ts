@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { router } from "../index";
-import { getWithoutAssigned } from "@crm-fran/api/services/leads/index";
+import { getAll, getWithoutAssigned } from "@crm-fran/api/services/leads/index";
 import { permittedProcedure } from "@crm-fran/api/trpc/trpc";
 
 const idInput = z.object({ id: z.string() });
@@ -13,7 +13,7 @@ const updateLeadInput = createLeadInput.partial().extend({ id: z.string() });
 
 export const leadsRouter = router({
   listAll: permittedProcedure(["leads:read"]).query(async () => {
-    return [];
+    return await getAll();
   }),
 
   listWithoutAassigned: permittedProcedure(["leads:read"]).query(async () => {
