@@ -202,10 +202,18 @@ const data = {
 export function AppSidebar({
   LinkComponent = "a",
   currentPathname,
+  user,
+  onSignOut,
   ...props
 }: React.ComponentProps<typeof Sidebar> & {
   LinkComponent?: React.ComponentType<any> | string
   currentPathname?: string
+  user?: {
+    name: string
+    email: string
+    avatar: string
+  }
+  onSignOut?: () => void
 }) {
   return (
     <Sidebar collapsible="offcanvas" {...props}>
@@ -238,7 +246,7 @@ export function AppSidebar({
         />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser user={user ?? data.user} onSignOut={onSignOut} />
       </SidebarFooter>
     </Sidebar>
   )
