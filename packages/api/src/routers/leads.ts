@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { router } from "../index";
-import { getAll, getWithoutAssigned } from "@crm-fran/api/services/leads/index";
+import { getAll, getWithoutAssigned } from "../leads/services/index";
 import { permittedProcedure } from "@crm-fran/api/trpc/trpc";
 
 const idInput = z.object({ id: z.string() });
@@ -24,6 +24,20 @@ export const leadsRouter = router({
     .input(idInput)
     .query(async ({ input }) => {
       console.log(`[stub] getById called with id: ${input.id}`);
+      return null;
+    }),
+
+  listByCloser: permittedProcedure(["leads:read"])
+    .input(idInput)
+    .query(async ({ input }) => {
+      console.log(`[stub] listByCloser called with id: ${input.id}`);
+      return null;
+    }),
+
+  listByCaller: permittedProcedure(["leads:read"])
+    .input(idInput)
+    .query(async ({ input }) => {
+      console.log(`[stub] listByCaller called with id: ${input.id}`);
       return null;
     }),
 
