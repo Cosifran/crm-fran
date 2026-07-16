@@ -104,6 +104,12 @@ export const schema = z.object({
   reviewer: z.string(),
 })
 
+interface DataTableProps<TData> {
+  data: TData[]
+  columns: ColumnDef<TData>[]
+  getRowId: (row: TData) => UniqueIdentifier
+}
+
 // Create a separate component for the drag handle
 function DragHandle({ id }: { id: number }) {
   const { attributes, listeners } = useSortable({
@@ -306,9 +312,9 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
     ),
   },
 ]
-function DraggableRow({ row }: { row: Row<z.infer<typeof schema>> }) {
+function DraggableRow<TData>({ row }: { row: Row<TData> }) {
   const { transform, transition, setNodeRef, isDragging } = useSortable({
-    id: row.original.id,
+    id: row.id
   })
   return (
     <TableRow
@@ -329,12 +335,12 @@ function DraggableRow({ row }: { row: Row<z.infer<typeof schema>> }) {
     </TableRow>
   )
 }
-export function DataTable({
-  data: initialData,
-}: {
-  data: z.infer<typeof schema>[]
-}) {
+export function DataTable<TData>({ data: initialData, columns, getRowId }: DataTableProps<TData>) {
+
   const [data, setData] = React.useState(() => initialData)
+  React.useEffect(() => {
+    setData(initialData)
+  }, [initialData])
   const [rowSelection, setRowSelection] = React.useState({})
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({})
@@ -353,8 +359,8 @@ export function DataTable({
     useSensor(KeyboardSensor, {})
   )
   const dataIds = React.useMemo<UniqueIdentifier[]>(
-    () => data?.map(({ id }) => id) || [],
-    [data]
+    () => data.map(getRowId),
+    [data, getRowId]
   )
   const table = useReactTable({
     data,
@@ -366,7 +372,7 @@ export function DataTable({
       columnFilters,
       pagination,
     },
-    getRowId: (row) => row.id.toString(),
+    getRowId: (row) => String(getRowId(row)),
     enableRowSelection: true,
     onRowSelectionChange: setRowSelection,
     onSortingChange: setSorting,
