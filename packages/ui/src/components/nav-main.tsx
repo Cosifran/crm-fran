@@ -1,6 +1,5 @@
 "use client"
 
-import { Button } from "@crm-fran/ui/components/button"
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -8,7 +7,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@crm-fran/ui/components/sidebar"
-import { CirclePlusIcon, MailIcon } from "lucide-react"
 
 export function NavMain({
   items,

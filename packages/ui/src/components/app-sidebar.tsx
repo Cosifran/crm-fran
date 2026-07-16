@@ -2,7 +2,6 @@
 
 import * as React from "react"
 
-import { NavDocuments } from "@crm-fran/ui/components/nav-documents"
 import { NavMain } from "@crm-fran/ui/components/nav-main"
 import { NavSecondary } from "@crm-fran/ui/components/nav-secondary"
 import { NavUser } from "@crm-fran/ui/components/nav-user"
