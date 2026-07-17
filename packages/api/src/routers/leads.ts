@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { router } from "../index";
-import { getAll, getWithoutAssigned } from "../leads/services/index";
+import {
+  getAll,
+  getById,
+  assignLeadToCaller,
+  getWithoutAssigned
+} from "../leads/services/index";
 import { permittedProcedure } from "@crm-fran/api/trpc/trpc";
 
 const idInput = z.object({ id: z.string() });
@@ -16,15 +21,14 @@ export const leadsRouter = router({
     return await getAll();
   }),
 
-  listWithoutAassigned: permittedProcedure(["leads:read"]).query(async () => {
+  listWithoutAssigned: permittedProcedure(["leads:read"]).query(async () => {
     return await getWithoutAssigned();
   }),
 
   getById: permittedProcedure(["leads:read"])
     .input(idInput)
     .query(async ({ input }) => {
-      console.log(`[stub] getById called with id: ${input.id}`);
-      return null;
+      return await getById({ id: input.id });
     }),
 
   listByCloser: permittedProcedure(["leads:read"])
@@ -41,13 +45,10 @@ export const leadsRouter = router({
       return null;
     }),
 
-  assignLeadToUser: permittedProcedure(["leads:write"])
-    .input(z.object({ id: z.string(), userId: z.string() }))
-    .mutation(async ({ input }) => {
-      console.log(
-        `[stub] assignLeadToUser called with id: ${input.id} and userId: ${input.userId}`,
-      );
-      return { id: "stub", userId: input.userId };
+  assignLeadToCaller: permittedProcedure(["leads:write"])
+    .input(z.object({ id: z.string()}))
+    .mutation(async ({ctx,  input }) => {
+      return await assignLeadToCaller({ id: input.id, userId: ctx.session.user.id});
     }),
 
   create: permittedProcedure(["leads:write"])

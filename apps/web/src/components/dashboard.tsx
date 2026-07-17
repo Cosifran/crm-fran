@@ -9,7 +9,9 @@ import { dashboardData } from "@/constants/constanst";
 import { leadColumns } from "@/features/table/columns";
 
 export default function Dashboard() {
-  const leadsWithoutAssigned = useQuery(trpc.leads.listWithoutAassigned.queryOptions());
+  const leadsWithoutAssigned = useQuery(
+    trpc.leads.listWithoutAssigned.queryOptions(),
+  );
 
   console.log(leadsWithoutAssigned.data)
 
