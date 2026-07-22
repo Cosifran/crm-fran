@@ -5,7 +5,6 @@ import { useQuery } from "@tanstack/react-query";
 import { DataTable } from "@crm-fran/ui/components/data-table";
 import { SectionCards } from "@crm-fran/ui/components/section-cards";
 import { ChartAreaInteractive } from "@crm-fran/ui/components/chart-area-interactive";
-import { dashboardData } from "@/constants/constanst";
 import { leadColumns } from "@/features/table/columns";
 
 export default function Dashboard() {
@@ -13,7 +12,7 @@ export default function Dashboard() {
     trpc.leads.listWithoutAssigned.queryOptions(),
   );
 
-  console.log(leadsWithoutAssigned.data)
+  console.log(leadsWithoutAssigned.data);
 
   return (
     <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">

@@ -17,8 +17,26 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@crm-fran/ui/components/dialog";
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@crm-fran/ui/components/drawer";
+
 import { UserRoundPlus } from "lucide-react";
+import z from "zod";
+import { toast } from "sonner";
+import { useRouter } from "next/navigation";
+import { useForm } from "@tanstack/react-form";
+import { Input } from "@crm-fran/ui/components/input";
+import { Label } from "@crm-fran/ui/components/label";
 import { Button } from "@crm-fran/ui/components/button";
+
 export interface Lead {
   id: string;
   name: string;
@@ -32,48 +50,62 @@ export interface Lead {
   createdAt: string;
   updatedAt: string;
 }
+
 import AssignLeadButton from "@/components/assign-lead-button";
 import { useState } from "react";
 
 const AssignLeadDialog = ({ leadId }: { leadId: string }) => {
   const [openDialog, setOpenDialog] = useState(false);
+
+  const form = useForm({
+    defaultValues: {
+      question1: "",
+      question2: "",
+      question3: "",
+      question4: "",
+    },
+    onSubmit: async ({ value }) => {
+    console.log(value);
+    },
+    validators: {
+      onSubmit: z.object({
+        question1: z.string().min(1, "Question 1 is required"),
+        question2: z.string().min(1, "Question 2 is required"),
+        question3: z.string().min(1, "Question 3 is required"),
+        question4: z.string().min(1, "Question 4 is required"),
+      }),
+    },
+  });
+
   return (
-    <Dialog open={openDialog} onOpenChange={setOpenDialog}>
-      <DialogTrigger
-        render={
-          <Button variant="outline" onClick={() => setOpenDialog(true)}>
-            <UserRoundPlus />
-          </Button>
-        }
-      />
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>CONFIRMAR</DialogTitle>
-          <DialogDescription>
-            ¿Estás seguro de assignar este lead?
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter className="sm:justify-start">
-          <DialogClose
-            render={
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setOpenDialog(false)}
-              >
-                Close
-              </Button>
-            }
-          />
-          <AssignLeadButton
-            leadId={leadId}
-            closeDialog={() => setOpenDialog(false)}
-          >
-            Confirmar
-          </AssignLeadButton>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <>
+      <Drawer
+        open={openDialog}
+        onOpenChange={setOpenDialog}
+        swipeDirection={"right"}
+      >
+        <DrawerTrigger
+          render={
+            <Button variant="outline" onClick={() => setOpenDialog(true)}>
+              <UserRoundPlus />
+            </Button>
+          }
+        />
+        <DrawerContent>
+          <DrawerHeader>
+            <DrawerTitle>Are you absolutely sure?</DrawerTitle>
+            <DrawerDescription>This action cannot be undone.</DrawerDescription>
+          </DrawerHeader>
+          <div className="p-4">{/* Content here */}</div>
+          <DrawerFooter>
+            <Button>Submit</Button>
+            <DrawerClose render={<Button variant="outline" />}>
+              Cancel
+            </DrawerClose>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
+    </>
   );
 };
 
