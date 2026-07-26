@@ -3,6 +3,7 @@ import { router } from "../index";
 import {
   getAll,
   getById,
+  getByUserId,
   assignLeadToCaller,
   getWithoutAssigned
 } from "../leads/services/index";
@@ -32,10 +33,8 @@ export const leadsRouter = router({
     }),
 
   listByUserId: permittedProcedure(["leads:read"])
-    .input(idInput)
-    .query(async ({ input }) => {
-      console.log(`[stub] listByUserId called with id: ${input.id}`);
-      return null;
+    .query(async ({ ctx }) => {
+      return await getByUserId({ userId: ctx.session.user.id });
     }),
 
   assignLeadToCaller: permittedProcedure(["leads:write"])

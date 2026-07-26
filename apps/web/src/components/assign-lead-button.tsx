@@ -34,6 +34,9 @@ export default function AssignLeadButton({
           queryClient.invalidateQueries({
             queryKey: trpc.leads.listWithoutAssigned.queryKey(),
           });
+          queryClient.invalidateQueries({
+            queryKey: trpc.leads.listByUserId.queryKey(),
+          });
           closeDialog();
         },
         onError: (error) => {
