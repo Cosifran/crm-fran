@@ -14,7 +14,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@crm-fran/ui/components/sidebar"
-import { HouseIcon, ChartBarIcon, FlameIcon, CalendarIcon, TrophyIcon, MessageSquareIcon, ChartColumnIcon, UsersIcon, CameraIcon, FileTextIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, CommandIcon } from "lucide-react"
+import { CircleAlertIcon, HouseIcon, ChartBarIcon, FlameIcon, CalendarIcon, TrophyIcon, MessageSquareIcon, ChartColumnIcon, UsersIcon, CameraIcon, FileTextIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, CommandIcon } from "lucide-react"
 
 const data = {
   user: {
@@ -31,14 +31,14 @@ const data = {
         />
       ),
     },
-    {
-      title: "Usuarios",
-      url: "/users",
-      icon: (
-        <UsersIcon
-        />
-      ),
-    },
+    /*  {
+       title: "Usuarios",
+       url: "/users",
+       icon: (
+         <UsersIcon
+         />
+       ),
+     }, */
     {
       title: "Leads",
       url: "/leads",
@@ -48,45 +48,53 @@ const data = {
       ),
     },
     {
-      title: "Analitica",
-      url: "/analytical",
+      title: "Alertas",
+      url: "/alerts",
       icon: (
-        <ChartColumnIcon
+        <CircleAlertIcon
         />
       ),
     },
-    {
-      title: "Campañas",
-      url: "/campaigns",
-      icon: (
-        <FlameIcon
-        />
-      ),
-    },
-    {
-      title: "Calendario",
-      url: "/calendar",
-      icon: (
-        <CalendarIcon
-        />
-      ),
-    },
-    {
-      title: "Ranking",
-      url: "/ranking",
-      icon: (
-        <TrophyIcon
-        />
-      ),
-    },
-    {
-      title: "Tickets",
-      url: "/tickets",
-      icon: (
-        <MessageSquareIcon
-        />
-      ),
-    },
+    /*  {
+       title: "Analitica",
+       url: "/analytical",
+       icon: (
+         <ChartColumnIcon
+         />
+       ),
+     },
+     {
+       title: "Campañas",
+       url: "/campaigns",
+       icon: (
+         <FlameIcon
+         />
+       ),
+     }, */
+    /*  {
+       title: "Calendario",
+       url: "/calendar",
+       icon: (
+         <CalendarIcon
+         />
+       ),
+     },
+     {
+       title: "Ranking",
+       url: "/ranking",
+       icon: (
+         <TrophyIcon
+         />
+       ),
+     },
+     {
+       title: "Tickets",
+       url: "/tickets",
+       icon: (
+         <MessageSquareIcon
+         />
+       ),
+     }, */
   ],
   navClouds: [
     {
