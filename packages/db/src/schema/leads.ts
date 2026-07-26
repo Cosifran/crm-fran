@@ -2,6 +2,7 @@ import { relations } from "drizzle-orm";
 import {
   pgTable,
   text,
+  json,
   timestamp,
 } from "drizzle-orm/pg-core";
 import { user } from "./auth";
@@ -12,6 +13,7 @@ export const leads = pgTable("leads", {
     name: text("name").notNull(),
     email: text("email").notNull().unique(),
     phone: text("phone").notNull(),
+    questions: json("questions").default([]).notNull(),
     state: text("state").default("sin asignar").notNull(),
     callerId: text("caller_id").references(() => user.id, { onDelete: "set null" }),
     closerId: text("closer_id").references(() => user.id, { onDelete: "set null" }),

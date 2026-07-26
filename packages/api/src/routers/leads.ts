@@ -31,17 +31,10 @@ export const leadsRouter = router({
       return await getById({ id: input.id });
     }),
 
-  listByCloser: permittedProcedure(["leads:read"])
+  listByUserId: permittedProcedure(["leads:read"])
     .input(idInput)
     .query(async ({ input }) => {
-      console.log(`[stub] listByCloser called with id: ${input.id}`);
-      return null;
-    }),
-
-  listByCaller: permittedProcedure(["leads:read"])
-    .input(idInput)
-    .query(async ({ input }) => {
-      console.log(`[stub] listByCaller called with id: ${input.id}`);
+      console.log(`[stub] listByUserId called with id: ${input.id}`);
       return null;
     }),
 
