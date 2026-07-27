@@ -1,3 +1,4 @@
+import { TRPCError } from "@trpc/server";
 import { db } from "@crm-fran/db";
 import { alerts, type AlertKind, type AlertSeverity } from "@crm-fran/db/schema/index";
 import { ALERT_KIND_CONFIG } from "./config";
@@ -31,6 +32,13 @@ export async function createAlert(input: CreateAlertInput) {
 			occurrences: 0,
 		})
 		.returning();
+
+	if (!alert) {
+		throw new TRPCError({
+			code: "INTERNAL_SERVER_ERROR",
+			message: "Failed to create alert",
+		});
+	}
 
 	return alert;
 }

@@ -37,7 +37,7 @@ const alertIdInput = z.object({
 export const alertsRouter = router({
 	createAlert: permittedProcedure(["alerts:write"])
 		.input(createAlertInput)
-		.mutation(async ({ ctx, input }) => {
+		.mutation(async ({ input }) => {
 			return await createAlert(input);
 		}),
 

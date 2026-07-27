@@ -51,5 +51,12 @@ export async function resolveAlert(input: ResolveAlertInput) {
 		.where(eq(alerts.id, input.id))
 		.returning();
 
+	if (!updated) {
+		throw new TRPCError({
+			code: "INTERNAL_SERVER_ERROR",
+			message: "Failed to resolve alert",
+		});
+	}
+
 	return updated;
 }

@@ -52,5 +52,12 @@ export async function dismissAlert(input: DismissAlertInput) {
 		.where(eq(alerts.id, input.id))
 		.returning();
 
+	if (!updated) {
+		throw new TRPCError({
+			code: "INTERNAL_SERVER_ERROR",
+			message: "Failed to dismiss alert",
+		});
+	}
+
 	return updated;
 }
