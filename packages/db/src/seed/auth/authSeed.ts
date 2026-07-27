@@ -12,7 +12,7 @@ await db
     {
       id: "role-caller",
       name: "Caller",
-      permissions: ["leads:*"],
+      permissions: ["leads:*", "users:read"],
     },
     {
       id: "role-closer",
