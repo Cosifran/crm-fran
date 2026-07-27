@@ -1,6 +1,11 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, waitFor, cleanup } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import AssignLeadForm from "./assign-lead-form";
+
+afterEach(() => {
+  cleanup();
+});
 
 const mocks = vi.hoisted(() => ({
   mutate: vi.fn(),
@@ -52,20 +57,25 @@ describe("AssignLeadForm", () => {
   });
 
   it("hides the conditional fields and submits a no-contact payload when isContacted is no", async () => {
+    const user = userEvent.setup();
     const onSuccess = vi.fn();
     render(<AssignLeadForm leadId="lead-1" onSuccess={onSuccess} />);
 
     const trigger = screen.getByTestId("isContacted-trigger");
-    fireEvent.click(trigger);
-    await waitFor(() =>
-      expect(screen.getByRole("option", { name: "No" })).toBeInTheDocument(),
+    await user.click(trigger);
+    const option = await waitFor(() =>
+      screen.getByRole("option", { name: "No" }),
     );
-    fireEvent.click(screen.getByRole("option", { name: "No" }));
+    await user.click(option);
 
     expect(screen.queryByLabelText("¿Es el decisor?")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Closer asignado")).not.toBeInTheDocument();
 
-    fireEvent.submit(screen.getByTestId("assign-lead-form"));
+    const form = screen.getByTestId("assign-lead-form");
+    const submitButton = document.createElement("button");
+    submitButton.type = "submit";
+    form.appendChild(submitButton);
+    await user.click(submitButton);
 
     await waitFor(() => {
       expect(mocks.mutate).toHaveBeenCalledWith(
@@ -78,14 +88,15 @@ describe("AssignLeadForm", () => {
   });
 
   it("reveals the conditional fields when isContacted is yes", async () => {
+    const user = userEvent.setup();
     render(<AssignLeadForm leadId="lead-1" />);
 
     const trigger = screen.getByTestId("isContacted-trigger");
-    fireEvent.click(trigger);
-    await waitFor(() =>
-      expect(screen.getByRole("option", { name: "Sí" })).toBeInTheDocument(),
+    await user.click(trigger);
+    const option = await waitFor(() =>
+      screen.getByRole("option", { name: "Sí" }),
     );
-    fireEvent.click(screen.getByRole("option", { name: "Sí" }));
+    await user.click(option);
 
     expect(screen.getByLabelText("¿Es el decisor?")).toBeInTheDocument();
     expect(screen.getByLabelText("Closer asignado")).toBeInTheDocument();

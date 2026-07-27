@@ -1,333 +1,439 @@
 "use client";
 
+import { useState } from "react";
 import { useForm } from "@tanstack/react-form";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
+import { trpc } from "@/utils/trpc";
 import { Input } from "@crm-fran/ui/components/input";
-import { Label } from "@crm-fran/ui/components/label";
 import { Textarea } from "@crm-fran/ui/components/textarea";
-
+import { Skeleton } from "@crm-fran/ui/components/skeleton";
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@crm-fran/ui/components/select";
+import {
+  FieldGroup,
+  Field,
+  FieldLabel,
+  FieldError,
+} from "@crm-fran/ui/components/field";
 
-const schema = z.object({
-    isContacted: z.string().min(1, "Seleccione una opción"),
-    isDecisionMaker: z.string().min(1, "Seleccione una opción"),
-    decisionMakerName: z.string(),
-    financialSource: z.string().min(1, "Campo obligatorio"),
-    productFit: z.string().min(1, "Seleccione un producto"),
-    urgencyReason: z.string().min(1, "Campo obligatorio"),
-    extraInfo: z.string(),
-    closerId: z.string().min(1, "Seleccione un closer"),
-    scheduledDate: z.string().min(1, "Seleccione una fecha"),
-    scheduledTime: z.string().min(1, "Seleccione una hora"),
+const formSchema = z.object({
+  isContacted: z.string(),
+  isDecisionMaker: z.string(),
+  decisionMakerName: z.string(),
+  financialSource: z.string(),
+  productFit: z.string(),
+  urgencyReason: z.string(),
+  extraInfo: z.string(),
+  closerId: z.string(),
+  scheduledDate: z.string(),
+  scheduledTime: z.string(),
 });
 
+type FormValue = z.infer<typeof formSchema>;
+
+const defaultValues = {
+  isContacted: "",
+  isDecisionMaker: "",
+  decisionMakerName: "",
+  financialSource: "",
+  productFit: "",
+  urgencyReason: "",
+  extraInfo: "",
+  closerId: "",
+  scheduledDate: "",
+  scheduledTime: "",
+};
+
+type FieldName = keyof typeof defaultValues;
+
+const conditionalFieldNames: FieldName[] = [
+  "isDecisionMaker",
+  "decisionMakerName",
+  "financialSource",
+  "productFit",
+  "urgencyReason",
+  "extraInfo",
+  "closerId",
+  "scheduledDate",
+  "scheduledTime",
+];
+
 interface AssignLeadFormProps {
-    leadId: string;
-    onCancel?: () => void;
-    onSuccess?: () => void;
+  leadId: string;
+  onCancel?: () => void;
+  onSuccess?: () => void;
 }
 
 export default function AssignLeadForm({
-    leadId,
-    onSuccess,
+  leadId,
+  onSuccess,
 }: AssignLeadFormProps) {
-    const form = useForm({
-        defaultValues: {
-            isContacted: "",
-            isDecisionMaker: "",
-            decisionMakerName: "",
-            financialSource: "",
-            productFit: "",
-            urgencyReason: "",
-            extraInfo: "",
-            closerId: "",
-            scheduledDate: "",
-            scheduledTime: "",
-        },
+  const [branch, setBranch] = useState<"" | "yes" | "no">("");
+  const mutation = useMutation(trpc.leads.assignLead.mutationOptions());
+  const closers = useQuery(trpc.users.listClosers.queryOptions());
 
-        validators: {
-            onSubmit: schema,
-        },
+  const form = useForm({
+    defaultValues,
+    validators: {
+      onSubmit: ({ value }) => {
+        const result = validateAssignLead(value as FormValue);
+        return result;
+      },
+    },
+    onSubmit: async ({ value }) => {
+      const payload = buildPayload(leadId, value as FormValue);
+      mutation.mutate(payload, {
+        onSuccess: () => onSuccess?.(),
+      });
+    },
+  });
 
-        onSubmit: async ({ value }) => {
-            console.log({
-                leadId,
-                ...value,
-            });
+  const resetConditionalFields = () => {
+    for (const name of conditionalFieldNames) {
+      form.setFieldValue(name, "");
+    }
+  };
 
-            onSuccess?.();
-        },
-    });
+  const handleIsContactedChange = (value: string) => {
+    setBranch(value as "yes" | "no" | "");
+    if (value === "no" || value === "yes") {
+      resetConditionalFields();
+    }
+  };
 
-    return (
-      <form
-        className="mx-auto w-full max-w-lg space-y-7"
-        id="assign-lead-form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          form.handleSubmit();
-        }}
-      >
+  return (
+    <form
+      className="mx-auto w-full max-w-lg"
+      id="assign-lead-form"
+      data-testid="assign-lead-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        form.handleSubmit();
+      }}
+    >
+      <FieldGroup>
         <form.Field name="isContacted">
           {(field) => (
-            <div className="space-y-2">
-              <Label>¿Fué contactado?</Label>
-
+            <Field invalid={field.state.meta.errors.length > 0}>
+              <FieldLabel htmlFor="isContacted">¿Fué contactado?</FieldLabel>
               <Select
                 value={field.state.value}
-                onValueChange={(value) => field.handleChange(value ?? "")}
+                onValueChange={(value) => {
+                  field.handleChange(value ?? "");
+                  handleIsContactedChange(value ?? "");
+                }}
               >
-                <SelectTrigger className="h-11">
+                <SelectTrigger
+                  id="isContacted"
+                  data-testid="isContacted-trigger"
+                  className="h-11"
+                >
                   <SelectValue placeholder="Seleccione una opción" />
                 </SelectTrigger>
-
                 <SelectContent>
                   <SelectItem value="yes">Sí</SelectItem>
                   <SelectItem value="no">No</SelectItem>
                 </SelectContent>
               </Select>
-
-              {field.state.meta.errors.map((error) => (
-                <p
-                  key={error?.message}
-                  className="mt-1 text-xs text-destructive"
-                >
-                  {error?.message}
-                </p>
-              ))}
-            </div>
+              <FieldError>
+                {field.state.meta.errors.map((error) => (typeof error === "string" ? error : "")).join(" ")}
+              </FieldError>
+            </Field>
           )}
         </form.Field>
 
-        <form.Field name="isDecisionMaker">
-          {(field) => (
-            <div className="space-y-2">
-              <Label>¿Es el decisor?</Label>
-
-              <Select
-                value={field.state.value}
-                onValueChange={(value) => field.handleChange(value ?? "")}
-              >
-                <SelectTrigger className="h-11">
-                  <SelectValue placeholder="Seleccione una opción" />
-                </SelectTrigger>
-
-                <SelectContent>
-                  <SelectItem value="yes">Sí</SelectItem>
-                  <SelectItem value="no">No</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {field.state.meta.errors.map((error) => (
-                <p
-                  key={error?.message}
-                  className="mt-1 text-xs text-destructive"
-                >
-                  {error?.message}
-                </p>
-              ))}
-            </div>
-          )}
-        </form.Field>
-
-        <form.Field name="decisionMakerName">
-          {(field) => (
-            <div className="space-y-2">
-              <Label>Si respondió NO ¿quién es la persona correcta?</Label>
-
-              <Input
-                value={field.state.value}
-                onChange={(e) => field.handleChange(e.target.value)}
-              />
-
-              {field.state.meta.errors.map((error) => (
-                <p
-                  key={error?.message}
-                  className="mt-1 text-xs text-destructive"
-                >
-                  {error?.message}
-                </p>
-              ))}
-            </div>
-          )}
-        </form.Field>
-
-        <form.Field name="financialSource">
-          {(field) => (
-            <div className="space-y-2">
-              <Label>¿De dónde sale su capacidad económica?</Label>
-
-              <Textarea
-                value={field.state.value}
-                className="min-h-28 resize-none"
-                onChange={(e) => field.handleChange(e.target.value)}
-              />
-
-              {field.state.meta.errors.map((error) => (
-                <p
-                  key={error?.message}
-                  className="mt-1 text-xs text-destructive"
-                >
-                  {error?.message}
-                </p>
-              ))}
-            </div>
-          )}
-        </form.Field>
-
-        <form.Field name="productFit">
-          {(field) => (
-            <div className="space-y-2">
-              <Label>Producto recomendado</Label>
-
-              <Select
-                value={field.state.value}
-                onValueChange={(value) => field.handleChange(value ?? "")}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccione un producto" />
-                </SelectTrigger>
-
-                <SelectContent>
-                  <SelectItem value="Product 1">Product 1</SelectItem>
-                  <SelectItem value="Product 2">Product 2</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {field.state.meta.errors.map((error) => (
-                <p
-                  key={error?.message}
-                  className="mt-1 text-xs text-destructive"
-                >
-                  {error?.message}
-                </p>
-              ))}
-            </div>
-          )}
-        </form.Field>
-
-        <form.Field name="urgencyReason">
-          {(field) => (
-            <div className="space-y-2">
-              <Label>¿De dónde sale la urgencia?</Label>
-
-              <Textarea
-                value={field.state.value}
-                className="min-h-28 resize-none"
-                onChange={(e) => field.handleChange(e.target.value)}
-              />
-
-              {field.state.meta.errors.map((error) => (
-                <p
-                  key={error?.message}
-                  className="mt-1 text-xs text-destructive"
-                >
-                  {error?.message}
-                </p>
-              ))}
-            </div>
-          )}
-        </form.Field>
-
-        <form.Field name="extraInfo">
-          {(field) => (
-            <div className="space-y-2">
-              <Label>Información extra</Label>
-
-              <Textarea
-                value={field.state.value}
-                className="min-h-28 resize-none"
-                onChange={(e) => field.handleChange(e.target.value)}
-              />
-            </div>
-          )}
-        </form.Field>
-
-        <form.Field name="closerId">
-          {(field) => (
-            <div className="space-y-2">
-              <Label>Closer asignado</Label>
-
-              <Select
-                value={field.state.value}
-                onValueChange={(value) => field.handleChange(value ?? "")}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccione un closer" />
-                </SelectTrigger>
-
-                <SelectContent>
-                  <SelectItem value="Juan Pérez">Juan Pérez</SelectItem>
-                  <SelectItem value="María López">María López</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {field.state.meta.errors.map((error) => (
-                <p
-                  key={error?.message}
-                  className="mt-1 text-xs text-destructive"
-                >
-                  {error?.message}
-                </p>
-              ))}
-            </div>
-          )}
-        </form.Field>
-
-        <div className="grid grid-cols-2 gap-4">
-          <form.Field name="scheduledDate">
-            {(field) => (
-              <div className="space-y-2">
-                <Label>Fecha</Label>
-
-                <Input
-                  type="date"
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                />
-
-                {field.state.meta.errors.map((error) => (
-                  <p
-                    key={error?.message}
-                    className="mt-1 text-xs text-destructive"
+        {branch === "yes" && (
+          <>
+            <form.Field name="isDecisionMaker">
+              {(field) => (
+                <Field invalid={field.state.meta.errors.length > 0}>
+                  <FieldLabel htmlFor="isDecisionMaker">¿Es el decisor?</FieldLabel>
+                  <Select
+                    value={field.state.value}
+                    onValueChange={(value) => field.handleChange(value ?? "")}
                   >
-                    {error?.message}
-                  </p>
-                ))}
-              </div>
-            )}
-          </form.Field>
+                    <SelectTrigger id="isDecisionMaker" className="h-11">
+                      <SelectValue placeholder="Seleccione una opción" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="yes">Sí</SelectItem>
+                      <SelectItem value="no">No</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FieldError>
+                    {field.state.meta.errors.map((error) => (typeof error === "string" ? error : "")).join(" ")}
+                  </FieldError>
+                </Field>
+              )}
+            </form.Field>
 
-          <form.Field name="scheduledTime">
-            {(field) => (
-              <div className="space-y-2">
-                <Label>Hora</Label>
+            <form.Field name="decisionMakerName">
+              {(field) => (
+                <Field invalid={field.state.meta.errors.length > 0}>
+                  <FieldLabel htmlFor="decisionMakerName">
+                    Si respondió NO ¿quién es la persona correcta?
+                  </FieldLabel>
+                  <Input
+                    id="decisionMakerName"
+                    value={field.state.value}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    aria-invalid={field.state.meta.errors.length > 0}
+                  />
+                  <FieldError>
+                    {field.state.meta.errors.map((error) => (typeof error === "string" ? error : "")).join(" ")}
+                  </FieldError>
+                </Field>
+              )}
+            </form.Field>
 
-                <Input
-                  type="time"
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                />
+            <form.Field name="financialSource">
+              {(field) => (
+                <Field invalid={field.state.meta.errors.length > 0}>
+                  <FieldLabel htmlFor="financialSource">
+                    ¿De dónde sale su capacidad económica?
+                  </FieldLabel>
+                  <Textarea
+                    id="financialSource"
+                    value={field.state.value}
+                    className="min-h-28 resize-none"
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    aria-invalid={field.state.meta.errors.length > 0}
+                  />
+                  <FieldError>
+                    {field.state.meta.errors.map((error) => (typeof error === "string" ? error : "")).join(" ")}
+                  </FieldError>
+                </Field>
+              )}
+            </form.Field>
 
-                {field.state.meta.errors.map((error) => (
-                  <p
-                    key={error?.message}
-                    className="mt-1 text-xs text-destructive"
+            <form.Field name="productFit">
+              {(field) => (
+                <Field invalid={field.state.meta.errors.length > 0}>
+                  <FieldLabel htmlFor="productFit">Producto recomendado</FieldLabel>
+                  <Select
+                    value={field.state.value}
+                    onValueChange={(value) => field.handleChange(value ?? "")}
                   >
-                    {error?.message}
-                  </p>
-                ))}
-              </div>
-            )}
-          </form.Field>
-        </div>
-      </form>
-    );
+                    <SelectTrigger id="productFit">
+                      <SelectValue placeholder="Seleccione un producto" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Product 1">Product 1</SelectItem>
+                      <SelectItem value="Product 2">Product 2</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FieldError>
+                    {field.state.meta.errors.map((error) => (typeof error === "string" ? error : "")).join(" ")}
+                  </FieldError>
+                </Field>
+              )}
+            </form.Field>
+
+            <form.Field name="urgencyReason">
+              {(field) => (
+                <Field invalid={field.state.meta.errors.length > 0}>
+                  <FieldLabel htmlFor="urgencyReason">
+                    ¿De dónde sale la urgencia?
+                  </FieldLabel>
+                  <Textarea
+                    id="urgencyReason"
+                    value={field.state.value}
+                    className="min-h-28 resize-none"
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    aria-invalid={field.state.meta.errors.length > 0}
+                  />
+                  <FieldError>
+                    {field.state.meta.errors.map((error) => (typeof error === "string" ? error : "")).join(" ")}
+                  </FieldError>
+                </Field>
+              )}
+            </form.Field>
+
+            <form.Field name="extraInfo">
+              {(field) => (
+                <Field invalid={field.state.meta.errors.length > 0}>
+                  <FieldLabel htmlFor="extraInfo">Información extra</FieldLabel>
+                  <Textarea
+                    id="extraInfo"
+                    value={field.state.value}
+                    className="min-h-28 resize-none"
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    aria-invalid={field.state.meta.errors.length > 0}
+                  />
+                  <FieldError>
+                    {field.state.meta.errors.map((error) => (typeof error === "string" ? error : "")).join(" ")}
+                  </FieldError>
+                </Field>
+              )}
+            </form.Field>
+
+            <form.Field name="closerId">
+              {(field) => (
+                <Field invalid={field.state.meta.errors.length > 0}>
+                  <FieldLabel htmlFor="closerId">Closer asignado</FieldLabel>
+                  <Select
+                    value={field.state.value}
+                    onValueChange={(value) => field.handleChange(value ?? "")}
+                  >
+                    <SelectTrigger id="closerId">
+                      <SelectValue placeholder="Seleccione un closer" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {closers.isLoading ? (
+                        <Skeleton className="h-8 w-full" />
+                      ) : closers.data && closers.data.length > 0 ? (
+                        closers.data.map((closer) => (
+                          <SelectItem key={closer.id} value={closer.id}>
+                            {closer.name}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="" disabled>
+                          Sin closers
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <FieldError>
+                    {field.state.meta.errors.map((error) => (typeof error === "string" ? error : "")).join(" ")}
+                  </FieldError>
+                </Field>
+              )}
+            </form.Field>
+
+            <div className="grid grid-cols-2 gap-4">
+              <form.Field name="scheduledDate">
+                {(field) => (
+                  <Field invalid={field.state.meta.errors.length > 0}>
+                    <FieldLabel htmlFor="scheduledDate">Fecha</FieldLabel>
+                    <Input
+                      id="scheduledDate"
+                      type="date"
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      aria-invalid={field.state.meta.errors.length > 0}
+                    />
+                    <FieldError>
+                      {field.state.meta.errors.map((error) => (typeof error === "string" ? error : "")).join(" ")}
+                    </FieldError>
+                  </Field>
+                )}
+              </form.Field>
+
+              <form.Field name="scheduledTime">
+                {(field) => (
+                  <Field invalid={field.state.meta.errors.length > 0}>
+                    <FieldLabel htmlFor="scheduledTime">Hora</FieldLabel>
+                    <Input
+                      id="scheduledTime"
+                      type="time"
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      aria-invalid={field.state.meta.errors.length > 0}
+                    />
+                    <FieldError>
+                      {field.state.meta.errors.map((error) => (typeof error === "string" ? error : "")).join(" ")}
+                    </FieldError>
+                  </Field>
+                )}
+              </form.Field>
+            </div>
+          </>
+        )}
+      </FieldGroup>
+    </form>
+  );
+}
+
+function validateAssignLead(value: FormValue) {
+  const fieldErrors: Record<string, string[]> = {};
+
+  if (value.isContacted !== "yes" && value.isContacted !== "no") {
+    fieldErrors.isContacted = ["Seleccione una opción"];
+  }
+
+  if (value.isContacted === "yes") {
+    if (value.isDecisionMaker === "") {
+      fieldErrors.isDecisionMaker = ["Seleccione una opción"];
+    }
+    if (value.decisionMakerName.trim() === "") {
+      fieldErrors.decisionMakerName = ["Requerido"];
+    }
+    if (value.financialSource.trim() === "") {
+      fieldErrors.financialSource = ["Requerido"];
+    }
+    if (value.productFit.trim() === "") {
+      fieldErrors.productFit = ["Requerido"];
+    }
+    if (value.urgencyReason.trim() === "") {
+      fieldErrors.urgencyReason = ["Requerido"];
+    }
+    if (value.closerId === "") {
+      fieldErrors.closerId = ["Seleccione un closer"];
+    }
+    if (value.scheduledDate === "") {
+      fieldErrors.scheduledDate = ["Requerido"];
+    }
+    if (value.scheduledTime === "") {
+      fieldErrors.scheduledTime = ["Requerido"];
+    }
+  }
+
+  return Object.keys(fieldErrors).length > 0 ? { fields: fieldErrors } : undefined;
+}
+
+function buildPayload(
+  leadId: string,
+  value: FormValue,
+): { leadId: string; isContacted: "no" } | {
+  leadId: string;
+  isContacted: "yes";
+  closerId: string;
+  questions: { question: string; answer: string }[];
+  scheduledDate: string;
+  scheduledTime: string;
+  extraNotes: string;
+} {
+  if (value.isContacted === "no") {
+    return { leadId, isContacted: "no" };
+  }
+
+  return {
+    leadId,
+    isContacted: "yes",
+    closerId: value.closerId,
+    questions: [
+      { question: "¿Fué contactado?", answer: "Sí" },
+      {
+        question: "¿Es el decisor?",
+        answer: value.isDecisionMaker === "yes" ? "Sí" : "No",
+      },
+      {
+        question: "¿Quién es la persona correcta?",
+        answer: value.decisionMakerName,
+      },
+      {
+        question: "¿De dónde sale su capacidad económica?",
+        answer: value.financialSource,
+      },
+      { question: "Producto recomendado", answer: value.productFit },
+      {
+        question: "¿De dónde sale la urgencia?",
+        answer: value.urgencyReason,
+      },
+      { question: "Información extra", answer: value.extraInfo },
+      { question: "Fecha", answer: value.scheduledDate },
+      { question: "Hora", answer: value.scheduledTime },
+    ],
+    scheduledDate: value.scheduledDate,
+    scheduledTime: value.scheduledTime,
+    extraNotes: value.extraInfo,
+  };
 }
