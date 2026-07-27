@@ -95,6 +95,20 @@ export async function assignLead({
 				.returning({ id: alerts.id });
 
 			alertId = alert?.id;
+		} else if (isContacted === "yes" && closerId) {
+			const config = ALERT_KIND_CONFIG[ALERT_KIND.FOLLOW_UP];
+			await tx.insert(alerts).values({
+				id: crypto.randomUUID(),
+				leadId,
+				targetUserId: closerId,
+				kind: ALERT_KIND.FOLLOW_UP,
+				message: config.message,
+				severity: config.severity,
+				intervalMinutes: config.intervalMinutes,
+				maxOccurrences: config.maxOccurrences,
+				nextShowAt: new Date(Date.now() + config.intervalMinutes * 60_000),
+				occurrences: 0,
+			});
 		}
 
 		return { leadId: updated.id, alertId };

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { processRecurringAlerts } from "@crm-fran/api";
 
-export async function POST(request: NextRequest) {
+export async function GET(request: NextRequest) {
   const authorization = request.headers.get("authorization");
   const expected = `Bearer ${process.env.CRON_SECRET}`;
 

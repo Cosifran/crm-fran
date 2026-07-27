@@ -91,7 +91,13 @@ describe("assignLead service", () => {
     expect(updated?.questions).toEqual(questions);
 
     const alertRows = await db.select().from(alerts).where(eq(alerts.leadId, leadId));
-    expect(alertRows).toHaveLength(0);
+    expect(alertRows).toHaveLength(1);
+
+    const followUpAlert = alertRows[0];
+    created.alertIds.push(followUpAlert?.id ?? "");
+    expect(followUpAlert?.kind).toBe("follow_up");
+    expect(followUpAlert?.targetUserId).toBe(closerId);
+    expect(followUpAlert?.nextShowAt).toBeInstanceOf(Date);
   });
 
   it("creates a no_contact alert when isContacted is no", async () => {

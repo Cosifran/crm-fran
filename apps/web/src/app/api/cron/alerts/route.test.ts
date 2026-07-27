@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
-import { POST } from "./route";
+import { GET } from "./route";
 
 const mockProcessRecurringAlerts = vi.hoisted(() => vi.fn());
 
@@ -8,7 +8,7 @@ vi.mock("@crm-fran/api", () => ({
   processRecurringAlerts: mockProcessRecurringAlerts,
 }));
 
-describe("POST /api/cron/alerts", () => {
+describe("GET /api/cron/alerts", () => {
   beforeEach(() => {
     vi.unstubAllEnvs();
     vi.stubEnv("CRON_SECRET", "test-secret");
@@ -16,17 +16,17 @@ describe("POST /api/cron/alerts", () => {
   });
 
   it("returns 401 when the authorization header is missing", async () => {
-    const response = await POST(
-      new NextRequest("http://localhost/api/cron/alerts", { method: "POST" }),
+    const response = await GET(
+      new NextRequest("http://localhost/api/cron/alerts", { method: "GET" }),
     );
 
     expect(response.status).toBe(401);
   });
 
   it("returns 401 when the authorization secret is wrong", async () => {
-    const response = await POST(
+    const response = await GET(
       new NextRequest("http://localhost/api/cron/alerts", {
-        method: "POST",
+        method: "GET",
         headers: { Authorization: "Bearer wrong-secret" },
       }),
     );
@@ -37,9 +37,9 @@ describe("POST /api/cron/alerts", () => {
   it("returns the processed count when the secret is correct", async () => {
     mockProcessRecurringAlerts.mockResolvedValue(3);
 
-    const response = await POST(
+    const response = await GET(
       new NextRequest("http://localhost/api/cron/alerts", {
-        method: "POST",
+        method: "GET",
         headers: { Authorization: "Bearer test-secret" },
       }),
     );
