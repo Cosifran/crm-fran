@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeAll, afterEach } from "vitest";
-import { db, eq, inArray } from "@crm-fran/db";
+import { db, inArray } from "@crm-fran/db";
 import { roles, user } from "@crm-fran/db/schema/index";
 import { appRouter } from "./index";
 import type { Context } from "../context";
@@ -85,7 +85,7 @@ describe("listClosers", () => {
     expect(result.map((u) => u.name)).toEqual(["Amy Closer", "Zoe Closer"]);
   });
 
-  it.skip("allows users with users:read to call users.listClosers", async () => {
+  it("allows users with users:read to call users.listClosers", async () => {
     const callerId = crypto.randomUUID();
     const closerId = crypto.randomUUID();
     await insertUser({ id: callerId, name: "Caller C", email: "caller-c@test.com", roleId: "role-caller" });
@@ -97,7 +97,7 @@ describe("listClosers", () => {
     expect(result.map((u) => u.id)).toContain(closerId);
   });
 
-  it.skip("throws FORBIDDEN for users without users:read", async () => {
+  it("throws FORBIDDEN for users without users:read", async () => {
     const callerId = crypto.randomUUID();
     await insertUser({ id: callerId, name: "Caller D", email: "caller-d@test.com", roleId: "role-caller" });
 

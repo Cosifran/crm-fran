@@ -1,5 +1,6 @@
 import { authRouter } from "./auth";
 import { leadsRouter } from "./leads";
+import { usersRouter } from "./users";
 import { permittedProcedure } from "@crm-fran/api/trpc/trpc";
 import { publicProcedure, router } from "../index";
 
@@ -24,5 +25,6 @@ export const appRouter = router({
   }),
   auth: authRouter,
   leads: leadsRouter,
+  users: usersRouter,
 });
 export type AppRouter = typeof appRouter;
