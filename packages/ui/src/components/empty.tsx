@@ -3,13 +3,13 @@ import * as React from "react";
 import { cn } from "@crm-fran/ui/lib/utils";
 
 interface EmptyProps extends React.ComponentProps<"div"> {
-  title?: React.ReactNode;
+  heading?: React.ReactNode;
   description?: React.ReactNode;
 }
 
 function Empty({
   className,
-  title,
+  heading,
   description,
   children,
   ...props
@@ -23,7 +23,7 @@ function Empty({
       )}
       {...props}
     >
-      {title && <p className="text-sm font-medium">{title}</p>}
+      {heading && <p className="text-sm font-medium">{heading}</p>}
       {description && (
         <p className="text-xs text-muted-foreground">{description}</p>
       )}

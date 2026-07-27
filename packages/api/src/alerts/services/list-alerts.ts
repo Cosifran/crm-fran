@@ -1,4 +1,4 @@
-import { db, and, asc, eq, isNull, type SQL } from "@crm-fran/db";
+import { db, asc, eq, isNull, type SQL } from "@crm-fran/db";
 import { alerts } from "@crm-fran/db/schema/index";
 import type { Permission } from "@crm-fran/db/schema/auth";
 
@@ -12,6 +12,8 @@ export type ListAlertsInput = {
 	limit?: number;
 	offset?: number;
 };
+
+export type AlertRow = Awaited<ReturnType<typeof listAlerts>>[number];
 
 export async function listAlerts(input: ListAlertsInput) {
 	const limit = Math.min(input.limit ?? 50, 100);
@@ -43,13 +45,14 @@ export async function listAlerts(input: ListAlertsInput) {
 		conditions.push(isNull(alerts.resolvedAt));
 	}
 
-	const where = conditions.length > 0 ? and(...conditions) : undefined;
-
-	return db
-		.select()
-		.from(alerts)
-		.where(where)
-		.orderBy(asc(alerts.nextShowAt))
-		.limit(limit)
-		.offset(offset);
+	return db.query.alerts.findMany({
+		with: {
+			lead: true,
+			targetUser: true,
+		},
+		where: conditions.length > 0 ? (_fields, { and }) => and(...conditions) : undefined,
+		orderBy: asc(alerts.nextShowAt),
+		limit,
+		offset,
+	});
 }
