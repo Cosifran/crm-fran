@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeAll, afterEach } from "vitest";
 import { TRPCError } from "@trpc/server";
-import { db, inArray } from "@crm-fran/db";
+import { db, eq, inArray } from "@crm-fran/db";
 import { alerts, leads, roles, user } from "@crm-fran/db/schema/index";
 import { LEAD_STATE } from "@crm-fran/db/schema/state";
 import { assignLead } from "../leads/services/assign-lead";
@@ -90,7 +90,7 @@ describe("assignLead service", () => {
     expect(updated?.closerId).toBe(closerId);
     expect(updated?.questions).toEqual(questions);
 
-    const alertRows = await db.select().from(alerts).where((table) => table.leadId === leadId);
+    const alertRows = await db.select().from(alerts).where(eq(alerts.leadId, leadId));
     expect(alertRows).toHaveLength(0);
   });
 
@@ -113,13 +113,13 @@ describe("assignLead service", () => {
     expect(updated?.callerId).toBe(callerId);
     expect(updated?.questions).toEqual([]);
 
-    const alertRows = await db.select().from(alerts).where((table) => table.leadId === leadId);
+    const alertRows = await db.select().from(alerts).where(eq(alerts.leadId, leadId));
     expect(alertRows).toHaveLength(1);
 
     const alert = alertRows[0];
     created.alertIds.push(alert?.id ?? "");
     expect(alert?.kind).toBe("no_contact");
-    expect(alert?.severity).toBe("high");
+    expect(alert?.severity).toBe("urgent");
     expect(alert?.intervalMinutes).toBe(1440);
     expect(alert?.targetUserId).toBe(callerId);
     expect(alert?.nextShowAt).toBeInstanceOf(Date);
