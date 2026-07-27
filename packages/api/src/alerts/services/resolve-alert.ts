@@ -10,7 +10,11 @@ export type ResolveAlertInput = {
 };
 
 function isAdmin(permissions: Permission[]) {
-	return permissions.includes("alerts:*") || permissions.includes("users:read");
+	return (
+		permissions.includes("*") ||
+		permissions.includes("alerts:*") ||
+		permissions.includes("users:read")
+	);
 }
 
 export async function resolveAlert(input: ResolveAlertInput) {

@@ -17,7 +17,9 @@ export async function listAlerts(input: ListAlertsInput) {
 	const limit = Math.min(input.limit ?? 50, 100);
 	const offset = input.offset ?? 0;
 	const isAdmin =
-		input.permissions.includes("alerts:*") || input.permissions.includes("users:read");
+		input.permissions.includes("*") ||
+		input.permissions.includes("alerts:*") ||
+		input.permissions.includes("users:read");
 
 	const conditions: SQL<unknown>[] = [];
 
