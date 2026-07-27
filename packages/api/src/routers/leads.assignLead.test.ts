@@ -119,7 +119,7 @@ describe("assignLead service", () => {
     const alert = alertRows[0];
     created.alertIds.push(alert?.id ?? "");
     expect(alert?.kind).toBe("no_contact");
-    expect(alert?.severity).toBe("urgent");
+    expect(alert?.severity).toBe("high");
     expect(alert?.intervalMinutes).toBe(1440);
     expect(alert?.targetUserId).toBe(callerId);
     expect(alert?.nextShowAt).toBeInstanceOf(Date);
