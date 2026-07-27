@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeAll, afterEach } from "vitest";
 import { TRPCError } from "@trpc/server";
-import { db, eq, inArray } from "@crm-fran/db";
+import { db, inArray } from "@crm-fran/db";
 import { alerts, leads, roles, user } from "@crm-fran/db/schema/index";
 import { LEAD_STATE } from "@crm-fran/db/schema/state";
 import { ALERT_KIND, ALERT_SEVERITY } from "@crm-fran/db/schema/alerts";
