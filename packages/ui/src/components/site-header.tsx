@@ -1,7 +1,7 @@
 import { Separator } from "@crm-fran/ui/components/separator"
 import { SidebarTrigger } from "@crm-fran/ui/components/sidebar"
 
-export function SiteHeader({ children }: { children?: React.ReactNode }) {
+export function SiteHeader({ children, toggle }: { children?: React.ReactNode, toggle?: React.ReactNode }) {
   return (
     <header className="flex h-(--header-height) shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">
       <div className="flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6">
@@ -12,6 +12,7 @@ export function SiteHeader({ children }: { children?: React.ReactNode }) {
         />
         <h1 className="text-base font-medium">{children}</h1>
       </div>
+      <div className="px-4 lg:px-6">{toggle}</div>
     </header>
-  )
+  );
 }

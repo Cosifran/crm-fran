@@ -1,6 +1,4 @@
 "use client";
-
-import AssignLeadButton from "@/components/assign-lead-button";
 import {
   Select,
   SelectContent,
@@ -11,9 +9,10 @@ import {
 import type { ColumnDef } from "@tanstack/react-table";
 import type { Lead } from "../leads/assign-lead-drawer";
 
+
 export function createLeadColumns(
-  renderAction: (lead: Lead) => React.ReactNode
-): ColumnDef<Lead>[] {
+  renderAction: (lead: Lead) => React.ReactNode,
+): ColumnDef<any>[] {
   return [
     {
       accessorKey: "name",
@@ -30,37 +29,10 @@ export function createLeadColumns(
     {
       accessorKey: "state",
       header: "Estado",
-      cell: ({ row }) => {
-        return (
-          <Select defaultValue={row.original.state}>
-            <SelectTrigger className="w-40">
-              <SelectValue />
-            </SelectTrigger>
-
-            <SelectContent>
-              <SelectItem value="sin asignar">Sin asignar</SelectItem>
-              <SelectItem value="Asignado">Asignado</SelectItem>
-              <SelectItem value="Número erróneo">Número erróneo</SelectItem>
-            </SelectContent>
-          </Select>
-        );
-      },
     },
     {
       accessorKey: "response",
       header: "Respuesta",
-      cell: ({ row }) => (
-        <Select defaultValue={row.original.response}>
-          <SelectTrigger className="w-28">
-            <SelectValue />
-          </SelectTrigger>
-
-          <SelectContent>
-            <SelectItem value="SI">SI</SelectItem>
-            <SelectItem value="NO">NO</SelectItem>
-          </SelectContent>
-        </Select>
-      ),
     },
     {
       accessorKey: "feedback",
@@ -73,18 +45,17 @@ export function createLeadColumns(
     {
       accessorKey: "closerId",
       header: "Closer ID",
+      cell: ({ row }) => row.original.closerId || "sin asignar",
     },
     {
       accessorKey: "createdAt",
       header: "Creado en",
-      cell: ({ row }) =>
-        new Date(row.original.createdAt).toLocaleDateString(),
+      cell: ({ row }) => new Date(row.original.createdAt).toLocaleDateString(),
     },
     {
       accessorKey: "updatedAt",
       header: "Actualizado en",
-      cell: ({ row }) =>
-        new Date(row.original.updatedAt).toLocaleDateString(),
+      cell: ({ row }) => new Date(row.original.updatedAt).toLocaleDateString(),
     },
     {
       id: "actions",

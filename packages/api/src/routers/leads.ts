@@ -3,8 +3,10 @@ import { router } from "../index";
 import {
   getAll,
   getById,
+  getByUserId,
+  assignLead,
   assignLeadToCaller,
-  getWithoutAssigned
+  getWithoutAssigned,
 } from "../leads/services/index";
 import { permittedProcedure } from "@crm-fran/api/trpc/trpc";
 
@@ -15,6 +17,27 @@ const createLeadInput = z.object({
   phone: z.string(),
 });
 const updateLeadInput = createLeadInput.partial().extend({ id: z.string() });
+
+const assignLeadInput = z.discriminatedUnion("isContacted", [
+  z.object({
+    leadId: z.string().min(1),
+    isContacted: z.literal("yes"),
+    closerId: z.string().min(1),
+    scheduledDate: z.string().min(1).optional(),
+    scheduledTime: z.string().min(1).optional(),
+    questions: z.array(
+      z.object({
+        question: z.string().min(1),
+        answer: z.string().min(1),
+      }),
+    ),
+    extraNotes: z.string().optional(),
+  }),
+  z.object({
+    leadId: z.string().min(1),
+    isContacted: z.literal("no"),
+  }),
+]);
 
 export const leadsRouter = router({
   listAll: permittedProcedure(["leads:read"]).query(async () => {
@@ -31,24 +54,27 @@ export const leadsRouter = router({
       return await getById({ id: input.id });
     }),
 
-  listByCloser: permittedProcedure(["leads:read"])
-    .input(idInput)
-    .query(async ({ input }) => {
-      console.log(`[stub] listByCloser called with id: ${input.id}`);
-      return null;
+  listByUserId: permittedProcedure(["leads:read"]).query(async ({ ctx }) => {
+    return await getByUserId({ userId: ctx.session.user.id });
+  }),
+
+  assignLead: permittedProcedure(["leads:write"])
+    .input(assignLeadInput)
+    .mutation(async ({ ctx, input }) => {
+      return await assignLead({
+        input,
+        callerId: ctx.session.user.id,
+      });
     }),
 
-  listByCaller: permittedProcedure(["leads:read"])
-    .input(idInput)
-    .query(async ({ input }) => {
-      console.log(`[stub] listByCaller called with id: ${input.id}`);
-      return null;
-    }),
-
+  /**
+   * Asigna un lead a un caller para que empiece a trabajarlo.
+   * Falla con `CONFLICT` si el caller ya tiene un lead en estado "sin asignar".
+   */
   assignLeadToCaller: permittedProcedure(["leads:write"])
-    .input(z.object({ id: z.string()}))
-    .mutation(async ({ctx,  input }) => {
-      return await assignLeadToCaller({ id: input.id, userId: ctx.session.user.id});
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      return await assignLeadToCaller({ id: input.id, userId: ctx.session.user.id });
     }),
 
   create: permittedProcedure(["leads:write"])

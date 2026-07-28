@@ -7,24 +7,10 @@ import { Eye } from "lucide-react";
 import LeadDrawer from "@/components/lead-drawer/lead-drawer";
 import LeadDetails from "./lead-details";
 
-export interface Lead {
-    id: string;
-    name: string;
-    email: string;
-    phone: string;
-    state: string;
-    response: string;
-    feedback: string;
-    callerId: string | null;
-    closerId: string | null;
-    createdAt: string;
-    updatedAt: string;
-}
-
 export default function LeadViewDrawer({
     lead,
 }: {
-    lead: Lead;
+    lead: any;
 }) {
     const [open, setOpen] = useState(false);
 

@@ -5,6 +5,7 @@ import "../index.css";
 import Header from "@/components/header";
 import Providers from "@/components/providers";
 import { ActiveTitle } from "@/components/active-title";
+import { ModeToggle } from "@/components/mode-toggle";
 
 import { SiteHeader } from "@crm-fran/ui/components/site-header";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -46,7 +47,7 @@ export default function RootLayout({
           >
             <AppSidebar variant="inset" />
             <SidebarInset>
-              <SiteHeader>
+              <SiteHeader toggle={<ModeToggle />}>
                 <ActiveTitle />
               </SiteHeader>
               <div className="flex flex-1 flex-col"> {children}</div>

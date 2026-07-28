@@ -16,6 +16,8 @@ export interface Lead {
     feedback: string;
     callerId: string | null;
     closerId: string | null;
+    caller: { id: string; name: string; email: string } | null;
+    closer: { id: string; name: string; email: string } | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -23,6 +25,7 @@ export interface Lead {
 interface AssignLeadDrawerProps {
     lead: Lead;
 }
+
 
 export default function AssignLeadDrawer({
     lead,

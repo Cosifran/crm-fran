@@ -13,6 +13,8 @@ export const leadWithUsersSelect = {
   state: leads.state,
   response: leads.response,
   feedback: leads.feedback,
+  callerId: leads.callerId,
+  closerId: leads.closerId,
   createdAt: leads.createdAt,
   updatedAt: leads.updatedAt,
   caller: { id: caller.id, name: caller.name, email: caller.email },

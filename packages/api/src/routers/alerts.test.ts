@@ -1,0 +1,248 @@
+import { describe, expect, it, beforeAll, afterEach } from "vitest";
+import { TRPCError } from "@trpc/server";
+import { db, inArray } from "@crm-fran/db";
+import { alerts, leads, roles, user } from "@crm-fran/db/schema/index";
+import { LEAD_STATE } from "@crm-fran/db/schema/state";
+import { ALERT_KIND, ALERT_SEVERITY } from "@crm-fran/db/schema/alerts";
+import { appRouter } from "./index";
+import type { Context } from "../context";
+import type { Permission } from "@crm-fran/db/schema/auth";
+
+describe("alerts router", () => {
+  const created = {
+    userIds: [] as string[],
+    leadIds: [] as string[],
+    alertIds: [] as string[],
+  };
+
+  beforeAll(async () => {
+    await db
+      .insert(roles)
+      .values([
+        { id: "role-caller", name: "Caller", permissions: ["leads:*", "users:read"] },
+        { id: "role-closer", name: "Closer", permissions: ["leads:*", "alerts:*"] },
+        { id: "role-admin", name: "Admin", permissions: ["*"] },
+      ])
+      .onConflictDoNothing();
+  });
+
+  afterEach(async () => {
+    if (created.alertIds.length > 0) {
+      await db.delete(alerts).where(inArray(alerts.id, created.alertIds));
+    }
+    if (created.leadIds.length > 0) {
+      await db.delete(leads).where(inArray(leads.id, created.leadIds));
+    }
+    if (created.userIds.length > 0) {
+      await db.delete(user).where(inArray(user.id, created.userIds));
+    }
+    created.alertIds = [];
+    created.leadIds = [];
+    created.userIds = [];
+  });
+
+  async function insertUser(input: { id: string; name: string; email: string; roleId: string }) {
+    created.userIds.push(input.id);
+    await db.insert(user).values(input);
+    return input;
+  }
+
+  async function insertLead(input: { id: string }) {
+    created.leadIds.push(input.id);
+    await db.insert(leads).values({
+      id: input.id,
+      name: "Test Lead",
+      email: `lead-${input.id}@test.com`,
+      phone: "123456789",
+      state: LEAD_STATE.SIN_ASIGNAR,
+    });
+    return input;
+  }
+
+  async function insertAlert(input: {
+    id?: string;
+    leadId: string;
+    targetUserId: string;
+    kind?: string;
+    nextShowAt?: Date;
+    occurrences?: number;
+    maxOccurrences?: number | null;
+    dismissedAt?: Date | null;
+    resolvedAt?: Date | null;
+  }) {
+    const id = input.id ?? crypto.randomUUID();
+    created.alertIds.push(id);
+    await db.insert(alerts).values({
+      id,
+      leadId: input.leadId,
+      targetUserId: input.targetUserId,
+      kind: (input.kind ?? ALERT_KIND.FOLLOW_UP) as never,
+      message: "Test alert",
+      severity: ALERT_SEVERITY.INFO,
+      intervalMinutes: 60,
+      nextShowAt: input.nextShowAt ?? new Date(),
+      occurrences: input.occurrences ?? 0,
+      maxOccurrences: input.maxOccurrences ?? null,
+      dismissedAt: input.dismissedAt ?? null,
+      resolvedAt: input.resolvedAt ?? null,
+    });
+    return id;
+  }
+
+  function createCaller(userId: string, roleId: string, permissions: Permission[]) {
+    const ctx = {
+      session: {
+        user: {
+          id: userId,
+          roleId,
+          name: "Test",
+          email: "test@example.com",
+          emailVerified: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      },
+      role: { id: roleId, name: roleId, permissions },
+      permissions,
+    } as Context;
+    return appRouter.createCaller(ctx);
+  }
+
+  it("creates an alert with kind defaults", async () => {
+    const closerId = crypto.randomUUID();
+    const leadId = crypto.randomUUID();
+    await insertUser({ id: closerId, name: "Closer", email: "closer@test.com", roleId: "role-closer" });
+    await insertLead({ id: leadId });
+
+    const caller = createCaller(closerId, "role-closer", ["leads:*", "alerts:*"]);
+
+    const result = await caller.alerts.createAlert({
+      leadId,
+      targetUserId: closerId,
+      kind: ALERT_KIND.NO_CONTACT,
+    });
+
+    expect(result.leadId).toBe(leadId);
+    expect(result.targetUserId).toBe(closerId);
+    expect(result.kind).toBe(ALERT_KIND.NO_CONTACT);
+    expect(result.message).toBe("No se pudo contactar al lead");
+    expect(result.severity).toBe(ALERT_SEVERITY.HIGH);
+    expect(result.intervalMinutes).toBe(1440);
+    expect(result.occurrences).toBe(0);
+    expect(result.nextShowAt).toBeInstanceOf(Date);
+    created.alertIds.push(result.id);
+  });
+
+  it("lists unresolved alerts scoped to the requesting user", async () => {
+    const closerId = crypto.randomUUID();
+    const otherCloserId = crypto.randomUUID();
+    const leadId = crypto.randomUUID();
+
+    await insertUser({ id: closerId, name: "Closer A", email: "closer-a@test.com", roleId: "role-closer" });
+    await insertUser({ id: otherCloserId, name: "Closer B", email: "closer-b@test.com", roleId: "role-closer" });
+    await insertLead({ id: leadId });
+
+    const ownAlertId = await insertAlert({ leadId, targetUserId: closerId });
+    const otherAlertId = await insertAlert({ leadId, targetUserId: otherCloserId });
+    const dismissedAlertId = await insertAlert({ leadId, targetUserId: closerId, dismissedAt: new Date() });
+    const resolvedAlertId = await insertAlert({ leadId, targetUserId: closerId, resolvedAt: new Date() });
+
+    const caller = createCaller(closerId, "role-closer", ["leads:*", "alerts:read"]);
+    const result = await caller.alerts.listAlerts();
+
+    expect(result.map((a) => a.id)).toContain(ownAlertId);
+    expect(result.map((a) => a.id)).not.toContain(otherAlertId);
+    expect(result.map((a) => a.id)).not.toContain(dismissedAlertId);
+    expect(result.map((a) => a.id)).not.toContain(resolvedAlertId);
+  });
+
+  it("returns all unresolved alerts for admin users", async () => {
+    const adminId = crypto.randomUUID();
+    const closerId = crypto.randomUUID();
+    const leadId = crypto.randomUUID();
+
+    await insertUser({ id: adminId, name: "Admin", email: "admin@test.com", roleId: "role-admin" });
+    await insertUser({ id: closerId, name: "Closer", email: "closer@test.com", roleId: "role-closer" });
+    await insertLead({ id: leadId });
+
+    const ownAlertId = await insertAlert({ leadId, targetUserId: adminId });
+    const otherAlertId = await insertAlert({ leadId, targetUserId: closerId });
+
+    const caller = createCaller(adminId, "role-admin", ["*"]);
+    const result = await caller.alerts.listAlerts();
+
+    expect(result.map((a) => a.id)).toContain(ownAlertId);
+    expect(result.map((a) => a.id)).toContain(otherAlertId);
+  });
+
+  it("dismisses an alert and sets dismissedBy", async () => {
+    const closerId = crypto.randomUUID();
+    const leadId = crypto.randomUUID();
+
+    await insertUser({ id: closerId, name: "Closer", email: "closer@test.com", roleId: "role-closer" });
+    await insertLead({ id: leadId });
+    const alertId = await insertAlert({ leadId, targetUserId: closerId });
+
+    const caller = createCaller(closerId, "role-closer", ["leads:*", "alerts:write"]);
+    const result = await caller.alerts.dismissAlert({ id: alertId });
+
+    expect(result.id).toBe(alertId);
+    expect(result.dismissedAt).toBeInstanceOf(Date);
+    expect(result.dismissedBy).toBe(closerId);
+  });
+
+  it("resolves an alert and stops recurrence", async () => {
+    const closerId = crypto.randomUUID();
+    const leadId = crypto.randomUUID();
+
+    await insertUser({ id: closerId, name: "Closer", email: "closer@test.com", roleId: "role-closer" });
+    await insertLead({ id: leadId });
+    const alertId = await insertAlert({ leadId, targetUserId: closerId });
+
+    const caller = createCaller(closerId, "role-closer", ["leads:*", "alerts:write"]);
+    const result = await caller.alerts.resolveAlert({ id: alertId });
+
+    expect(result.id).toBe(alertId);
+    expect(result.resolvedAt).toBeInstanceOf(Date);
+  });
+
+  it("throws FORBIDDEN when dismissing an alert owned by another user", async () => {
+    const closerId = crypto.randomUUID();
+    const otherCloserId = crypto.randomUUID();
+    const leadId = crypto.randomUUID();
+
+    await insertUser({ id: closerId, name: "Closer A", email: "closer-a@test.com", roleId: "role-closer" });
+    await insertUser({ id: otherCloserId, name: "Closer B", email: "closer-b@test.com", roleId: "role-closer" });
+    await insertLead({ id: leadId });
+    const alertId = await insertAlert({ leadId, targetUserId: otherCloserId });
+
+    const caller = createCaller(closerId, "role-closer", ["leads:*", "alerts:write"]);
+
+    await expect(caller.alerts.dismissAlert({ id: alertId })).rejects.toBeInstanceOf(TRPCError);
+    await expect(caller.alerts.dismissAlert({ id: alertId })).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("throws NOT_FOUND when resolving a non-existent alert", async () => {
+    const closerId = crypto.randomUUID();
+    await insertUser({ id: closerId, name: "Closer", email: "closer@test.com", roleId: "role-closer" });
+
+    const caller = createCaller(closerId, "role-closer", ["leads:*", "alerts:write"]);
+
+    await expect(caller.alerts.resolveAlert({ id: crypto.randomUUID() })).rejects.toBeInstanceOf(TRPCError);
+    await expect(caller.alerts.resolveAlert({ id: crypto.randomUUID() })).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("throws BAD_REQUEST when resolving an already resolved alert", async () => {
+    const closerId = crypto.randomUUID();
+    const leadId = crypto.randomUUID();
+
+    await insertUser({ id: closerId, name: "Closer", email: "closer@test.com", roleId: "role-closer" });
+    await insertLead({ id: leadId });
+    const alertId = await insertAlert({ leadId, targetUserId: closerId, resolvedAt: new Date() });
+
+    const caller = createCaller(closerId, "role-closer", ["leads:*", "alerts:write"]);
+
+    await expect(caller.alerts.resolveAlert({ id: alertId })).rejects.toBeInstanceOf(TRPCError);
+    await expect(caller.alerts.resolveAlert({ id: alertId })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+});
