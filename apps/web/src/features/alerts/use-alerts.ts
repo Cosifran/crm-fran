@@ -1,8 +1,9 @@
 "use client";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { trpc } from "@/utils/trpc";
+import { useTrpcMutationWithToast } from "@/lib/use-trpc-mutation-with-toast";
 
 export type Alert = {
   id: string;
@@ -42,25 +43,37 @@ export function useAlerts(
 export function useDismissAlert() {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    ...trpc.alerts.dismissAlert.mutationOptions(),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: trpc.alerts.listAlerts.queryKey(),
-      });
+  return useTrpcMutationWithToast(
+    {
+      ...trpc.alerts.dismissAlert.mutationOptions(),
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({
+          queryKey: trpc.alerts.listAlerts.queryKey(),
+        });
+      },
     },
-  });
+    {
+      success: "Alerta descartada",
+      error: "Error al descartar la alerta",
+    },
+  );
 }
 
 export function useResolveAlert() {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    ...trpc.alerts.resolveAlert.mutationOptions(),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: trpc.alerts.listAlerts.queryKey(),
-      });
+  return useTrpcMutationWithToast(
+    {
+      ...trpc.alerts.resolveAlert.mutationOptions(),
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({
+          queryKey: trpc.alerts.listAlerts.queryKey(),
+        });
+      },
     },
-  });
+    {
+      success: "Alerta resuelta",
+      error: "Error al resolver la alerta",
+    },
+  );
 }

@@ -68,14 +68,12 @@ export const leadsRouter = router({
     }),
 
   /**
-   * @deprecated Use {@link leadsRouter.assignLead} instead.
+   * Asigna un lead a un caller para que empiece a trabajarlo.
+   * Falla con `CONFLICT` si el caller ya tiene un lead en estado "sin asignar".
    */
   assignLeadToCaller: permittedProcedure(["leads:write"])
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      console.warn(
-        "[leads.assignLeadToCaller] DEPRECATED — use leads.assignLead instead",
-      );
       return await assignLeadToCaller({ id: input.id, userId: ctx.session.user.id });
     }),
 

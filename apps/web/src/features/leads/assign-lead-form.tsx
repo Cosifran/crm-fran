@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { useForm } from "@tanstack/react-form";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
 import { trpc } from "@/utils/trpc";
+import { useTrpcMutationWithToast } from "@/lib/use-trpc-mutation-with-toast";
 import { Input } from "@crm-fran/ui/components/input";
 import { Textarea } from "@crm-fran/ui/components/textarea";
 import { Skeleton } from "@crm-fran/ui/components/skeleton";
@@ -76,7 +77,13 @@ export default function AssignLeadForm({
   onSuccess,
 }: AssignLeadFormProps) {
   const [branch, setBranch] = useState<"" | "yes" | "no">("");
-  const mutation = useMutation(trpc.leads.assignLead.mutationOptions());
+  const mutation = useTrpcMutationWithToast(
+    trpc.leads.assignLead.mutationOptions(),
+    {
+      success: "Lead asignado correctamente",
+      error: "Error al asignar el lead",
+    },
+  );
   const closers = useQuery(trpc.users.listClosers.queryOptions());
 
   const form = useForm({
@@ -90,7 +97,9 @@ export default function AssignLeadForm({
     onSubmit: async ({ value }) => {
       const payload = buildPayload(leadId, value as FormValue);
       mutation.mutate(payload, {
-        onSuccess: () => onSuccess?.(),
+        onSuccess: () => {
+          onSuccess?.();
+        },
       });
     },
   });

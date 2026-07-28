@@ -2,9 +2,9 @@
 import { trpc } from "@/utils/trpc";
 
 // Import React Hooks
-import { toast } from "sonner";
 import Loader from "@/components/loader";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
+import { useTrpcMutationWithToast } from "@/lib/use-trpc-mutation-with-toast";
 import { Button } from "@crm-fran/ui/components/button";
 
 export default function AssignLeadButton({
@@ -18,8 +18,12 @@ export default function AssignLeadButton({
 }) {
   const queryClient = useQueryClient();
 
-  const { mutate, isPending } = useMutation(
+  const { mutate, isPending } = useTrpcMutationWithToast(
     trpc.leads.assignLeadToCaller.mutationOptions(),
+    {
+      success: "Lead asignado correctamente",
+      error: "Error al asignar el lead",
+    },
   );
 
   const assignLeadFn = () => {
@@ -27,7 +31,6 @@ export default function AssignLeadButton({
       { id: leadId },
       {
         onSuccess: () => {
-          toast.success("Lead asignado correctamente");
           queryClient.invalidateQueries({
             queryKey: trpc.leads.listAll.queryKey(),
           });
@@ -38,9 +41,6 @@ export default function AssignLeadButton({
             queryKey: trpc.leads.listByUserId.queryKey(),
           });
           closeDialog();
-        },
-        onError: (error) => {
-          toast.error(`Error al asignar el lead ${error.message}`);
         },
       },
     );

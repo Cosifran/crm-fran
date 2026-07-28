@@ -2,6 +2,7 @@
 import { usePathname } from "next/navigation"
 const ROUTE_MAP: Record<string, string> = {
     "/": "Dashboard",
+    "/alerts": "Alertas",
     "/users": "Usuarios",
     "/leads": "Leads",
     "/analytical": "Analitica",
