@@ -1,12 +1,41 @@
 import { describe, it, expect } from "vitest";
-import { leads, type LeadQuestion, type LeadQuestions } from "./leads";
+import {
+	leads,
+	LEAD_QA_ROLE,
+	type LeadQARole,
+	type LeadQASessionItem,
+	type LeadQASession,
+} from "./leads";
 import { LEAD_STATE } from "./state";
 
 describe("leads schema", () => {
-	it("exports LeadQuestion and LeadQuestions types", () => {
-		const question: LeadQuestion = { question: "Q", answer: "A" };
-		const questions: LeadQuestions = [question];
-		expect(questions).toHaveLength(1);
+	it("exports LEAD_QA_ROLE and LeadQARole", () => {
+		const role: LeadQARole = LEAD_QA_ROLE.CALLER;
+		expect(role).toBe("caller");
+		expect(LEAD_QA_ROLE.CALLER).toBe("caller");
+		expect(LEAD_QA_ROLE.CLOSER).toBe("closer");
+	});
+
+	it("allows LeadQASessionItem with authorRole and authorId", () => {
+		const item: LeadQASessionItem = {
+			question: "Q",
+			answer: "A",
+			authorRole: LEAD_QA_ROLE.CALLER,
+			authorId: "u1",
+		};
+		expect(item.authorRole).toBe("caller");
+	});
+
+	it("allows LeadQASession array", () => {
+		const session: LeadQASession = [
+			{ question: "Q1", answer: "A1", authorRole: LEAD_QA_ROLE.CALLER, authorId: "u1" },
+			{ question: "Q2", answer: "A2", authorRole: LEAD_QA_ROLE.CLOSER, authorId: "u2" },
+		];
+		expect(session).toHaveLength(2);
+	});
+
+	it("leads.questions default is an empty array", () => {
+		expect(leads.questions.default).toEqual([]);
 	});
 
 	it("state default is the sin asignar enum value", () => {
