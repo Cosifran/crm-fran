@@ -1,5 +1,10 @@
 "use client";
 
+// DEPRECATED: use lead-view-drawer.tsx inline read-only view. This component
+// is kept for backward compatibility (lead-details.test.tsx still exercises
+// it) but is no longer rendered. The drawer is now polymorphic and routes
+// each role to its own edit form via assign-lead-drawer.tsx.
+
 import { usePermissionState } from "@crm-fran/ui/permissions";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@crm-fran/ui/components/tabs";
 import { Label } from "@crm-fran/ui/components/label";
