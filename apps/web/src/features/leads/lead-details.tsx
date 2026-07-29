@@ -1,126 +1,129 @@
+"use client";
+
+import { usePermissionState } from "@crm-fran/ui/permissions";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@crm-fran/ui/components/tabs";
 import { Label } from "@crm-fran/ui/components/label";
-import { Input } from "@crm-fran/ui/components/input";
-import { Textarea } from "@crm-fran/ui/components/textarea";
 
-interface Lead {
-    id: string;
-    name: string;
-    email: string;
-    phone: string;
-    state: string;
-    response: string;
-    feedback: string;
-    callerId: string | null;
-    closerId: string | null;
-    createdAt: string;
-    updatedAt: string;
+import { authClient } from "@/lib/auth-client";
 
-    decisionMaker?: string;
-    decisionMakerName?: string;
-    financialSource?: string;
-    recommendedProduct?: string;
-    urgency?: string;
-    extraInfo?: string;
-    closer?: string;
-    appointmentDate?: string;
-    appointmentTime?: string;
+import QASessionPanelComponent from "./qa-session-panel";
+
+// ── Local pure helpers (avoid bundling server-side @crm-fran/api) ────────────
+
+interface QASessionItem {
+  question: string;
+  answer: string;
+  authorRole: "caller" | "closer";
+  authorId: string | null;
 }
 
-export default function LeadDetails({
-    lead,
-}: {
-    lead: Lead;
-}) {
-    return (
-        <div className="space-y-6">
+function partitionQASession(items: readonly QASessionItem[]): {
+  caller: QASessionItem[];
+  closer: QASessionItem[];
+} {
+  const caller: QASessionItem[] = [];
+  const closer: QASessionItem[] = [];
+  for (const item of items) {
+    if (item.authorRole === "closer") {
+      closer.push(item);
+    } else {
+      caller.push(item);
+    }
+  }
+  return { caller, closer };
+}
 
-            <div className="space-y-4">
+function isCloserOf(lead: { closerId: string | null }, userId: string): boolean {
+  return lead.closerId !== null && lead.closerId === userId;
+}
 
-                <div className="space-y-2">
-                    <Label>¿Es el decisor?</Label>
+// ── Public types ─────────────────────────────────────────────────────────────
 
-                    <Input
-                        value={lead.decisionMaker ?? ""}
-                        disabled
-                    />
-                </div>
+export interface LeadDetailsData {
+  id: string;
+  closerId: string | null;
+  questions: QASessionItem[];
+}
 
-                <div className="space-y-2">
-                    <Label>Persona correcta</Label>
+interface LeadDetailsProps {
+  lead: LeadDetailsData;
+}
 
-                    <Input
-                        value={lead.decisionMakerName ?? ""}
-                        disabled
-                    />
-                </div>
+// ── Component ────────────────────────────────────────────────────────────────
 
-                <div className="space-y-2">
-                    <Label>Capacidad económica</Label>
+export default function LeadDetails({ lead }: LeadDetailsProps) {
+  const { data: session } = authClient.useSession();
+  const { permissions } = usePermissionState();
 
-                    <Textarea
-                        value={lead.financialSource ?? ""}
-                        disabled
-                        className="min-h-28 resize-none"
-                    />
-                </div>
+  const userId = session?.user?.id;
+  const isAdmin = permissions.includes("*");
+  const isCloser = userId != null && isCloserOf(lead, userId);
 
-                <div className="space-y-2">
-                    <Label>Producto recomendado</Label>
+  const { caller: callerItems, closer: closerItems } = partitionQASession(lead.questions ?? []);
 
-                    <Input
-                        value={lead.recommendedProduct ?? ""}
-                        disabled
-                    />
-                </div>
+  const callerEditable = isAdmin;
+  const closerEditable = isAdmin || isCloser;
 
-                <div className="space-y-2">
-                    <Label>Urgencia</Label>
+  return (
+    <>
+      {/* ── Mobile: Tabs ──────────────────────────────────────────── */}
+      <div className="md:hidden">
+        <Tabs defaultValue="caller">
+          <TabsList className="w-full">
+            <TabsTrigger value="caller" className="flex-1">
+              Sesión del caller
+            </TabsTrigger>
+            <TabsTrigger value="closer" className="flex-1">
+              Sesión del closer
+            </TabsTrigger>
+          </TabsList>
 
-                    <Textarea
-                        value={lead.urgency ?? ""}
-                        disabled
-                        className="min-h-28 resize-none"
-                    />
-                </div>
-
-                <div className="space-y-2">
-                    <Label>Información extra</Label>
-
-                    <Textarea
-                        value={lead.extraInfo ?? ""}
-                        disabled
-                        className="min-h-28 resize-none"
-                    />
-                </div>
-
-                <div className="space-y-2">
-                    <Label>Closer asignado</Label>
-
-                    <Input
-                        value={lead.closer ?? ""}
-                        disabled
-                    />
-                </div>
-
-                <div className="space-y-2">
-                    <Label>Fecha</Label>
-
-                    <Input
-                        value={lead.appointmentDate ?? ""}
-                        disabled
-                    />
-                </div>
-
-                <div className="space-y-2">
-                    <Label>Hora</Label>
-
-                    <Input
-                        value={lead.appointmentTime ?? ""}
-                        disabled
-                    />
-                </div>
-
+          <TabsContent value="caller">
+            <div className="pt-4">
+              <QASessionPanelComponent
+                role="caller"
+                items={callerItems}
+                leadId={lead.id}
+                editable={callerEditable}
+              />
             </div>
+          </TabsContent>
+
+          <TabsContent value="closer">
+            <div className="pt-4">
+              <QASessionPanelComponent
+                role="closer"
+                items={closerItems}
+                leadId={lead.id}
+                editable={closerEditable}
+              />
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      {/* ── Desktop: two-column grid ──────────────────────────────── */}
+      <div className="hidden md:grid md:grid-cols-2 md:gap-6">
+        <div className="space-y-3">
+          <Label className="text-base font-semibold">Sesión del caller</Label>
+          <QASessionPanelComponent
+            role="caller"
+            items={callerItems}
+            leadId={lead.id}
+            editable={callerEditable}
+          />
         </div>
-    );
+
+        <div className="space-y-3">
+          <Label className="text-base font-semibold">Sesión del closer</Label>
+          <QASessionPanelComponent
+            role="closer"
+            items={closerItems}
+            leadId={lead.id}
+            editable={closerEditable}
+          />
+        </div>
+      </div>
+    </>
+  );
 }
