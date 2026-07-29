@@ -11,6 +11,7 @@ describe("alerts schema", () => {
 		expect(ALERT_KIND.FOLLOW_UP).toBe("follow_up");
 		expect(ALERT_SEVERITY.INFO).toBe("info");
 		expect(ALERT_SEVERITY.WARNING).toBe("warning");
+		expect(ALERT_SEVERITY.HIGH).toBe("high");
 		expect(ALERT_SEVERITY.URGENT).toBe("urgent");
 	});
 

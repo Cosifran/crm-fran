@@ -57,6 +57,13 @@
       "when": 1785112160000,
       "tag": "0007_create_alerts",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1785284628235,
+      "tag": "0008_backfill_lead_qa_role",
+      "breakpoints": true
     }
   ]
 }
