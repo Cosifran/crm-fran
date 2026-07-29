@@ -7,7 +7,10 @@ import {
   assignLead,
   assignLeadToCaller,
   getWithoutAssigned,
+  recordCloserAnswers,
+  adminEditLeadQASession,
 } from "../leads/services/index";
+import { LeadQASessionItemSchema } from "../leads/qa-session-item";
 import { permittedProcedure } from "@crm-fran/api/trpc/trpc";
 
 const idInput = z.object({ id: z.string() });
@@ -17,6 +20,11 @@ const createLeadInput = z.object({
   phone: z.string(),
 });
 const updateLeadInput = createLeadInput.partial().extend({ id: z.string() });
+
+const qaSessionInput = z.object({
+  leadId: z.string().min(1),
+  items: z.array(LeadQASessionItemSchema),
+});
 
 const assignLeadInput = z.discriminatedUnion("isContacted", [
   z.object({
@@ -94,5 +102,17 @@ export const leadsRouter = router({
     .input(idInput)
     .mutation(async ({ input }) => {
       return { success: true, id: input.id };
+    }),
+
+  recordCloserAnswers: permittedProcedure(["leads:write"])
+    .input(qaSessionInput)
+    .mutation(async ({ ctx, input }) => {
+      return await recordCloserAnswers({ ctx, input });
+    }),
+
+  adminEditLeadQASession: permittedProcedure(["*"])
+    .input(qaSessionInput)
+    .mutation(async ({ ctx, input }) => {
+      return await adminEditLeadQASession({ ctx, input });
     }),
 });
