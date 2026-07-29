@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { sql, db, eq, inArray } from "@crm-fran/db";
-import { leads, user } from "@crm-fran/db/schema/index";
+import { sql, db, inArray } from "@crm-fran/db";
+import { leads, user, LEAD_QA_ROLE, type LeadQASessionItem } from "@crm-fran/db/schema/index";
 
 const MIGRATION = sql`
   UPDATE leads l
@@ -58,7 +58,7 @@ describe("0008_backfill_lead_qa_role migration", () => {
 			email: `${leadId}@test.com`,
 			phone: "123456789",
 			callerId,
-			questions: [{ question: "Q", answer: "A" }],
+			questions: [{ question: "Q", answer: "A" }] as LeadQASessionItem[],
 		});
 
 		await db.execute(MIGRATION);
@@ -79,11 +79,11 @@ describe("0008_backfill_lead_qa_role migration", () => {
 		created.userIds.push(callerId);
 		created.leadIds.push(leadId);
 
-		const initialQuestions = [
+		const initialQuestions: LeadQASessionItem[] = [
 			{
 				question: "Q1",
 				answer: "A1",
-				authorRole: "caller",
+				authorRole: LEAD_QA_ROLE.CALLER,
 				authorId: callerId,
 			},
 		];

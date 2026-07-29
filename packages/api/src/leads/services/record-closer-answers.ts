@@ -24,6 +24,13 @@ export async function recordCloserAnswers({
 	ctx: Context;
 	input: RecordCloserAnswersInput;
 }): Promise<Lead> {
+	if (!ctx.session) {
+		throw new TRPCError({
+			code: "UNAUTHORIZED",
+			message: "Authentication required",
+		});
+	}
+
 	return db.transaction(async (tx) => {
 		const [lead] = await tx
 			.select()

@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { db, eq } from "@crm-fran/db";
 import { leads, type LeadQASessionItem } from "@crm-fran/db/schema/index";
 
+import { hasPermission } from "../../permissions";
 import type { Context } from "../../context";
 
 type Lead = typeof leads.$inferSelect;
@@ -19,7 +20,7 @@ export async function adminEditLeadQASession({
 	input: AdminEditLeadQASessionInput;
 }): Promise<Lead> {
 	return db.transaction(async (tx) => {
-		if (!ctx.permissions.includes("*")) {
+		if (!hasPermission(ctx.permissions, ["*"])) {
 			throw new TRPCError({
 				code: "FORBIDDEN",
 				message: "Admin permission required",

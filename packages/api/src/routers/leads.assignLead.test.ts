@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { db, eq, inArray } from "@crm-fran/db";
 import { alerts, leads, roles, user } from "@crm-fran/db/schema/index";
 import { LEAD_STATE } from "@crm-fran/db/schema/state";
+import { LEAD_QA_ROLE, type LeadQASessionItem } from "@crm-fran/db/schema/index";
 import { assignLead } from "../leads/services/assign-lead";
 
 describe("assignLead service", () => {
@@ -69,6 +70,12 @@ describe("assignLead service", () => {
       { question: "Decision maker name", answer: "John Doe" },
     ];
 
+    const expectedQuestions: LeadQASessionItem[] = questions.map((q) => ({
+      ...q,
+      authorRole: LEAD_QA_ROLE.CALLER,
+      authorId: callerId,
+    }));
+
     const result = await assignLead({
       callerId,
       input: {
@@ -88,7 +95,7 @@ describe("assignLead service", () => {
     expect(updated?.state).toBe(LEAD_STATE.ASIGNADO);
     expect(updated?.callerId).toBe(callerId);
     expect(updated?.closerId).toBe(closerId);
-    expect(updated?.questions).toEqual(questions);
+    expect(updated?.questions).toEqual(expectedQuestions);
 
     const alertRows = await db.select().from(alerts).where(eq(alerts.leadId, leadId));
     expect(alertRows).toHaveLength(1);
@@ -129,6 +136,33 @@ describe("assignLead service", () => {
     expect(alert?.intervalMinutes).toBe(1440);
     expect(alert?.targetUserId).toBe(callerId);
     expect(alert?.nextShowAt).toBeInstanceOf(Date);
+  });
+
+  it("preserves existing questions when isContacted is no", async () => {
+    const callerId = crypto.randomUUID();
+    const leadId = crypto.randomUUID();
+
+    await insertUser({ id: callerId, name: "Caller", email: "caller5@test.com", roleId: "role-caller" });
+
+    const existingQuestions: LeadQASessionItem[] = [
+      { question: "Q1", answer: "A1", authorRole: LEAD_QA_ROLE.CALLER, authorId: callerId },
+    ];
+
+    await insertLead({ id: leadId });
+    await db
+      .update(leads)
+      .set({ questions: existingQuestions })
+      .where(eq(leads.id, leadId));
+
+    const result = await assignLead({
+      callerId,
+      input: { leadId, isContacted: "no" },
+    });
+
+    expect(result.leadId).toBe(leadId);
+
+    const updated = await db.query.leads.findFirst({ where: (table, { eq }) => eq(table.id, leadId) });
+    expect(updated?.questions).toEqual(existingQuestions);
   });
 
   it("throws NOT_FOUND when the lead does not exist", async () => {

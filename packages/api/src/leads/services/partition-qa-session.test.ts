@@ -43,9 +43,9 @@ describe("partitionQASession", () => {
 			{ question: "LQ1", answer: "LA1", authorRole: LEAD_QA_ROLE.CLOSER, authorId: "u2" },
 		];
 
-		const result = partitionQASession([callerItems[0], closerItems[0], callerItems[1]]);
+		const result = partitionQASession([callerItems[0]!, closerItems[0]!, callerItems[1]!]);
 
-		expect(result.caller).toEqual([callerItems[0], callerItems[1]]);
+		expect(result.caller).toEqual(callerItems);
 		expect(result.closer).toEqual(closerItems);
 	});
 

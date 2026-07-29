@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterEach } from "vitest";
 import { TRPCError } from "@trpc/server";
-import { db, eq, inArray } from "@crm-fran/db";
+import { db, inArray } from "@crm-fran/db";
 import { leads, roles, user, type LeadQASessionItem, LEAD_QA_ROLE } from "@crm-fran/db/schema/index";
 import type { Context } from "../../context";
 
