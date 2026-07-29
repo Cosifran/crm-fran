@@ -9,6 +9,7 @@ export const router = t.router;
 export const publicProcedure = t.procedure;
 
 export { processRecurringAlerts } from "./alerts/services/index";
+export { partitionQASession, isCloserOf, hasCloserSession } from "./leads/services/index";
 
 export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
   if (!ctx.session) {
