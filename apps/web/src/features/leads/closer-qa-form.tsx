@@ -59,21 +59,22 @@ const conditionalFieldNames: FieldName[] = [
   "urgencyReason",
   "scheduledDate",
   "scheduledTime",
+  "extraInfo",
 ];
 
-interface AssignLeadFormProps {
+interface CloserQAFormProps {
   leadId: string;
   onCancel?: () => void;
   onSuccess?: () => void;
 }
 
-export default function CloserQAForm({ leadId, onSuccess }: AssignLeadFormProps) {
+export default function CloserQAForm({ leadId, onSuccess }: CloserQAFormProps) {
   const [branch, setBranch] = useState<"" | "yes" | "no">("");
   const mutation = useTrpcMutationWithToast(
     trpc.leads.recordCloserAnswers.mutationOptions(),
     {
-      success: "Lead asignado correctamente",
-      error: "Error al asignar el lead",
+      success: "Respuestas guardadas correctamente",
+      error: "Error al guardar las respuestas",
     },
   );
 
@@ -81,7 +82,7 @@ export default function CloserQAForm({ leadId, onSuccess }: AssignLeadFormProps)
     defaultValues,
     validators: {
       onSubmit: ({ value }) => {
-        const result = validateAssignLead(value as FormValue);
+        const result = validateCloserAnswers(value as FormValue);
         return result;
       },
     },
@@ -112,7 +113,7 @@ export default function CloserQAForm({ leadId, onSuccess }: AssignLeadFormProps)
     <form
       className="mx-auto w-full max-w-lg"
       id="closer-qa-form"
-      data-testid="assign-lead-form"
+      data-testid="closer-qa-form"
       onSubmit={(e) => {
         e.preventDefault();
         form.handleSubmit();
@@ -344,7 +345,7 @@ export default function CloserQAForm({ leadId, onSuccess }: AssignLeadFormProps)
   );
 }
 
-function validateAssignLead(value: FormValue) {
+function validateCloserAnswers(value: FormValue) {
   const fieldErrors: Record<string, string[]> = {};
 
   if (value.isContacted !== "yes" && value.isContacted !== "no") {

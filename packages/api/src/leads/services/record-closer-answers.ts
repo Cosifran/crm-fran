@@ -67,14 +67,11 @@ export async function recordCloserAnswers({
         ),
     );
 
-    const updatedQuestions: LeadQASessionItem[] =
-      isContacted === "yes"
-        ? questions.map((q) => ({
-            ...q,
-            authorRole: LEAD_QA_ROLE.CLOSER,
-            authorId: ctx.session.user.id,
-          }))
-        : ((lead.questions as LeadQASessionItem[]) ?? []);
+    const updatedQuestions: LeadQASessionItem[] = questions.map((q) => ({
+      ...q,
+      authorRole: LEAD_QA_ROLE.CLOSER,
+      authorId: ctx.session.user.id,
+    }));
 
     const [updated] = await tx
       .update(leads)

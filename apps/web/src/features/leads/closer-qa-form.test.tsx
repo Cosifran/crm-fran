@@ -1,4 +1,4 @@
-import { describe, expect, it, afterEach } from "vitest";
+import { describe, expect, it, vi, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 import CloserQAForm from "./closer-qa-form";
 
@@ -6,9 +6,46 @@ afterEach(() => {
   cleanup();
 });
 
-describe("CloserQAForm — sin botón propio", () => {
+// ── Mocks ────────────────────────────────────────────────────────────────────
+
+const mocks = vi.hoisted(() => ({
+  mutate: vi.fn(),
+  recordCloserAnswersMutationOptions: vi.fn(() => ({
+    mutationKey: ["leads", "recordCloserAnswers"],
+  })),
+}));
+
+vi.mock("@/utils/trpc", () => ({
+  trpc: {
+    leads: {
+      recordCloserAnswers: {
+        mutationOptions: mocks.recordCloserAnswersMutationOptions,
+      },
+    },
+  },
+}));
+
+vi.mock("@tanstack/react-query", async () => {
+  const actual = await vi.importActual<typeof import("@tanstack/react-query")>(
+    "@tanstack/react-query",
+  );
+  return {
+    ...actual,
+    useMutation: vi.fn(() => ({
+      mutate: mocks.mutate,
+      isPending: false,
+      status: "idle",
+      isSuccess: false,
+      isError: false,
+    })),
+  };
+});
+
+// ── Tests ────────────────────────────────────────────────────────────────────
+
+describe("CloserQAForm — integración con el drawer", () => {
   it("renders the form with the expected id for the drawer's submit button to attach", () => {
-    render(<CloserQAForm initialAnswers={{}} />);
+    render(<CloserQAForm leadId="lead-1" />);
 
     const form = screen.getByTestId("closer-qa-form");
     expect(form).toBeInTheDocument();
@@ -17,25 +54,10 @@ describe("CloserQAForm — sin botón propio", () => {
   });
 
   it("does NOT render any submit button of its own (el padre controla el submit)", () => {
-    render(<CloserQAForm initialAnswers={{}} />);
+    render(<CloserQAForm leadId="lead-1" />);
 
-    // El form no debe contener ningún <button type="submit">.
     const form = screen.getByTestId("closer-qa-form");
     const submitButtons = form.querySelectorAll('button[type="submit"]');
     expect(submitButtons).toHaveLength(0);
-  });
-
-  it("renders one input per closer question, prefilled from initialAnswers", () => {
-    render(
-      <CloserQAForm
-        initialAnswers={{
-          "¿De dónde sale su capacidad económica?": "USD 5000",
-          "Información extra": "En 2 semanas",
-        }}
-      />,
-    );
-
-    expect(screen.getByDisplayValue("USD 5000")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("En 2 semanas")).toBeInTheDocument();
   });
 });

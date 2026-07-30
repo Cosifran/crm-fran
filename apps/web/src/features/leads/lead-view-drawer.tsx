@@ -1,13 +1,8 @@
 "use client";
-//Import react
 import { useState } from "react";
-//Import lucide react
 import { Eye } from "lucide-react";
-//Import types
 import type { QASessionItem } from "@/app/types";
-//Import QA Questions from qa-questions.ts
 import { CALLER_QUESTIONS, CLOSER_QUESTIONS } from "./qa-questions";
-//Import components
 import { Button } from "@crm-fran/ui/components/button";
 import { Input } from "@crm-fran/ui/components/input";
 import { Textarea } from "@crm-fran/ui/components/textarea";
@@ -112,7 +107,7 @@ function ReadOnlyQAView({
               <ReadOnlySession
                 role="caller"
                 items={callerAnswers}
-                emptyMessage="Aún no se registraron respuestas del caller"
+                emptyMessage="Sin respuesta"
               />
             </div>
           </TabsContent>
@@ -122,7 +117,7 @@ function ReadOnlyQAView({
               <ReadOnlySession
                 role="closer"
                 items={closerAnswers}
-                emptyMessage="Aún no se registraron respuestas del closer"
+                emptyMessage="Sin respuesta"
               />
             </div>
           </TabsContent>
@@ -179,8 +174,10 @@ function ReadOnlySession({
                 disabled
                 className="min-h-20 resize-none"
               />
+            ) : answer ? (
+              <Input value={answer} disabled />
             ) : (
-              <Input value={answer || emptyMessage} disabled />
+              <p className="text-sm text-muted-foreground italic">{emptyMessage}</p>
             )}
           </div>
         );
