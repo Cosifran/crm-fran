@@ -17,6 +17,14 @@ interface LeadDrawerProps {
   title: string;
   type: "view" | "edit";
   description?: string;
+  /**
+   * id del <form> activo dentro del drawer. El botón Guardar del footer
+   * se asocia a ese form para disparar su submit. Si no se provee,
+   * el footer se renderiza sin botón Guardar (degradación segura).
+   */
+  submitFormId?: string;
+  /** Label del botón Guardar del footer. Default: "Guardar". */
+  submitLabel?: string;
   children: ReactNode;
 }
 
@@ -27,6 +35,8 @@ export default function LeadDrawer({
   description,
   children,
   type,
+  submitFormId,
+  submitLabel = "Guardar",
 }: LeadDrawerProps) {
   return (
     <Drawer open={open} onOpenChange={onOpenChange} swipeDirection="right">
@@ -50,9 +60,11 @@ export default function LeadDrawer({
                 Cancelar
               </Button>
 
-              <Button type="submit" form="assign-lead-form">
-                Guardar
-              </Button>
+              {submitFormId && (
+                <Button type="submit" form={submitFormId}>
+                  {submitLabel}
+                </Button>
+              )}
             </div>
           </DrawerFooter>
         )}

@@ -5,55 +5,59 @@ import { leads, type LeadQASessionItem } from "@crm-fran/db/schema/index";
 import { hasPermission } from "../../permissions";
 import type { Context } from "../../context";
 
-type Lead = typeof leads.$inferSelect;
-
 export type AdminEditLeadQASessionInput = {
-	leadId: string;
-	items: LeadQASessionItem[];
+  leadId: string;
+  isContacted: "yes" | "no";
+  scheduledDate?: string;
+  scheduledTime?: string;
+  questions?: Array<{ question: string; answer: string }>;
+  extraNotes?: string;
 };
 
 export async function adminEditLeadQASession({
-	ctx,
-	input,
+  ctx,
+  input,
 }: {
-	ctx: Context;
-	input: AdminEditLeadQASessionInput;
-}): Promise<Lead> {
-	return db.transaction(async (tx) => {
-		if (!hasPermission(ctx.permissions, ["*"])) {
-			throw new TRPCError({
-				code: "FORBIDDEN",
-				message: "Admin permission required",
-			});
-		}
+  ctx: Context;
+  input: AdminEditLeadQASessionInput;
+}) {
+  return db.transaction(async (tx) => {
+    if (!hasPermission(ctx.permissions, ["*"])) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Admin permission required",
+      });
+    }
 
-		const [lead] = await tx
-			.select()
-			.from(leads)
-			.where(eq(leads.id, input.leadId));
+    const { leadId, questions = [] } = input;
 
-		if (!lead) {
-			throw new TRPCError({
-				code: "NOT_FOUND",
-				message: "Lead not found",
-			});
-		}
+    const [lead] = await tx
+      .select()
+      .from(leads)
+      .where(eq(leads.id, leadId));
 
-		const [updated] = await tx
-			.update(leads)
-			.set({
-				questions: input.items,
-			})
-			.where(eq(leads.id, input.leadId))
-			.returning();
+    if (!lead) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Lead not found",
+      });
+    }
 
-		if (!updated) {
-			throw new TRPCError({
-				code: "INTERNAL_SERVER_ERROR",
-				message: "Failed to update lead",
-			});
-		}
+    const [updated] = await tx
+      .update(leads)
+      .set({
+        questions: questions as LeadQASessionItem[],
+      })
+      .where(eq(leads.id, leadId))
+      .returning();
 
-		return updated;
-	});
+    if (!updated) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Failed to update lead",
+      });
+    }
+
+    return updated;
+  });
 }

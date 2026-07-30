@@ -1,89 +1,119 @@
 import { TRPCError } from "@trpc/server";
 import { db, eq } from "@crm-fran/db";
 import {
-	leads,
-	LEAD_QA_ROLE,
-	type LeadQASessionItem,
+  alerts,
+  leads,
+  ALERT_KIND,
+  LEAD_QA_ROLE,
+  type LeadQASessionItem,
 } from "@crm-fran/db/schema/index";
+import { ALERT_KIND_CONFIG } from "../../alerts/services/config";
 
 import type { Context } from "../../context";
 import { isCloserOf } from "./is-closer-of";
-import { partitionQASession } from "./partition-qa-session";
-
-type Lead = typeof leads.$inferSelect;
 
 export type RecordCloserAnswersInput = {
-	leadId: string;
-	items: LeadQASessionItem[];
+  leadId: string;
+  isContacted: "yes" | "no";
+  scheduledDate?: string;
+  scheduledTime?: string;
+  questions?: Array<{ question: string; answer: string }>;
+  extraNotes?: string;
 };
 
 export async function recordCloserAnswers({
-	ctx,
-	input,
+  ctx,
+  input,
 }: {
-	ctx: Context;
-	input: RecordCloserAnswersInput;
-}): Promise<Lead> {
-	if (!ctx.session) {
-		throw new TRPCError({
-			code: "UNAUTHORIZED",
-			message: "Authentication required",
-		});
-	}
+  ctx: Context;
+  input: RecordCloserAnswersInput;
+}) {
+  if (!ctx.session) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Authentication required",
+    });
+  }
 
-	return db.transaction(async (tx) => {
-		const [lead] = await tx
-			.select()
-			.from(leads)
-			.where(eq(leads.id, input.leadId));
+  const { leadId, isContacted, questions = [] } = input;
 
-		if (!lead) {
-			throw new TRPCError({
-				code: "NOT_FOUND",
-				message: "Lead not found",
-			});
-		}
+  return db.transaction(async (tx) => {
+    const [lead] = await tx
+      .select()
+      .from(leads)
+      .where(eq(leads.id, input.leadId));
 
-		if (!isCloserOf(lead, ctx.session.user.id)) {
-			throw new TRPCError({
-				code: "FORBIDDEN",
-				message: "Only the assigned closer can record answers",
-			});
-		}
+    if (!lead) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Lead not found",
+      });
+    }
 
-		const allItems = (lead.questions ?? []) as LeadQASessionItem[];
+    if (!isCloserOf(lead, ctx.session.user.id)) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Only the assigned closer can record answers",
+      });
+    }
 
-		// Per SH-LEADQA-002: only items where authorRole === "closer" AND authorId === current user
-		// are replaced. Caller items are immutable. Other closers' items (forward-compat) are preserved.
-		const preservedItems = allItems.filter(
-			(item) =>
-				!(
-					item.authorRole === LEAD_QA_ROLE.CLOSER &&
-					item.authorId === ctx.session.user.id
-				),
-		);
+    const allItems = (lead.questions ?? []) as LeadQASessionItem[];
 
-		const closerItems: LeadQASessionItem[] = input.items.map((item) => ({
-			...item,
-			authorRole: LEAD_QA_ROLE.CLOSER,
-			authorId: ctx.session.user.id,
-		}));
+    const preservedItems = allItems.filter(
+      (item) =>
+        !(
+          item.authorRole === LEAD_QA_ROLE.CLOSER &&
+          item.authorId === ctx.session.user.id
+        ),
+    );
 
-		const [updated] = await tx
-			.update(leads)
-			.set({
-				questions: [...preservedItems, ...closerItems],
-			})
-			.where(eq(leads.id, input.leadId))
-			.returning();
+    const updatedQuestions: LeadQASessionItem[] =
+      isContacted === "yes"
+        ? questions.map((q) => ({
+            ...q,
+            authorRole: LEAD_QA_ROLE.CLOSER,
+            authorId: ctx.session.user.id,
+          }))
+        : ((lead.questions as LeadQASessionItem[]) ?? []);
 
-		if (!updated) {
-			throw new TRPCError({
-				code: "INTERNAL_SERVER_ERROR",
-				message: "Failed to update lead",
-			});
-		}
+    const [updated] = await tx
+      .update(leads)
+      .set({
+        questions: [...preservedItems, ...updatedQuestions],
+      })
+      .where(eq(leads.id, input.leadId))
+      .returning();
 
-		return updated;
-	});
+    if (!updated) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Failed to update lead",
+      });
+    }
+
+    let alertId: string | undefined;
+
+    if (isContacted === "no") {
+      const config = ALERT_KIND_CONFIG[ALERT_KIND.NO_CONTACT];
+      const [alert] = await tx
+        .insert(alerts)
+        .values({
+          id: crypto.randomUUID(),
+          leadId,
+          targetUserId: ctx.session.user.id,
+          kind: ALERT_KIND.NO_CONTACT,
+          message: config.message,
+          severity: config.severity,
+          intervalMinutes: config.intervalMinutes,
+          maxOccurrences: config.maxOccurrences,
+          nextShowAt: new Date(Date.now() + config.intervalMinutes * 60_000),
+          occurrences: 0,
+        })
+        .returning({ id: alerts.id });
+
+      alertId = alert?.id;
+    }
+
+    return { leadId: updated.id, alertId };
+  });
 }

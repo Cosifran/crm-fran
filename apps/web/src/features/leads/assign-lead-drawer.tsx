@@ -3,6 +3,11 @@
 import { useState } from "react";
 import { UserRoundPlus } from "lucide-react";
 import { Button } from "@crm-fran/ui/components/button";
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+} from "@crm-fran/ui/components/tabs";
 
 import { authClient } from "@/lib/auth-client";
 import { usePermissionState } from "@crm-fran/ui/permissions";
@@ -72,19 +77,20 @@ const MOCK_LEAD: Lead = {
 // ── Role detection ───────────────────────────────────────────────────────────
 
 type DrawerRole = "role-admin" | "role-caller" | "role-closer";
+type AdminTab = "caller" | "closer";
 
-// TODO phase 2: derive role from session.user.roleId via authClient.
-// Forzamos "caller" para que el dev server renderice el camino caller por defecto;
-// el switch admin/closer se puede testear cambiando MOCK_ROLE abajo.
-const MOCK_ROLE: DrawerRole = "role-closer";
+const FORM_ID_BY_ROLE_AND_TAB: Record<
+    Exclude<DrawerRole, "role-admin">,
+    string
+> = {
+    "role-caller": "assign-lead-form",
+    "role-closer": "closer-qa-form",
+};
 
 function resolveRole(
     permissions: readonly string[],
     sessionRoleId: string | null | undefined,
 ): DrawerRole {
-    if (MOCK_ROLE !== null) {
-        return MOCK_ROLE;
-    }
     if (permissions.includes("*")) {
         return "role-admin";
     }
@@ -100,16 +106,24 @@ export default function AssignLeadDrawer({
     lead: _lead,
 }: AssignLeadDrawerProps) {
     const [open, setOpen] = useState(false);
+    // Tab activo solo aplica al rol admin; los otros roles lo ignoran.
+    const [adminTab, setAdminTab] = useState<AdminTab>("caller");
 
     const { data: session } = authClient.useSession();
     const { permissions } = usePermissionState();
-
-    console.log(permissions);
 
     const role = resolveRole(
         permissions,
         (session?.user as { roleId?: string } | undefined)?.roleId,
     );
+
+    // El id del form que el botón Guardar del drawer debe disparar.
+    const submitFormId =
+        role === "role-admin"
+            ? adminTab === "caller"
+                ? "admin-caller-form"
+                : "admin-closer-form"
+            : FORM_ID_BY_ROLE_AND_TAB[role as Exclude<DrawerRole, "role-admin">];
 
     const titleByRole: Record<DrawerRole, { title: string; description: string }> = {
         "role-caller": {
@@ -130,7 +144,11 @@ export default function AssignLeadDrawer({
 
     return (
       <>
-        <Button variant="outline" onClick={() => setOpen(true)}>
+        <Button
+          variant="outline"
+          onClick={() => setOpen(true)}
+          aria-label="Abrir drawer"
+        >
           <UserRoundPlus />
         </Button>
 
@@ -140,18 +158,38 @@ export default function AssignLeadDrawer({
           title={title}
           description={description}
           type="edit"
+          submitFormId={submitFormId}
         >
           {role === "role-admin" && (
-            <AdminQAEditor
-              initialCallerAnswers={MOCK_CALLER_ANSWERS}
-              initialCloserAnswers={MOCK_CLOSER_ANSWERS}
-            />
+            <div className="space-y-4">
+              <Tabs
+                value={adminTab}
+                onValueChange={(v) => setAdminTab(v as AdminTab)}
+                className="w-full"
+              >
+                <TabsList className="w-full">
+                  <TabsTrigger value="caller" className="flex-1">
+                    Sesión del caller
+                  </TabsTrigger>
+                  <TabsTrigger value="closer" className="flex-1">
+                    Sesión del closer
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+
+              <AdminQAEditor
+                activeTab={adminTab}
+                initialCallerAnswers={MOCK_CALLER_ANSWERS}
+                initialCloserAnswers={MOCK_CLOSER_ANSWERS}
+              />
+            </div>
           )}
 
           {role === "role-closer" && (
             <CloserQAForm
-              initialAnswers={MOCK_CLOSER_ANSWERS}
-              isEditing={true}
+              leadId={MOCK_LEAD.id}
+              onCancel={() => setOpen(false)}
+              onSuccess={() => setOpen(false)}
             />
           )}
 

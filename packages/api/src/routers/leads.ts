@@ -10,7 +10,6 @@ import {
   recordCloserAnswers,
   adminEditLeadQASession,
 } from "../leads/services/index";
-import { LeadQASessionItemSchema } from "../leads/qa-session-item";
 import { permittedProcedure } from "@crm-fran/api/trpc/trpc";
 
 const idInput = z.object({ id: z.string() });
@@ -21,10 +20,25 @@ const createLeadInput = z.object({
 });
 const updateLeadInput = createLeadInput.partial().extend({ id: z.string() });
 
-const qaSessionInput = z.object({
-  leadId: z.string().min(1),
-  items: z.array(LeadQASessionItemSchema),
-});
+const qaSessionInput = z.discriminatedUnion("isContacted", [
+  z.object({
+    leadId: z.string().min(1),
+    isContacted: z.literal("yes"),
+    scheduledDate: z.string().min(1).optional(),
+    scheduledTime: z.string().min(1).optional(),
+    questions: z.array(
+      z.object({
+        question: z.string().min(1),
+        answer: z.string().min(1),
+      }),
+    ),
+    extraNotes: z.string().optional(),
+  }),
+  z.object({
+    leadId: z.string().min(1),
+    isContacted: z.literal("no"),
+  }),
+]);
 
 const assignLeadInput = z.discriminatedUnion("isContacted", [
   z.object({
