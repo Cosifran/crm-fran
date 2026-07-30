@@ -1,7 +1,13 @@
 "use client";
-
+//Import react
 import { useState } from "react";
+//Import lucide react
 import { Eye } from "lucide-react";
+//Import types
+import type { QASessionItem } from "@/app/types";
+//Import QA Questions from qa-questions.ts
+import { CALLER_QUESTIONS, CLOSER_QUESTIONS } from "./qa-questions";
+//Import components
 import { Button } from "@crm-fran/ui/components/button";
 import { Input } from "@crm-fran/ui/components/input";
 import { Textarea } from "@crm-fran/ui/components/textarea";
@@ -12,207 +18,173 @@ import {
   TabsContent,
 } from "@crm-fran/ui/components/tabs";
 import { Label } from "@crm-fran/ui/components/label";
-import {
-  FieldGroup,
-  Field,
-  FieldLabel,
-} from "@crm-fran/ui/components/field";
-
 import LeadDrawer from "@/components/lead-drawer/lead-drawer";
-import { CALLER_QUESTIONS, CLOSER_QUESTIONS } from "./qa-questions";
 
-// ── Types ────────────────────────────────────────────────────────────────────
-
-export interface LeadDrawerData {
-    id: string;
-    name: string;
-    email: string;
-    phone: string;
-    state: string;
-    caller: { id: string; name: string; email: string } | null;
-    closer: { id: string; name: string; email: string } | null;
+export interface LeadDetailsData {
+  questions: QASessionItem[];
 }
 
-// ── Mock data (fase 1) ───────────────────────────────────────────────────────
-// TODO phase 2: replace with trpc.leads.getById
-const MOCK_LEAD: LeadDrawerData = {
-    id: "lead-mock",
-    name: "Lead mock",
-    email: "mock@example.com",
-    phone: "+54 11 5555 5555",
-    state: "Nuevo",
-    caller: { id: "u-caller", name: "Caller mock", email: "caller@example.com" },
-    closer: { id: "u-closer", name: "Closer mock", email: "closer@example.com" },
-};
+const QUESTIONS_BY_ROLE = {
+  caller: CALLER_QUESTIONS,
+  closer: CLOSER_QUESTIONS,
+} as const;
 
-const MOCK_CALLER_ANSWERS: Record<string, string> = CALLER_QUESTIONS.reduce(
-    (acc, question, index) => {
-        acc[question] = index === 0 ? "Sí" : `Respuesta caller #${index}`;
-        return acc;
-    },
-    {} as Record<string, string>,
-);
+function partitionQASession(items: readonly QASessionItem[]): {
+  caller: QASessionItem[];
+  closer: QASessionItem[];
+} {
+  const caller: QASessionItem[] = [];
+  const closer: QASessionItem[] = [];
+  for (const item of items) {
+    if (item.authorRole === "closer") {
+      closer.push(item);
+    } else {
+      caller.push(item);
+    }
+  }
+  return { caller, closer };
+}
 
-const MOCK_CLOSER_ANSWERS: Record<string, string> = CLOSER_QUESTIONS.reduce(
-    (acc, question, index) => {
-        acc[question] = index === 0 ? "Confirmado" : `Respuesta closer #${index}`;
-        return acc;
-    },
-    {} as Record<string, string>,
-);
-
-// ── Component ────────────────────────────────────────────────────────────────
+function buildAnswersMap(items: QASessionItem[]): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const item of items) {
+    map[item.question] = item.answer;
+  }
+  return map;
+}
 
 export default function LeadViewDrawer({
-    lead: _lead,
+  lead: lead,
 }: {
-    lead: LeadDrawerData;
+  lead: LeadDetailsData;
 }) {
-    const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(false);
 
-    return (
-        <>
-            <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setOpen(true)}
-            >
-                <Eye className="size-4" />
-            </Button>
+  const { caller: callerItems, closer: closerItems } = partitionQASession(
+    lead.questions ?? [],
+  );
 
-            <LeadDrawer
-                open={open}
-                onOpenChange={setOpen}
-                title="Información del lead"
-                description="Datos registrados durante la llamada."
-                type="view"
-            >
-                <ReadOnlyQAView
-                    callerAnswers={MOCK_CALLER_ANSWERS}
-                    closerAnswers={MOCK_CLOSER_ANSWERS}
-                />
-            </LeadDrawer>
-        </>
-    );
+  return (
+    <>
+      <Button variant="outline" size="icon" onClick={() => setOpen(true)}>
+        <Eye className="size-4" />
+      </Button>
+
+      <LeadDrawer
+        open={open}
+        onOpenChange={setOpen}
+        title="Información del lead"
+        description="Datos registrados durante la llamada."
+        type="view"
+      >
+        <ReadOnlyQAView
+          callerAnswers={callerItems}
+          closerAnswers={closerItems}
+        />
+      </LeadDrawer>
+    </>
+  );
 }
 
-// ── Read-only inline view ────────────────────────────────────────────────────
-// Fase 1: 100% read-only para todos los roles. Sin inputs editables,
-// sin submit, sin botones que abran otros drawers.
-
 function ReadOnlyQAView({
-    callerAnswers,
-    closerAnswers,
+  callerAnswers,
+  closerAnswers,
 }: {
-    callerAnswers: Record<string, string>;
-    closerAnswers: Record<string, string>;
+  callerAnswers: QASessionItem[];
+  closerAnswers: QASessionItem[];
 }) {
-    return (
-        <>
-            {/* Mobile: tabs */}
-            <div className="md:hidden">
-                <Tabs defaultValue="caller">
-                    <TabsList className="w-full">
-                        <TabsTrigger value="caller" className="flex-1">
-                            Sesión del caller
-                        </TabsTrigger>
-                        <TabsTrigger value="closer" className="flex-1">
-                            Sesión del closer
-                        </TabsTrigger>
-                    </TabsList>
+  return (
+    <>
+      {/* Mobile: tabs */}
+      <div className="md:hidden">
+        <Tabs defaultValue="caller">
+          <TabsList className="w-full">
+            <TabsTrigger value="caller" className="flex-1">
+              Sesión del caller
+            </TabsTrigger>
+            <TabsTrigger value="closer" className="flex-1">
+              Sesión del closer
+            </TabsTrigger>
+          </TabsList>
 
-                    <TabsContent value="caller">
-                        <div className="pt-4">
-                            <ReadOnlySession
-                                questions={CALLER_QUESTIONS}
-                                answers={callerAnswers}
-                                emptyMessage="Aún no se registraron respuestas del caller"
-                            />
-                        </div>
-                    </TabsContent>
-
-                    <TabsContent value="closer">
-                        <div className="pt-4">
-                            <ReadOnlySession
-                                questions={CLOSER_QUESTIONS}
-                                answers={closerAnswers}
-                                emptyMessage="Aún no se registraron respuestas del closer"
-                            />
-                        </div>
-                    </TabsContent>
-                </Tabs>
+          <TabsContent value="caller">
+            <div className="pt-4">
+              <ReadOnlySession
+                role="caller"
+                items={callerAnswers}
+                emptyMessage="Aún no se registraron respuestas del caller"
+              />
             </div>
+          </TabsContent>
 
-            {/* Desktop: two-column grid */}
-            <div className="hidden md:grid md:grid-cols-2 md:gap-6">
-                <div className="flex flex-col gap-3">
-                    <Label className="text-base font-semibold">Sesión del caller</Label>
-                    <ReadOnlySession
-                        questions={CALLER_QUESTIONS}
-                        answers={callerAnswers}
-                        emptyMessage="Aún no se registraron respuestas del caller"
-                    />
-                </div>
-
-                <div className="flex flex-col gap-3">
-                    <Label className="text-base font-semibold">Sesión del closer</Label>
-                    <ReadOnlySession
-                        questions={CLOSER_QUESTIONS}
-                        answers={closerAnswers}
-                        emptyMessage="Aún no se registraron respuestas del closer"
-                    />
-                </div>
+          <TabsContent value="closer">
+            <div className="pt-4">
+              <ReadOnlySession
+                role="closer"
+                items={closerAnswers}
+                emptyMessage="Aún no se registraron respuestas del closer"
+              />
             </div>
-        </>
-    );
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      {/* Desktop: two-column grid */}
+      <div className="hidden md:grid md:grid-cols-2 md:gap-6">
+        <div className="flex flex-col gap-3">
+          <Label className="text-base font-semibold">Sesión del caller</Label>
+          <ReadOnlySession
+            role="caller"
+            items={callerAnswers}
+            emptyMessage="Aún no se registraron respuestas del caller"
+          />
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <Label className="text-base font-semibold">Sesión del closer</Label>
+          <ReadOnlySession
+            role="closer"
+            items={closerAnswers}
+            emptyMessage="Aún no se registraron respuestas del closer"
+          />
+        </div>
+      </div>
+    </>
+  );
 }
 
 function ReadOnlySession({
-    questions,
-    answers,
-    emptyMessage,
+  role,
+  items,
+  emptyMessage,
 }: {
-    questions: readonly string[];
-    answers: Record<string, string>;
-    emptyMessage: string;
+  role: "caller" | "closer";
+  items: QASessionItem[];
+  emptyMessage: string;
 }) {
-    const hasAnyAnswer = questions.some(
-        (question) => (answers[question] ?? "").trim() !== "",
-    );
+  const questions = QUESTIONS_BY_ROLE[role];
+  const existingAnswers = buildAnswersMap(items);
 
-    if (!hasAnyAnswer) {
+  return (
+    <div className="space-y-4">
+
+      {questions.map((question) => {
+        const answer = existingAnswers[question] ?? "";
         return (
-            <p className="text-muted-foreground text-sm">{emptyMessage}</p>
+          <div key={question} className="space-y-2">
+            <span className="text-sm font-medium">{question}</span>
+            {answer.length > 80 ? (
+              <Textarea
+                value={answer}
+                disabled
+                className="min-h-20 resize-none"
+              />
+            ) : (
+              <Input value={answer || emptyMessage} disabled />
+            )}
+          </div>
         );
-    }
-
-    return (
-        <FieldGroup>
-            {questions.map((question) => {
-                const answer = answers[question] ?? "";
-                if (answer.trim() === "") {
-                    return null;
-                }
-                const isLongText =
-                    question.includes("económica") ||
-                    question.includes("urgencia") ||
-                    question.includes("extra");
-
-                return (
-                    <Field key={question}>
-                        <FieldLabel>{question}</FieldLabel>
-                        {isLongText ? (
-                            <Textarea
-                                value={answer}
-                                disabled
-                                className="min-h-20 resize-none"
-                            />
-                        ) : (
-                            <Input value={answer} disabled />
-                        )}
-                    </Field>
-                );
-            })}
-        </FieldGroup>
-    );
+      })}
+    </div>
+  );
 }

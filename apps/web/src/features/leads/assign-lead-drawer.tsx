@@ -28,6 +28,12 @@ export interface Lead {
     state: string;
     response: string;
     feedback: string;
+    questions: {
+        question: string;
+        answer: string;
+        authorRole: "caller" | "closer";
+        authorId: string | null;
+    }[];
     callerId: string | null;
     closerId: string | null;
     caller: { id: string; name: string; email: string } | null;
@@ -58,22 +64,6 @@ const MOCK_CLOSER_ANSWERS: Record<string, string> = CLOSER_QUESTIONS.reduce(
     {} as Record<string, string>,
 );
 
-const MOCK_LEAD: Lead = {
-    id: "lead-mock",
-    name: "Lead mock",
-    email: "mock@example.com",
-    phone: "+54 11 5555 5555",
-    state: "Nuevo",
-    response: "",
-    feedback: "",
-    callerId: "u-caller",
-    closerId: "u-closer",
-    caller: { id: "u-caller", name: "Caller mock", email: "caller@example.com" },
-    closer: { id: "u-closer", name: "Closer mock", email: "closer@example.com" },
-    createdAt: "2026-01-01T00:00:00Z",
-    updatedAt: "2026-01-01T00:00:00Z",
-};
-
 // ── Role detection ───────────────────────────────────────────────────────────
 
 type DrawerRole = "role-admin" | "role-caller" | "role-closer";
@@ -103,7 +93,7 @@ function resolveRole(
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function AssignLeadDrawer({
-    lead: _lead,
+    lead,
 }: AssignLeadDrawerProps) {
     const [open, setOpen] = useState(false);
     // Tab activo solo aplica al rol admin; los otros roles lo ignoran.
@@ -187,7 +177,7 @@ export default function AssignLeadDrawer({
 
           {role === "role-closer" && (
             <CloserQAForm
-              leadId={MOCK_LEAD.id}
+              leadId={lead.id}
               onCancel={() => setOpen(false)}
               onSuccess={() => setOpen(false)}
             />
@@ -195,7 +185,7 @@ export default function AssignLeadDrawer({
 
           {role === "role-caller" && (
             <AssignLeadForm
-              leadId={MOCK_LEAD.id}
+              leadId={lead.id}
               onCancel={() => setOpen(false)}
               onSuccess={() => setOpen(false)}
             />
