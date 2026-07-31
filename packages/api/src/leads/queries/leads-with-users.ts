@@ -11,6 +11,7 @@ export const leadWithUsersSelect = {
   email: leads.email,
   phone: leads.phone,
   state: leads.state,
+  questions: leads.questions,
   response: leads.response,
   feedback: leads.feedback,
   callerId: leads.callerId,

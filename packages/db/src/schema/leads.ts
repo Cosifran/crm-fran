@@ -8,8 +8,21 @@ import {
 import { user } from "./auth";
 import { LEAD_STATE, type LeadState } from "./state";
 
-export type LeadQuestion = { question: string; answer: string };
-export type LeadQuestions = LeadQuestion[];
+export const LEAD_QA_ROLE = {
+  CALLER: "caller",
+  CLOSER: "closer",
+} as const;
+
+export type LeadQARole = (typeof LEAD_QA_ROLE)[keyof typeof LEAD_QA_ROLE];
+
+export type LeadQASessionItem = {
+  question: string;
+  answer: string;
+  authorRole: LeadQARole;
+  authorId: string | null;
+};
+
+export type LeadQASession = LeadQASessionItem[];
 
 export const leads = pgTable("leads", {
     id: text("id").primaryKey(),
@@ -17,7 +30,7 @@ export const leads = pgTable("leads", {
     email: text("email").notNull().unique(),
     phone: text("phone").notNull(),
     questions: json("questions")
-      .$type<LeadQuestions>()
+      .$type<LeadQASession>()
       .default([])
       .notNull(),
     state: text("state")

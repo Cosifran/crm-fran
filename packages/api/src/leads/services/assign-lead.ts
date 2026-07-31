@@ -6,7 +6,8 @@ import {
 	user,
 	LEAD_STATE,
 	ALERT_KIND,
-	type LeadQuestions,
+	LEAD_QA_ROLE,
+	type LeadQASessionItem,
 } from "@crm-fran/db/schema/index";
 import { ALERT_KIND_CONFIG } from "../../alerts/services/config";
 
@@ -53,8 +54,14 @@ export async function assignLead({
 			}
 		}
 
-		const updatedQuestions: LeadQuestions =
-			isContacted === "yes" ? questions : (lead.questions as LeadQuestions) ?? [];
+		const updatedQuestions: LeadQASessionItem[] =
+			isContacted === "yes"
+				? questions.map((q) => ({
+						...q,
+						authorRole: LEAD_QA_ROLE.CALLER,
+						authorId: callerId,
+					}))
+				: (lead.questions as LeadQASessionItem[]) ?? [];
 
 		const [updated] = await tx
 			.update(leads)
