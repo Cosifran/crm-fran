@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "@tanstack/react-form";
+import { useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
-
+import type { QASessionItem } from "@/app/types";
 import { trpc } from "@/utils/trpc";
 import { useTrpcMutationWithToast } from "@/lib/use-trpc-mutation-with-toast";
 import { Input } from "@crm-fran/ui/components/input";
 import { Textarea } from "@crm-fran/ui/components/textarea";
-import { Skeleton } from "@crm-fran/ui/components/skeleton";
 import {
   Select,
   SelectContent,
@@ -64,22 +64,60 @@ const conditionalFieldNames: FieldName[] = [
 
 interface CloserQAFormProps {
   leadId: string;
+  leadQuestions: QASessionItem[];
   onCancel?: () => void;
   onSuccess?: () => void;
+  onSubmitLabelChange?: (label: string) => void;
 }
 
-export default function CloserQAForm({ leadId, onSuccess }: CloserQAFormProps) {
-  const [branch, setBranch] = useState<"" | "yes" | "no">("");
+export default function CloserQAForm({
+  leadId,
+  leadQuestions,
+  onSuccess,
+  onSubmitLabelChange,
+}: CloserQAFormProps) {
+  const queryClient = useQueryClient();
+    const closerAnswers = leadQuestions.filter(
+      (q) => q.authorRole === "closer",
+    );
+    const hasCloserAnswers = closerAnswers.length > 0;
+
+  const parsedDefaults = closerAnswers.reduce(
+    (acc, q) => {
+      if (q.questionKey && q.questionKey in defaultValues) {
+        acc[q.questionKey as FieldName] = q.answer;
+      }
+      return acc;
+    },
+    { ...defaultValues },
+  );
+
+   const [branch, setBranch] = useState<"" | "Si" | "No">(
+     () => (parsedDefaults.isContacted as "" | "Si" | "No") || "",
+   );
+
+  const toastMessages = hasCloserAnswers
+    ? {
+        success: "Respuestas editadas correctamente",
+        error: "Error al editar las respuestas",
+      }
+    : {
+        success: "Respuestas guardadas correctamente",
+        error: "Error al guardar las respuestas",
+      };
+
+  const submitLabel = hasCloserAnswers ? "Editar" : "Guardar";
+  useEffect(() => {
+    onSubmitLabelChange?.(submitLabel);
+  }, [submitLabel, onSubmitLabelChange]);
+
   const mutation = useTrpcMutationWithToast(
     trpc.leads.recordCloserAnswers.mutationOptions(),
-    {
-      success: "Respuestas guardadas correctamente",
-      error: "Error al guardar las respuestas",
-    },
+    toastMessages,
   );
 
   const form = useForm({
-    defaultValues,
+    defaultValues: parsedDefaults,
     validators: {
       onSubmit: ({ value }) => {
         const result = validateCloserAnswers(value as FormValue);
@@ -91,6 +129,9 @@ export default function CloserQAForm({ leadId, onSuccess }: CloserQAFormProps) {
       mutation.mutate(payload, {
         onSuccess: () => {
           onSuccess?.();
+          queryClient.invalidateQueries({
+            queryKey: trpc.leads.listByUserId.queryKey(),
+          });
         },
       });
     },
@@ -103,8 +144,8 @@ export default function CloserQAForm({ leadId, onSuccess }: CloserQAFormProps) {
   };
 
   const handleIsContactedChange = (value: string) => {
-    setBranch(value as "yes" | "no" | "");
-    if (value === "no" || value === "yes") {
+    setBranch(value as "Si" | "No" | "");
+    if (value === "No" || value === "Si") {
       resetConditionalFields();
     }
   };
@@ -139,8 +180,8 @@ export default function CloserQAForm({ leadId, onSuccess }: CloserQAFormProps) {
                   <SelectValue placeholder="Seleccione una opción" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="yes">Sí</SelectItem>
-                  <SelectItem value="no">No</SelectItem>
+                  <SelectItem value="Si">Si</SelectItem>
+                  <SelectItem value="No">No</SelectItem>
                 </SelectContent>
               </Select>
               <FieldError>
@@ -152,7 +193,7 @@ export default function CloserQAForm({ leadId, onSuccess }: CloserQAFormProps) {
           )}
         </form.Field>
 
-        {branch === "yes" && (
+        {branch === "Si" && (
           <>
             <form.Field name="isDecisionMaker">
               {(field) => (
@@ -168,8 +209,8 @@ export default function CloserQAForm({ leadId, onSuccess }: CloserQAFormProps) {
                       <SelectValue placeholder="Seleccione una opción" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="yes">Sí</SelectItem>
-                      <SelectItem value="no">No</SelectItem>
+                      <SelectItem value="Si">Si</SelectItem>
+                      <SelectItem value="No">No</SelectItem>
                     </SelectContent>
                   </Select>
                   <FieldError>
@@ -348,11 +389,11 @@ export default function CloserQAForm({ leadId, onSuccess }: CloserQAFormProps) {
 function validateCloserAnswers(value: FormValue) {
   const fieldErrors: Record<string, string[]> = {};
 
-  if (value.isContacted !== "yes" && value.isContacted !== "no") {
+  if (value.isContacted !== "Si" && value.isContacted !== "No") {
     fieldErrors.isContacted = ["Seleccione una opción"];
   }
 
-  if (value.isContacted === "yes") {
+  if (value.isContacted === "Si") {
     if (value.isDecisionMaker === "") {
       fieldErrors.isDecisionMaker = ["Seleccione una opción"];
     }
@@ -377,53 +418,80 @@ function validateCloserAnswers(value: FormValue) {
     }
   }
 
-  return Object.keys(fieldErrors).length > 0 ? { fields: fieldErrors } : undefined;
+  return Object.keys(fieldErrors).length > 0
+    ? { fields: fieldErrors }
+    : undefined;
 }
 
 function buildPayload(
   leadId: string,
   value: FormValue,
-): { leadId: string; isContacted: "no" } | {
-  leadId: string;
-  isContacted: "yes";
-  questions: { question: string; answer: string }[];
-  scheduledDate: string;
-  scheduledTime: string;
-  extraNotes: string;
-} {
-  if (value.isContacted === "no") {
-    return { leadId, isContacted: "no" };
+):
+  | { leadId: string; isContacted: "No" }
+  | {
+      leadId: string;
+      isContacted: "Si";
+      questions: { questionKey: string; question: string; answer: string }[];
+      scheduledDate: string;
+      scheduledTime: string;
+      extraNotes: string;
+    } {
+  if (value.isContacted === "No") {
+    return { leadId, isContacted: "No" };
   }
 
   return {
     leadId,
-    isContacted: "yes",
+    isContacted: "Si",
     questions: [
-      { question: "¿Fué contactado?", answer: "Sí" },
       {
-        question: "¿Es el decisor?",
-        answer: value.isDecisionMaker === "yes" ? "Sí" : "No",
+        questionKey: "isContacted",
+        question: "¿Fué contactado?",
+        answer: "Si",
       },
       {
+        questionKey: "isDecisionMaker",
+        question: "¿Es el decisor?",
+        answer: value.isDecisionMaker === "Si" ? "Si" : "No",
+      },
+      {
+        questionKey: "decisionMakerName",
         question: "¿Quién es la persona correcta?",
         answer: value.decisionMakerName,
       },
       {
+        questionKey: "financialSource",
         question: "¿De dónde sale su capacidad económica?",
         answer: value.financialSource,
       },
-      { question: "Producto recomendado", answer: value.productFit },
       {
+        questionKey: "productFit",
+        question: "Producto recomendado",
+        answer: value.productFit,
+      },
+      {
+        questionKey: "urgencyReason",
         question: "¿De dónde sale la urgencia?",
         answer: value.urgencyReason,
       },
-      { question: "Información extra", answer: value.extraInfo },
-      { question: "Fecha", answer: value.scheduledDate },
-      { question: "Hora", answer: value.scheduledTime },
+      {
+        questionKey: "extraInfo",
+        question: "Información extra",
+        answer: value.extraInfo,
+      },
+      {
+        questionKey: "scheduledDate",
+        question: "Fecha",
+        answer: value.scheduledDate,
+      },
+      {
+        questionKey: "scheduledTime",
+        question: "Hora",
+        answer: value.scheduledTime,
+      },
     ],
     scheduledDate: value.scheduledDate,
     scheduledTime: value.scheduledTime,
     extraNotes: value.extraInfo,
   };
 }
-

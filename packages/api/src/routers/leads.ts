@@ -23,11 +23,12 @@ const updateLeadInput = createLeadInput.partial().extend({ id: z.string() });
 const qaSessionInput = z.discriminatedUnion("isContacted", [
   z.object({
     leadId: z.string().min(1),
-    isContacted: z.literal("yes"),
+    isContacted: z.literal("Si"),
     scheduledDate: z.string().min(1).optional(),
     scheduledTime: z.string().min(1).optional(),
     questions: z.array(
       z.object({
+        questionKey: z.string().min(1),
         question: z.string().min(1),
         answer: z.string().min(1),
       }),
@@ -36,7 +37,7 @@ const qaSessionInput = z.discriminatedUnion("isContacted", [
   }),
   z.object({
     leadId: z.string().min(1),
-    isContacted: z.literal("no"),
+    isContacted: z.literal("No"),
   }),
 ]);
 
@@ -49,6 +50,7 @@ const assignLeadInput = z.discriminatedUnion("isContacted", [
     scheduledTime: z.string().min(1).optional(),
     questions: z.array(
       z.object({
+        questionKey: z.string().min(1),
         question: z.string().min(1),
         answer: z.string().min(1),
       }),

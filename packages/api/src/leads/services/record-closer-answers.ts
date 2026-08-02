@@ -14,10 +14,10 @@ import { isCloserOf } from "./is-closer-of";
 
 export type RecordCloserAnswersInput = {
   leadId: string;
-  isContacted: "yes" | "no";
+  isContacted: "Si" | "No";
   scheduledDate?: string;
   scheduledTime?: string;
-  questions?: Array<{ question: string; answer: string }>;
+  questions?: Array<{ questionKey: string; question: string; answer: string }>;
   extraNotes?: string;
 };
 
@@ -90,7 +90,7 @@ export async function recordCloserAnswers({
 
     let alertId: string | undefined;
 
-    if (isContacted === "no") {
+    if (isContacted === "No") {
       const config = ALERT_KIND_CONFIG[ALERT_KIND.NO_CONTACT];
       const [alert] = await tx
         .insert(alerts)

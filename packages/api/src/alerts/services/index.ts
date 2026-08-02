@@ -1,4 +1,5 @@
 export { createAlert } from "./create-alert";
+export { countAlerts } from "./count-alerts";
 export { dismissAlert } from "./dismiss-alert";
 export { listAlerts } from "./list-alerts";
 export { resolveAlert } from "./resolve-alert";

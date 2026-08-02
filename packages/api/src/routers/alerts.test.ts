@@ -245,4 +245,51 @@ describe("alerts router", () => {
     await expect(caller.alerts.resolveAlert({ id: alertId })).rejects.toBeInstanceOf(TRPCError);
     await expect(caller.alerts.resolveAlert({ id: alertId })).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
+
+  it("advanceRecurringAlerts processes only the caller's due alerts", async () => {
+    const closerId = crypto.randomUUID();
+    const otherCloserId = crypto.randomUUID();
+    const leadId = crypto.randomUUID();
+
+    await insertUser({ id: closerId, name: "Closer", email: "closer@test.com", roleId: "role-closer" });
+    await insertUser({ id: otherCloserId, name: "Other", email: "other@test.com", roleId: "role-closer" });
+    await insertLead({ id: leadId });
+
+    const now = new Date();
+    const ownAlertId = await insertAlert({
+      leadId,
+      targetUserId: closerId,
+      nextShowAt: new Date(now.getTime() - 1_000),
+      occurrences: 0,
+    });
+    const otherAlertId = await insertAlert({
+      leadId,
+      targetUserId: otherCloserId,
+      nextShowAt: new Date(now.getTime() - 1_000),
+      occurrences: 0,
+    });
+
+    const caller = createCaller(closerId, "role-closer", ["leads:*", "alerts:read"]);
+    const result = await caller.alerts.advanceRecurringAlerts();
+
+    expect(result).toBeGreaterThanOrEqual(1);
+
+    const updatedOwn = await db.query.alerts.findFirst({ where: (table, { eq }) => eq(table.id, ownAlertId) });
+    const unchangedOther = await db.query.alerts.findFirst({ where: (table, { eq }) => eq(table.id, otherAlertId) });
+    expect(updatedOwn?.occurrences).toBe(1);
+    expect(unchangedOther?.occurrences).toBe(0);
+  });
+
+  it("advanceRecurringAlerts throws UNAUTHORIZED when not authenticated", async () => {
+    const unauthCtx = {
+      session: null,
+      role: null,
+      permissions: null,
+    } as unknown as Context;
+
+    const caller = appRouter.createCaller(unauthCtx);
+
+    await expect(caller.alerts.advanceRecurringAlerts()).rejects.toBeInstanceOf(TRPCError);
+    await expect(caller.alerts.advanceRecurringAlerts()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
 });

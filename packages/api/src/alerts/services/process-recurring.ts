@@ -1,7 +1,7 @@
 import { db, and, eq, isNull, lt, lte, or, sql } from "@crm-fran/db";
 import { alerts } from "@crm-fran/db/schema/index";
 
-export async function processRecurringAlerts(now: Date = new Date()) {
+export async function processRecurringAlerts(now: Date = new Date(), userId?: string) {
 	return db.transaction(async (tx) => {
 		const dueAlerts = await tx
 			.select({ id: alerts.id })
@@ -14,6 +14,7 @@ export async function processRecurringAlerts(now: Date = new Date()) {
 						isNull(alerts.maxOccurrences),
 						lt(alerts.occurrences, alerts.maxOccurrences),
 					),
+					userId ? eq(alerts.targetUserId, userId) : undefined,
 				),
 			)
 			.for("update", { skipLocked: true });

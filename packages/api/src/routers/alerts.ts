@@ -1,11 +1,13 @@
 import { z } from "zod";
-import { router } from "../index";
+import { router, protectedProcedure } from "../index";
 import { permittedProcedure } from "@crm-fran/api/trpc/trpc";
 import {
 	createAlert,
+	countAlerts,
 	dismissAlert,
 	listAlerts,
 	resolveAlert,
+	processRecurringAlerts,
 } from "../alerts/services/index";
 import { ALERT_KIND, ALERT_SEVERITY } from "@crm-fran/db/schema/index";
 
@@ -41,6 +43,13 @@ export const alertsRouter = router({
 			return await createAlert(input);
 		}),
 
+	countAlerts: permittedProcedure(["alerts:read"]).query(async ({ ctx }) => {
+		return await countAlerts({
+			actorId: ctx.session.user.id,
+			permissions: ctx.permissions,
+		});
+	}),
+
 	listAlerts: permittedProcedure(["alerts:read"])
 		.input(listAlertsInput)
 		.query(async ({ ctx, input }) => {
@@ -75,4 +84,8 @@ export const alertsRouter = router({
 				permissions: ctx.permissions,
 			});
 		}),
+
+	advanceRecurringAlerts: protectedProcedure.query(async ({ ctx }) => {
+		return await processRecurringAlerts(new Date(), ctx.session.user.id);
+	}),
 });

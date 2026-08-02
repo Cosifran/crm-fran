@@ -11,8 +11,6 @@ export default function LeadsPage() {
         trpc.leads.listByUserId.queryOptions(),
     );
 
-    console.log(leads.data);
-
     const columns = createLeadColumns((lead) => (
       <div className="flex gap-2">
         <LeadViewDrawer lead={lead} />

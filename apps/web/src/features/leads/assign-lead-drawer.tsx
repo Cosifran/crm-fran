@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { UserRoundPlus } from "lucide-react";
 import { Button } from "@crm-fran/ui/components/button";
 import {
@@ -33,6 +33,7 @@ export interface Lead {
         answer: string;
         authorRole: "caller" | "closer";
         authorId: string | null;
+        questionKey?: string;
     }[];
     callerId: string | null;
     closerId: string | null;
@@ -98,9 +99,16 @@ export default function AssignLeadDrawer({
     const [open, setOpen] = useState(false);
     // Tab activo solo aplica al rol admin; los otros roles lo ignoran.
     const [adminTab, setAdminTab] = useState<AdminTab>("caller");
+    const [closerSubmitLabel, setCloserSubmitLabel] = useState("Guardar");
+
+    const handleCloserSubmitLabelChange = useCallback((label: string) => {
+        setCloserSubmitLabel(label);
+    }, []);
 
     const { data: session } = authClient.useSession();
     const { permissions } = usePermissionState();
+
+
 
     const role = resolveRole(
         permissions,
@@ -149,6 +157,7 @@ export default function AssignLeadDrawer({
           description={description}
           type="edit"
           submitFormId={submitFormId}
+          submitLabel={role === "role-closer" ? closerSubmitLabel : "Guardar"}
         >
           {role === "role-admin" && (
             <div className="space-y-4">
@@ -178,8 +187,12 @@ export default function AssignLeadDrawer({
           {role === "role-closer" && (
             <CloserQAForm
               leadId={lead.id}
+              leadQuestions={lead.questions.filter(
+                (q) => q.authorRole === "closer",
+              )}
               onCancel={() => setOpen(false)}
               onSuccess={() => setOpen(false)}
+              onSubmitLabelChange={handleCloserSubmitLabelChange}
             />
           )}
 

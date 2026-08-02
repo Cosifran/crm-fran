@@ -1,8 +1,7 @@
 "use client";
-
 import { useState } from "react";
 import { useForm } from "@tanstack/react-form";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 
 import { trpc } from "@/utils/trpc";
@@ -77,6 +76,7 @@ export default function AssignLeadForm({
   onSuccess,
 }: AssignLeadFormProps) {
   const [branch, setBranch] = useState<"" | "yes" | "no">("");
+  const queryClient = useQueryClient();
   const mutation = useTrpcMutationWithToast(
     trpc.leads.assignLead.mutationOptions(),
     {
@@ -99,6 +99,9 @@ export default function AssignLeadForm({
       mutation.mutate(payload, {
         onSuccess: () => {
           onSuccess?.();
+          queryClient.invalidateQueries({
+            queryKey: trpc.leads.listByUserId.queryKey(),
+          });
         },
       });
     },
@@ -152,7 +155,9 @@ export default function AssignLeadForm({
                 </SelectContent>
               </Select>
               <FieldError>
-                {field.state.meta.errors.map((error) => (typeof error === "string" ? error : "")).join(" ")}
+                {field.state.meta.errors
+                  .map((error) => (typeof error === "string" ? error : ""))
+                  .join(" ")}
               </FieldError>
             </Field>
           )}
@@ -163,7 +168,9 @@ export default function AssignLeadForm({
             <form.Field name="isDecisionMaker">
               {(field) => (
                 <Field invalid={field.state.meta.errors.length > 0}>
-                  <FieldLabel htmlFor="isDecisionMaker">¿Es el decisor?</FieldLabel>
+                  <FieldLabel htmlFor="isDecisionMaker">
+                    ¿Es el decisor?
+                  </FieldLabel>
                   <Select
                     value={field.state.value}
                     onValueChange={(value) => field.handleChange(value ?? "")}
@@ -177,7 +184,9 @@ export default function AssignLeadForm({
                     </SelectContent>
                   </Select>
                   <FieldError>
-                    {field.state.meta.errors.map((error) => (typeof error === "string" ? error : "")).join(" ")}
+                    {field.state.meta.errors
+                      .map((error) => (typeof error === "string" ? error : ""))
+                      .join(" ")}
                   </FieldError>
                 </Field>
               )}
@@ -196,7 +205,9 @@ export default function AssignLeadForm({
                     aria-invalid={field.state.meta.errors.length > 0}
                   />
                   <FieldError>
-                    {field.state.meta.errors.map((error) => (typeof error === "string" ? error : "")).join(" ")}
+                    {field.state.meta.errors
+                      .map((error) => (typeof error === "string" ? error : ""))
+                      .join(" ")}
                   </FieldError>
                 </Field>
               )}
@@ -216,7 +227,9 @@ export default function AssignLeadForm({
                     aria-invalid={field.state.meta.errors.length > 0}
                   />
                   <FieldError>
-                    {field.state.meta.errors.map((error) => (typeof error === "string" ? error : "")).join(" ")}
+                    {field.state.meta.errors
+                      .map((error) => (typeof error === "string" ? error : ""))
+                      .join(" ")}
                   </FieldError>
                 </Field>
               )}
@@ -225,7 +238,9 @@ export default function AssignLeadForm({
             <form.Field name="productFit">
               {(field) => (
                 <Field invalid={field.state.meta.errors.length > 0}>
-                  <FieldLabel htmlFor="productFit">Producto recomendado</FieldLabel>
+                  <FieldLabel htmlFor="productFit">
+                    Producto recomendado
+                  </FieldLabel>
                   <Select
                     value={field.state.value}
                     onValueChange={(value) => field.handleChange(value ?? "")}
@@ -239,7 +254,9 @@ export default function AssignLeadForm({
                     </SelectContent>
                   </Select>
                   <FieldError>
-                    {field.state.meta.errors.map((error) => (typeof error === "string" ? error : "")).join(" ")}
+                    {field.state.meta.errors
+                      .map((error) => (typeof error === "string" ? error : ""))
+                      .join(" ")}
                   </FieldError>
                 </Field>
               )}
@@ -259,7 +276,9 @@ export default function AssignLeadForm({
                     aria-invalid={field.state.meta.errors.length > 0}
                   />
                   <FieldError>
-                    {field.state.meta.errors.map((error) => (typeof error === "string" ? error : "")).join(" ")}
+                    {field.state.meta.errors
+                      .map((error) => (typeof error === "string" ? error : ""))
+                      .join(" ")}
                   </FieldError>
                 </Field>
               )}
@@ -277,7 +296,9 @@ export default function AssignLeadForm({
                     aria-invalid={field.state.meta.errors.length > 0}
                   />
                   <FieldError>
-                    {field.state.meta.errors.map((error) => (typeof error === "string" ? error : "")).join(" ")}
+                    {field.state.meta.errors
+                      .map((error) => (typeof error === "string" ? error : ""))
+                      .join(" ")}
                   </FieldError>
                 </Field>
               )}
@@ -311,7 +332,9 @@ export default function AssignLeadForm({
                     </SelectContent>
                   </Select>
                   <FieldError>
-                    {field.state.meta.errors.map((error) => (typeof error === "string" ? error : "")).join(" ")}
+                    {field.state.meta.errors
+                      .map((error) => (typeof error === "string" ? error : ""))
+                      .join(" ")}
                   </FieldError>
                 </Field>
               )}
@@ -330,7 +353,11 @@ export default function AssignLeadForm({
                       aria-invalid={field.state.meta.errors.length > 0}
                     />
                     <FieldError>
-                      {field.state.meta.errors.map((error) => (typeof error === "string" ? error : "")).join(" ")}
+                      {field.state.meta.errors
+                        .map((error) =>
+                          typeof error === "string" ? error : "",
+                        )
+                        .join(" ")}
                     </FieldError>
                   </Field>
                 )}
@@ -348,7 +375,11 @@ export default function AssignLeadForm({
                       aria-invalid={field.state.meta.errors.length > 0}
                     />
                     <FieldError>
-                      {field.state.meta.errors.map((error) => (typeof error === "string" ? error : "")).join(" ")}
+                      {field.state.meta.errors
+                        .map((error) =>
+                          typeof error === "string" ? error : "",
+                        )
+                        .join(" ")}
                     </FieldError>
                   </Field>
                 )}
@@ -395,21 +426,25 @@ function validateAssignLead(value: FormValue) {
     }
   }
 
-  return Object.keys(fieldErrors).length > 0 ? { fields: fieldErrors } : undefined;
+  return Object.keys(fieldErrors).length > 0
+    ? { fields: fieldErrors }
+    : undefined;
 }
 
 function buildPayload(
   leadId: string,
   value: FormValue,
-): { leadId: string; isContacted: "no" } | {
-  leadId: string;
-  isContacted: "yes";
-  closerId: string;
-  questions: { question: string; answer: string }[];
-  scheduledDate: string;
-  scheduledTime: string;
-  extraNotes: string;
-} {
+):
+  | { leadId: string; isContacted: "no" }
+  | {
+      leadId: string;
+      isContacted: "yes";
+      closerId: string;
+      questions: { questionKey: string; question: string; answer: string }[];
+      scheduledDate: string;
+      scheduledTime: string;
+      extraNotes: string;
+    } {
   if (value.isContacted === "no") {
     return { leadId, isContacted: "no" };
   }
@@ -419,27 +454,51 @@ function buildPayload(
     isContacted: "yes",
     closerId: value.closerId,
     questions: [
-      { question: "¿Fué contactado?", answer: "Sí" },
       {
+        questionKey: "isContacted",
+        question: "¿Fué contactado?",
+        answer: "Sí",
+      },
+      {
+        questionKey: "isDecisionMaker",
         question: "¿Es el decisor?",
         answer: value.isDecisionMaker === "yes" ? "Sí" : "No",
       },
       {
+        questionKey: "decisionMakerName",
         question: "¿Quién es la persona correcta?",
         answer: value.decisionMakerName,
       },
       {
+        questionKey: "financialSource",
         question: "¿De dónde sale su capacidad económica?",
         answer: value.financialSource,
       },
-      { question: "Producto recomendado", answer: value.productFit },
       {
+        questionKey: "productFit",
+        question: "Producto recomendado",
+        answer: value.productFit,
+      },
+      {
+        questionKey: "urgencyReason",
         question: "¿De dónde sale la urgencia?",
         answer: value.urgencyReason,
       },
-      { question: "Información extra", answer: value.extraInfo },
-      { question: "Fecha", answer: value.scheduledDate },
-      { question: "Hora", answer: value.scheduledTime },
+      {
+        questionKey: "extraInfo",
+        question: "Información extra",
+        answer: value.extraInfo,
+      },
+      {
+        questionKey: "scheduledDate",
+        question: "Fecha",
+        answer: value.scheduledDate,
+      },
+      {
+        questionKey: "scheduledTime",
+        question: "Hora",
+        answer: value.scheduledTime,
+      },
     ],
     scheduledDate: value.scheduledDate,
     scheduledTime: value.scheduledTime,

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import CloserQAForm from "./closer-qa-form";
 
 afterEach(() => {
@@ -43,9 +44,15 @@ vi.mock("@tanstack/react-query", async () => {
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
+const queryClient = new QueryClient();
+
 describe("CloserQAForm — integración con el drawer", () => {
   it("renders the form with the expected id for the drawer's submit button to attach", () => {
-    render(<CloserQAForm leadId="lead-1" />);
+    render(
+      <QueryClientProvider client={queryClient}>
+        <CloserQAForm leadId="lead-1" leadQuestions={[]} />
+      </QueryClientProvider>,
+    );
 
     const form = screen.getByTestId("closer-qa-form");
     expect(form).toBeInTheDocument();
@@ -54,7 +61,11 @@ describe("CloserQAForm — integración con el drawer", () => {
   });
 
   it("does NOT render any submit button of its own (el padre controla el submit)", () => {
-    render(<CloserQAForm leadId="lead-1" />);
+    render(
+      <QueryClientProvider client={queryClient}>
+        <CloserQAForm leadId="lead-1" leadQuestions={[]} />
+      </QueryClientProvider>,
+    );
 
     const form = screen.getByTestId("closer-qa-form");
     const submitButtons = form.querySelectorAll('button[type="submit"]');

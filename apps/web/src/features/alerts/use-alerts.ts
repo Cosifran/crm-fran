@@ -6,38 +6,45 @@ import { trpc } from "@/utils/trpc";
 import { useTrpcMutationWithToast } from "@/lib/use-trpc-mutation-with-toast";
 
 export type Alert = {
-  id: string;
-  lead: { name: string } | null;
-  targetUser: { name: string } | null;
-  kind: string;
-  severity: string;
-  message: string;
-  nextShowAt: Date | string;
+	id: string;
+	lead: { name: string } | null;
+	targetUser: { name: string } | null;
+	kind: string;
+	severity: string;
+	message: string;
+	nextShowAt: Date | string;
 };
 
 export function useAlerts(
-  filters: {
-    leadId?: string;
-    targetUserId?: string;
-    includeDismissed?: boolean;
-    includeResolved?: boolean;
-    limit?: number;
-    offset?: number;
-  } = {},
+	filters: {
+		leadId?: string;
+		targetUserId?: string;
+		includeDismissed?: boolean;
+		includeResolved?: boolean;
+		limit?: number;
+		offset?: number;
+	} = {},
 ) {
-  return useQuery({
-    ...trpc.alerts.listAlerts.queryOptions(filters),
-    select: (data) =>
-      data.map((alert) => ({
-        id: alert.id,
-        lead: alert.lead ? { name: alert.lead.name } : null,
-        targetUser: alert.targetUser ? { name: alert.targetUser.name } : null,
-        kind: alert.kind,
-        severity: alert.severity,
-        message: alert.message,
-        nextShowAt: alert.nextShowAt,
-      })),
-  });
+	return useQuery({
+		...trpc.alerts.listAlerts.queryOptions(filters),
+		select: (data) =>
+			data.map((alert) => ({
+				id: alert.id,
+				lead: alert.lead ? { name: alert.lead.name } : null,
+				targetUser: alert.targetUser ? { name: alert.targetUser.name } : null,
+				kind: alert.kind,
+				severity: alert.severity,
+				message: alert.message,
+				nextShowAt: alert.nextShowAt,
+			})),
+	});
+}
+
+export function useAlertsCount() {
+	return useQuery({
+		...trpc.alerts.countAlerts.queryOptions(),
+		refetchInterval: 30_000, // poll every 30s
+	});
 }
 
 export function useDismissAlert() {
@@ -76,4 +83,11 @@ export function useResolveAlert() {
       error: "Error al resolver la alerta",
     },
   );
+}
+
+export function useAdvanceRecurringAlerts() {
+  return useQuery({
+    ...trpc.alerts.advanceRecurringAlerts.queryOptions(),
+    refetchInterval: 900_000,
+  });
 }

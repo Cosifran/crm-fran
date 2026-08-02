@@ -7,7 +7,7 @@ import type { Context } from "../../context";
 
 export type AdminEditLeadQASessionInput = {
   leadId: string;
-  isContacted: "yes" | "no";
+  isContacted: "Si" | "No";
   scheduledDate?: string;
   scheduledTime?: string;
   questions?: Array<{ question: string; answer: string }>;

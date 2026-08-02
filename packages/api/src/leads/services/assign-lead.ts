@@ -17,7 +17,7 @@ export type AssignLeadInput = {
 	closerId?: string;
 	scheduledDate?: string;
 	scheduledTime?: string;
-	questions?: Array<{ question: string; answer: string }>;
+	questions?: Array<{ questionKey: string; question: string; answer: string }>;
 	extraNotes?: string;
 };
 

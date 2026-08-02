@@ -3,4 +3,5 @@ export interface QASessionItem {
   answer: string;
   authorRole: "caller" | "closer";
   authorId: string | null;
+  questionKey?: string;
 }

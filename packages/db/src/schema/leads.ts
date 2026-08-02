@@ -16,6 +16,7 @@ export const LEAD_QA_ROLE = {
 export type LeadQARole = (typeof LEAD_QA_ROLE)[keyof typeof LEAD_QA_ROLE];
 
 export type LeadQASessionItem = {
+  questionKey: string;
   question: string;
   answer: string;
   authorRole: LeadQARole;

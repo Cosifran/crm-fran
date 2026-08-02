@@ -79,6 +79,7 @@ const lead = {
   state: "Nuevo",
   response: "",
   feedback: "",
+  questions: [],
   callerId: null,
   closerId: null,
   caller: null,
