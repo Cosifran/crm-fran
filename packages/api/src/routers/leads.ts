@@ -41,10 +41,10 @@ const qaSessionInput = z.discriminatedUnion("isContacted", [
   }),
 ]);
 
-const assignLeadInput = z.discriminatedUnion("isContacted", [
+export const assignLeadInput = z.discriminatedUnion("isContacted", [
   z.object({
     leadId: z.string().min(1),
-    isContacted: z.literal("yes"),
+    isContacted: z.literal("Si"),
     closerId: z.string().min(1),
     scheduledDate: z.string().min(1).optional(),
     scheduledTime: z.string().min(1).optional(),
@@ -59,7 +59,7 @@ const assignLeadInput = z.discriminatedUnion("isContacted", [
   }),
   z.object({
     leadId: z.string().min(1),
-    isContacted: z.literal("no"),
+    isContacted: z.literal("No"),
   }),
 ]);
 

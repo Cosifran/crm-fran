@@ -5,6 +5,7 @@ import { alerts, leads, roles, user } from "@crm-fran/db/schema/index";
 import { LEAD_STATE } from "@crm-fran/db/schema/state";
 import { LEAD_QA_ROLE, type LeadQASessionItem } from "@crm-fran/db/schema/index";
 import { assignLead } from "../leads/services/assign-lead";
+import { assignLeadInput } from "./leads";
 
 describe("assignLead service", () => {
   const created = {
@@ -56,7 +57,7 @@ describe("assignLead service", () => {
     return input;
   }
 
-  it("assigns a lead and persists Q&A when isContacted is yes", async () => {
+  it("assigns a lead and persists Q&A when isContacted is Si", async () => {
     const callerId = crypto.randomUUID();
     const closerId = crypto.randomUUID();
     const leadId = crypto.randomUUID();
@@ -66,8 +67,8 @@ describe("assignLead service", () => {
     await insertLead({ id: leadId });
 
     const questions = [
-      { question: "Is decision maker?", answer: "yes" },
-      { question: "Decision maker name", answer: "John Doe" },
+      { questionKey: "isDecisionMaker", question: "Is decision maker?", answer: "yes" },
+      { questionKey: "decisionMakerName", question: "Decision maker name", answer: "John Doe" },
     ];
 
     const expectedQuestions: LeadQASessionItem[] = questions.map((q) => ({
@@ -80,7 +81,7 @@ describe("assignLead service", () => {
       callerId,
       input: {
         leadId,
-        isContacted: "yes",
+        isContacted: "Si",
         closerId,
         scheduledDate: "2026-07-26",
         scheduledTime: "10:00",
@@ -107,7 +108,7 @@ describe("assignLead service", () => {
     expect(followUpAlert?.nextShowAt).toBeInstanceOf(Date);
   });
 
-  it("creates a no_contact alert when isContacted is no", async () => {
+  it("creates a no_contact alert when isContacted is No", async () => {
     const callerId = crypto.randomUUID();
     const leadId = crypto.randomUUID();
 
@@ -116,7 +117,7 @@ describe("assignLead service", () => {
 
     const result = await assignLead({
       callerId,
-      input: { leadId, isContacted: "no" },
+      input: { leadId, isContacted: "No" },
     });
 
     expect(result.leadId).toBe(leadId);
@@ -138,14 +139,15 @@ describe("assignLead service", () => {
     expect(alert?.nextShowAt).toBeInstanceOf(Date);
   });
 
-  it("preserves existing questions when isContacted is no", async () => {
+  it("preserves existing questions when isContacted is No", async () => {
     const callerId = crypto.randomUUID();
     const leadId = crypto.randomUUID();
 
     await insertUser({ id: callerId, name: "Caller", email: "caller5@test.com", roleId: "role-caller" });
 
     const existingQuestions: LeadQASessionItem[] = [
-      { question: "Q1", answer: "A1", authorRole: LEAD_QA_ROLE.CALLER, authorId: callerId },
+      { questionKey: "isContacted", question: "Q1", answer: "A1", authorRole: LEAD_QA_ROLE.CALLER, authorId: callerId },
+      { questionKey: "budget", question: "Budget?", answer: "1000", authorRole: LEAD_QA_ROLE.CLOSER, authorId: "closer-1" },
     ];
 
     await insertLead({ id: leadId });
@@ -156,13 +158,142 @@ describe("assignLead service", () => {
 
     const result = await assignLead({
       callerId,
-      input: { leadId, isContacted: "no" },
+      input: { leadId, isContacted: "No" },
     });
 
     expect(result.leadId).toBe(leadId);
 
     const updated = await db.query.leads.findFirst({ where: (table, { eq }) => eq(table.id, leadId) });
     expect(updated?.questions).toEqual(existingQuestions);
+  });
+
+  it("preserves closer items when caller resubmits with Si", async () => {
+    const callerId = crypto.randomUUID();
+    const closerId = crypto.randomUUID();
+    const leadId = crypto.randomUUID();
+
+    await insertUser({ id: callerId, name: "Caller", email: "caller-partition@test.com", roleId: "role-caller" });
+    await insertUser({ id: closerId, name: "Closer", email: "closer-partition@test.com", roleId: "role-closer" });
+
+    const existingQuestions: LeadQASessionItem[] = [
+      { questionKey: "isContacted", question: "Contacted?", answer: "Si", authorRole: LEAD_QA_ROLE.CALLER, authorId: callerId },
+      { questionKey: "budget", question: "Budget?", answer: "1000", authorRole: LEAD_QA_ROLE.CLOSER, authorId: closerId },
+    ];
+
+    await insertLead({ id: leadId });
+    await db.update(leads).set({ questions: existingQuestions, closerId }).where(eq(leads.id, leadId));
+
+    await assignLead({
+      callerId,
+      input: {
+        leadId,
+        isContacted: "Si",
+        closerId,
+        questions: [
+          { questionKey: "isContacted", question: "Contacted?", answer: "Si" },
+          { questionKey: "budget", question: "Budget?", answer: "2000" },
+        ],
+      },
+    });
+
+    const updated = await db.query.leads.findFirst({ where: (table, { eq }) => eq(table.id, leadId) });
+    const updatedQuestions = updated?.questions as LeadQASessionItem[];
+
+    // Closer items preserved
+    const closerItems = updatedQuestions.filter((q) => q.authorRole === LEAD_QA_ROLE.CLOSER);
+    expect(closerItems).toHaveLength(1);
+    expect(closerItems[0]?.authorId).toBe(closerId);
+    expect(closerItems[0]?.answer).toBe("1000");
+
+    // Caller items replaced with new ones
+    const callerItems = updatedQuestions.filter((q) => q.authorRole === LEAD_QA_ROLE.CALLER);
+    expect(callerItems).toHaveLength(2);
+    expect(callerItems[0]?.answer).toBe("Si");
+    expect(callerItems[1]?.answer).toBe("2000");
+    expect(callerItems[0]?.authorId).toBe(callerId);
+  });
+
+  it("preserves other-caller items when one caller resubmits with Si", async () => {
+    const callerA = crypto.randomUUID();
+    const callerB = crypto.randomUUID();
+    const closerId = crypto.randomUUID();
+    const leadId = crypto.randomUUID();
+
+    await insertUser({ id: callerA, name: "Caller A", email: "callerA@test.com", roleId: "role-caller" });
+    await insertUser({ id: callerB, name: "Caller B", email: "callerB@test.com", roleId: "role-caller" });
+    await insertUser({ id: closerId, name: "Closer", email: "closer-other@test.com", roleId: "role-closer" });
+
+    const existingQuestions: LeadQASessionItem[] = [
+      { questionKey: "isContacted", question: "Contacted?", answer: "Si", authorRole: LEAD_QA_ROLE.CALLER, authorId: callerA },
+      { questionKey: "isContacted", question: "Contacted?", answer: "No", authorRole: LEAD_QA_ROLE.CALLER, authorId: callerB },
+      { questionKey: "budget", question: "Budget?", answer: "500", authorRole: LEAD_QA_ROLE.CLOSER, authorId: closerId },
+    ];
+
+    await insertLead({ id: leadId });
+    await db.update(leads).set({ questions: existingQuestions, closerId }).where(eq(leads.id, leadId));
+
+    // Caller A resubmits
+    await assignLead({
+      callerId: callerA,
+      input: {
+        leadId,
+        isContacted: "Si",
+        closerId,
+        questions: [{ questionKey: "isContacted", question: "Contacted?", answer: "Si" }],
+      },
+    });
+
+    const updated = await db.query.leads.findFirst({ where: (table, { eq }) => eq(table.id, leadId) });
+    const updatedQuestions = updated?.questions as LeadQASessionItem[];
+
+    // Caller B items preserved
+    const callerBItems = updatedQuestions.filter(
+      (q) => q.authorRole === LEAD_QA_ROLE.CALLER && q.authorId === callerB,
+    );
+    expect(callerBItems).toHaveLength(1);
+    expect(callerBItems[0]?.answer).toBe("No");
+
+    // Closer items preserved
+    const closerItems = updatedQuestions.filter((q) => q.authorRole === LEAD_QA_ROLE.CLOSER);
+    expect(closerItems).toHaveLength(1);
+    expect(closerItems[0]?.answer).toBe("500");
+
+    // Caller A items replaced
+    const callerAItems = updatedQuestions.filter(
+      (q) => q.authorRole === LEAD_QA_ROLE.CALLER && q.authorId === callerA,
+    );
+    expect(callerAItems).toHaveLength(1);
+    expect(callerAItems[0]?.answer).toBe("Si");
+  });
+
+  it("rejects old yes/no encoding via Zod schema", () => {
+    const resultSi = assignLeadInput.safeParse({
+      leadId: "test",
+      isContacted: "Si",
+      closerId: "closer",
+      questions: [{ questionKey: "q1", question: "Q?", answer: "A" }],
+    });
+    expect(resultSi.success).toBe(true);
+
+    const resultNo = assignLeadInput.safeParse({
+      leadId: "test",
+      isContacted: "No",
+    });
+    expect(resultNo.success).toBe(true);
+
+    const resultOldYes = assignLeadInput.safeParse({
+      leadId: "test",
+      isContacted: "yes",
+      closerId: "closer",
+      questions: [{ questionKey: "q1", question: "Q?", answer: "A" }],
+    });
+    expect(resultOldYes.success).toBe(false);
+
+    const resultOldNo = assignLeadInput.safeParse({
+      leadId: "test",
+      isContacted: "no",
+    });
+    expect(resultOldNo.success).toBe(false);
   });
 
   it("throws NOT_FOUND when the lead does not exist", async () => {
@@ -172,14 +303,14 @@ describe("assignLead service", () => {
     await expect(
       assignLead({
         callerId,
-        input: { leadId: crypto.randomUUID(), isContacted: "no" },
+        input: { leadId: crypto.randomUUID(), isContacted: "No" },
       }),
     ).rejects.toBeInstanceOf(TRPCError);
 
     await expect(
       assignLead({
         callerId,
-        input: { leadId: crypto.randomUUID(), isContacted: "no" },
+        input: { leadId: crypto.randomUUID(), isContacted: "No" },
       }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
@@ -196,11 +327,11 @@ describe("assignLead service", () => {
         callerId,
         input: {
           leadId,
-          isContacted: "yes",
+          isContacted: "Si",
           closerId: crypto.randomUUID(),
           scheduledDate: "2026-07-26",
           scheduledTime: "10:00",
-          questions: [{ question: "Q", answer: "A" }],
+          questions: [{ questionKey: "q1", question: "Q", answer: "A" }],
         },
       }),
     ).rejects.toBeInstanceOf(TRPCError);
@@ -210,11 +341,11 @@ describe("assignLead service", () => {
         callerId,
         input: {
           leadId,
-          isContacted: "yes",
+          isContacted: "Si",
           closerId: crypto.randomUUID(),
           scheduledDate: "2026-07-26",
           scheduledTime: "10:00",
-          questions: [{ question: "Q", answer: "A" }],
+          questions: [{ questionKey: "q1", question: "Q", answer: "A" }],
         },
       }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });

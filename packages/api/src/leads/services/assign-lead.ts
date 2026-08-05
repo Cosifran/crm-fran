@@ -13,7 +13,7 @@ import { ALERT_KIND_CONFIG } from "../../alerts/services/config";
 
 export type AssignLeadInput = {
 	leadId: string;
-	isContacted: "yes" | "no";
+	isContacted: "Si" | "No";
 	closerId?: string;
 	scheduledDate?: string;
 	scheduledTime?: string;
@@ -54,14 +54,28 @@ export async function assignLead({
 			}
 		}
 
-		const updatedQuestions: LeadQASessionItem[] =
-			isContacted === "yes"
-				? questions.map((q) => ({
-						...q,
-						authorRole: LEAD_QA_ROLE.CALLER,
-						authorId: callerId,
-					}))
-				: (lead.questions as LeadQASessionItem[]) ?? [];
+		let updatedQuestions: LeadQASessionItem[];
+
+		if (isContacted === "Si") {
+			// Partition-preserving upsert: remove only current caller's items, keep closer + other callers
+			const existingItems = (lead.questions as LeadQASessionItem[]) ?? [];
+			const preservedItems = existingItems.filter(
+				(item) =>
+					!(
+						item.authorRole === LEAD_QA_ROLE.CALLER &&
+						item.authorId === callerId
+					),
+			);
+			const newCallerItems: LeadQASessionItem[] = questions.map((q) => ({
+				...q,
+				authorRole: LEAD_QA_ROLE.CALLER,
+				authorId: callerId,
+			}));
+			updatedQuestions = [...preservedItems, ...newCallerItems];
+		} else {
+			// "No": preserve all existing questions, no new items appended
+			updatedQuestions = (lead.questions as LeadQASessionItem[]) ?? [];
+		}
 
 		const [updated] = await tx
 			.update(leads)
@@ -83,7 +97,7 @@ export async function assignLead({
 
 		let alertId: string | undefined;
 
-		if (isContacted === "no") {
+		if (isContacted === "No") {
 			const config = ALERT_KIND_CONFIG[ALERT_KIND.NO_CONTACT];
 			const [alert] = await tx
 				.insert(alerts)
@@ -102,7 +116,7 @@ export async function assignLead({
 				.returning({ id: alerts.id });
 
 			alertId = alert?.id;
-		} else if (isContacted === "yes" && closerId) {
+		} else if (isContacted === "Si" && closerId) {
 			const config = ALERT_KIND_CONFIG[ALERT_KIND.FOLLOW_UP];
 			await tx.insert(alerts).values({
 				id: crypto.randomUUID(),

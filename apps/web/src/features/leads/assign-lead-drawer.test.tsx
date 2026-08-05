@@ -1,5 +1,5 @@
-import { describe, expect, it, vi, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, cleanup, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import AssignLeadDrawer from "./assign-lead-drawer";
 
@@ -27,6 +27,11 @@ type PermissionState = {
 const mocks = vi.hoisted(() => ({
   useSession: vi.fn<() => SessionState>(),
   usePermissionState: vi.fn<() => PermissionState>(),
+  assignLeadFormProps: vi.fn((_props: {
+    leadQuestions?: unknown[];
+    currentCloserId?: string | null;
+    onSubmitLabelChange?: (label: string) => void;
+  }) => <form id="assign-lead-form" data-testid="assign-lead-form" />),
 }));
 
 vi.mock("@/lib/auth-client", () => ({
@@ -60,18 +65,13 @@ vi.mock("./admin-qa-editor", () => ({
   }),
 }));
 
-// assign-lead-form ya tiene su propio test; lo mockeamos liviano acá
 vi.mock("./assign-lead-form", () => ({
-  default: vi.fn(() => (
-    <form id="assign-lead-form" data-testid="assign-lead-form">
-      <input />
-    </form>
-  )),
+  default: mocks.assignLeadFormProps,
 }));
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
-const lead = {
+const baseLead = {
   id: "lead-1",
   name: "Test Lead",
   email: "test@example.com",
@@ -79,11 +79,17 @@ const lead = {
   state: "Nuevo",
   response: "",
   feedback: "",
-  questions: [],
-  callerId: null,
-  closerId: null,
-  caller: null,
-  closer: null,
+  questions: [] as Array<{
+    question: string;
+    answer: string;
+    authorRole: "caller" | "closer";
+    authorId: string | null;
+    questionKey?: string;
+  }>,
+  callerId: null as string | null,
+  closerId: null as string | null,
+  caller: null as { id: string; name: string; email: string } | null,
+  closer: null as { id: string; name: string; email: string } | null,
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
 };
@@ -96,7 +102,7 @@ async function openDrawer(user: ReturnType<typeof userEvent.setup>) {
 
 function setupRole(role: "role-caller" | "role-closer" | "role-admin") {
   mocks.useSession.mockReturnValue({
-    data: { user: { id: "u1", roleId: role } },
+    data: { user: { id: "user-1", roleId: role } },
   });
   if (role === "role-admin") {
     mocks.usePermissionState.mockReturnValue({
@@ -124,11 +130,18 @@ function setupRole(role: "role-caller" | "role-closer" | "role-admin") {
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 describe("AssignLeadDrawer — orquesta submitFormId por rol", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.assignLeadFormProps.mockImplementation((_props) => (
+      <form id="assign-lead-form" data-testid="assign-lead-form" />
+    ));
+  });
+
   it("caller: pasa submitFormId='assign-lead-form' al drawer", async () => {
     setupRole("role-caller");
     const user = userEvent.setup();
 
-    render(<AssignLeadDrawer lead={lead} />);
+    render(<AssignLeadDrawer lead={baseLead} />);
     await openDrawer(user);
 
     expect(screen.getByTestId("assign-lead-form")).toBeInTheDocument();
@@ -141,7 +154,7 @@ describe("AssignLeadDrawer — orquesta submitFormId por rol", () => {
     setupRole("role-closer");
     const user = userEvent.setup();
 
-    render(<AssignLeadDrawer lead={lead} />);
+    render(<AssignLeadDrawer lead={baseLead} />);
     await openDrawer(user);
 
     expect(screen.getByTestId("closer-qa-form")).toBeInTheDocument();
@@ -154,10 +167,9 @@ describe("AssignLeadDrawer — orquesta submitFormId por rol", () => {
     setupRole("role-admin");
     const user = userEvent.setup();
 
-    render(<AssignLeadDrawer lead={lead} />);
+    render(<AssignLeadDrawer lead={baseLead} />);
     await openDrawer(user);
 
-    // El activeTab por defecto es 'caller' → el form del footer debe ser admin-caller-form
     expect(screen.getByTestId("admin-caller-form")).toBeInTheDocument();
 
     const submitButton = screen.getByRole("button", { name: /guardar/i });
@@ -168,22 +180,116 @@ describe("AssignLeadDrawer — orquesta submitFormId por rol", () => {
     setupRole("role-admin");
     const user = userEvent.setup();
 
-    render(<AssignLeadDrawer lead={lead} />);
+    render(<AssignLeadDrawer lead={baseLead} />);
     await openDrawer(user);
 
-    // Estado inicial: caller
     expect(
       screen.getByRole("button", { name: /guardar/i }),
     ).toHaveAttribute("form", "admin-caller-form");
 
-    // Cambiamos al tab closer
     await user.click(screen.getByRole("tab", { name: /sesión del closer/i }));
 
-    // Ahora el submit debe apuntar al form del closer
     expect(
       screen.getByRole("button", { name: /guardar/i }),
     ).toHaveAttribute("form", "admin-closer-form");
     expect(screen.getByTestId("admin-closer-form")).toBeInTheDocument();
     expect(screen.queryByTestId("admin-caller-form")).not.toBeInTheDocument();
+  });
+});
+
+describe("AssignLeadDrawer — data wiring for edit mode", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("caller: passes filtered caller questions + currentCloserId to form", async () => {
+    setupRole("role-caller");
+    const user = userEvent.setup();
+
+    const leadWithQuestions = {
+      ...baseLead,
+      closerId: "closer-789",
+      questions: [
+        { questionKey: "isContacted", question: "¿Fué contactado?", answer: "Si", authorRole: "caller" as const, authorId: "user-1" },
+        { questionKey: "financialSource", question: "Financial", answer: "Salary", authorRole: "caller" as const, authorId: "user-1" },
+        { questionKey: "budget", question: "Budget", answer: "1000", authorRole: "closer" as const, authorId: "closer-789" },
+      ],
+    };
+
+    mocks.assignLeadFormProps.mockImplementation(
+      (props: { leadQuestions?: unknown[]; currentCloserId?: string | null }) => (
+        <form id="assign-lead-form" data-testid="assign-lead-form">
+          <span data-testid="caller-count">{(props.leadQuestions ?? []).length}</span>
+          <span data-testid="closer-id">{props.currentCloserId ?? "null"}</span>
+        </form>
+      ),
+    );
+
+    render(<AssignLeadDrawer lead={leadWithQuestions} />);
+    await openDrawer(user);
+
+    // All questions passed (form filters by authorRole internally)
+    expect(screen.getByTestId("caller-count")).toHaveTextContent("3");
+    // currentCloserId passed from lead
+    expect(screen.getByTestId("closer-id")).toHaveTextContent("closer-789");
+  });
+
+  it("caller: dynamic submit label changes to Editar", async () => {
+    setupRole("role-caller");
+    const user = userEvent.setup();
+
+    mocks.assignLeadFormProps.mockImplementation(
+      (props: { onSubmitLabelChange?: (label: string) => void }) => (
+        <form id="assign-lead-form" data-testid="assign-lead-form">
+          <button
+            type="button"
+            data-testid="trigger-label"
+            onClick={() => props.onSubmitLabelChange?.("Editar")}
+          >
+            trigger
+          </button>
+        </form>
+      ),
+    );
+
+    render(<AssignLeadDrawer lead={baseLead} />);
+    await openDrawer(user);
+
+    // Initially "Guardar"
+    expect(screen.getByRole("button", { name: /guardar/i })).toBeInTheDocument();
+
+    // Simulate form calling onSubmitLabelChange
+    await user.click(screen.getByTestId("trigger-label"));
+
+    // Button label changes to "Editar"
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /editar/i })).toBeInTheDocument();
+    });
+  });
+
+  it("caller: passes empty questions when lead has no caller items", async () => {
+    setupRole("role-caller");
+    const user = userEvent.setup();
+
+    const leadWithCloserOnly = {
+      ...baseLead,
+      questions: [
+        { questionKey: "budget", question: "Budget", answer: "1000", authorRole: "closer" as const, authorId: "closer-789" },
+      ],
+    };
+
+    mocks.assignLeadFormProps.mockImplementation(
+      (props: { leadQuestions?: unknown[] }) => (
+        <form id="assign-lead-form" data-testid="assign-lead-form">
+          <span data-testid="caller-count">{(props.leadQuestions ?? []).length}</span>
+        </form>
+      ),
+    );
+
+    render(<AssignLeadDrawer lead={leadWithCloserOnly} />);
+    await openDrawer(user);
+
+    // All questions passed (form filters by authorRole internally)
+    expect(screen.getByTestId("caller-count")).toHaveTextContent("1");
   });
 });

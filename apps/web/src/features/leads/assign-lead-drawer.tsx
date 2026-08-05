@@ -100,9 +100,14 @@ export default function AssignLeadDrawer({
     // Tab activo solo aplica al rol admin; los otros roles lo ignoran.
     const [adminTab, setAdminTab] = useState<AdminTab>("caller");
     const [closerSubmitLabel, setCloserSubmitLabel] = useState("Guardar");
+    const [callerSubmitLabel, setCallerSubmitLabel] = useState("Guardar");
 
     const handleCloserSubmitLabelChange = useCallback((label: string) => {
         setCloserSubmitLabel(label);
+    }, []);
+
+    const handleCallerSubmitLabelChange = useCallback((label: string) => {
+        setCallerSubmitLabel(label);
     }, []);
 
     const { data: session } = authClient.useSession();
@@ -157,7 +162,13 @@ export default function AssignLeadDrawer({
           description={description}
           type="edit"
           submitFormId={submitFormId}
-          submitLabel={role === "role-closer" ? closerSubmitLabel : "Guardar"}
+          submitLabel={
+            role === "role-closer"
+              ? closerSubmitLabel
+              : role === "role-caller"
+                ? callerSubmitLabel
+                : "Guardar"
+          }
         >
           {role === "role-admin" && (
             <div className="space-y-4">
@@ -201,6 +212,9 @@ export default function AssignLeadDrawer({
               leadId={lead.id}
               onCancel={() => setOpen(false)}
               onSuccess={() => setOpen(false)}
+              leadQuestions={lead.questions}
+              currentCloserId={lead.closerId}
+              onSubmitLabelChange={handleCallerSubmitLabelChange}
             />
           )}
         </LeadDrawer>
