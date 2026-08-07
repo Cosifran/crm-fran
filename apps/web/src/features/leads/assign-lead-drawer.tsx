@@ -120,6 +120,8 @@ export default function AssignLeadDrawer({
         (session?.user as { roleId?: string } | undefined)?.roleId,
     );
 
+    console.log(session?.user, "session?.user");
+
     // El id del form que el botón Guardar del drawer debe disparar.
     const submitFormId =
         role === "role-admin"
@@ -144,6 +146,8 @@ export default function AssignLeadDrawer({
     };
 
     const { title, description } = titleByRole[role];
+
+    console.log(lead, "lead");
 
     return (
       <>

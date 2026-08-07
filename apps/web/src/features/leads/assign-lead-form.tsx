@@ -117,7 +117,7 @@ export default function AssignLeadForm({
     (q) => q.authorRole === "caller" && q.questionKey,
   );
   const isEditMode = callerQuestions.length > 0;
-  const closerIdProvided = currentCloserId !== undefined;
+  const closerIdProvided = currentCloserId !== null && currentCloserId !== undefined && currentCloserId !== "";
 
   // Prefill from caller questions on mount
   const prefilledRef = useRef(false);
