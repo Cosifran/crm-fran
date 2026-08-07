@@ -20,6 +20,13 @@ const createLeadInput = z.object({
 });
 const updateLeadInput = createLeadInput.partial().extend({ id: z.string() });
 
+const dateRangeInput = z
+  .object({
+    from: z.string().date().optional(),
+    to: z.string().date().optional(),
+  })
+  .optional();
+
 const qaSessionInput = z.discriminatedUnion("isContacted", [
   z.object({
     leadId: z.string().min(1),
@@ -64,8 +71,10 @@ export const assignLeadInput = z.discriminatedUnion("isContacted", [
 ]);
 
 export const leadsRouter = router({
-  listAll: permittedProcedure(["leads:read"]).query(async () => {
-    return await getAll();
+  listAll: permittedProcedure(["leads:read"])
+    .input(dateRangeInput)
+    .query(async ({ input }) => {
+    return await getAll({ dateRange: input });
   }),
 
   listWithoutAssigned: permittedProcedure(["leads:read"]).query(async () => {
@@ -78,8 +87,10 @@ export const leadsRouter = router({
       return await getById({ id: input.id });
     }),
 
-  listByUserId: permittedProcedure(["leads:read"]).query(async ({ ctx }) => {
-    return await getByUserId({ userId: ctx.session.user.id });
+  listByUserId: permittedProcedure(["leads:read"])
+    .input(dateRangeInput)
+    .query(async ({ ctx, input }) => {
+    return await getByUserId({ userId: ctx.session.user.id, dateRange: input });
   }),
 
   assignLead: permittedProcedure(["leads:write"])
