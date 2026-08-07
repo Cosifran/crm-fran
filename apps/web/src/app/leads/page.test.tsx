@@ -5,11 +5,15 @@ import LeadsPage from "./page";
 const mocks = vi.hoisted(() => ({
   useSession: vi.fn(),
   useQuery: vi.fn(),
-  listAllQueryOptions: vi.fn((input: unknown) => ({ input })),
-  listByUserIdQueryOptions: vi.fn((input: unknown) => ({ input })),
+  listAllQueryOptions: vi.fn(() => ({})),
+  listByUserIdQueryOptions: vi.fn(() => ({})),
   dateRangePickerOnChange: undefined as
     | ((range: { from?: string; to?: string }) => void)
     | undefined,
+  dateFieldSelectOnValueChange: undefined as
+    | ((value: string | null) => void)
+    | undefined,
+  dataTableData: [] as unknown[][],
 }));
 
 vi.mock("@/lib/auth-client", () => ({
@@ -39,7 +43,24 @@ vi.mock("@/components/date-range-picker", () => ({
 }));
 
 vi.mock("@crm-fran/ui/components/data-table", () => ({
-  DataTable: () => null,
+  DataTable: (props: { data: unknown[] }) => {
+    mocks.dataTableData.push(props.data);
+    return null;
+  },
+}));
+
+vi.mock("@crm-fran/ui/components/select", () => ({
+  Select: (props: {
+    onValueChange: (value: string | null) => void;
+  }) => {
+    mocks.dateFieldSelectOnValueChange = props.onValueChange;
+    return null;
+  },
+  SelectContent: () => null,
+  SelectGroup: () => null,
+  SelectItem: () => null,
+  SelectTrigger: () => null,
+  SelectValue: () => null,
 }));
 
 vi.mock("@/features/table/columns", () => ({
@@ -57,6 +78,7 @@ vi.mock("@/features/leads/assign-lead-drawer", () => ({
 describe("LeadsPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.dataTableData = [];
     mocks.useQuery.mockReturnValue({ data: [], isLoading: false });
   });
 
@@ -75,16 +97,30 @@ describe("LeadsPage", () => {
     );
   });
 
-  it("passes the selected direct date range to both query option paths", () => {
+  it("filters loaded leads locally when the selected date field changes", () => {
     mocks.useSession.mockReturnValue({
       data: { user: { roleId: "role-admin" } },
       isPending: false,
     });
+    const createdAtMatch = {
+      id: "created-at-match",
+      createdAt: new Date(2026, 0, 15, 12),
+      updatedAt: new Date(2026, 1, 15, 12),
+    };
+    const updatedAtMatch = {
+      id: "updated-at-match",
+      createdAt: new Date(2026, 1, 15, 12),
+      updatedAt: new Date(2026, 0, 15, 12),
+    };
+    mocks.useQuery.mockReturnValue({
+      data: [createdAtMatch, updatedAtMatch],
+      isLoading: false,
+    });
 
     render(<LeadsPage />);
 
-    expect(mocks.listAllQueryOptions).toHaveBeenCalledWith(undefined);
-    expect(mocks.listByUserIdQueryOptions).toHaveBeenCalledWith(undefined);
+    expect(mocks.listAllQueryOptions).toHaveBeenCalledWith();
+    expect(mocks.listByUserIdQueryOptions).toHaveBeenCalledWith();
 
     act(() => {
       mocks.dateRangePickerOnChange?.({
@@ -93,13 +129,18 @@ describe("LeadsPage", () => {
       });
     });
 
-    expect(mocks.listAllQueryOptions).toHaveBeenLastCalledWith({
-      from: "2026-01-01",
-      to: "2026-01-31",
+    expect(mocks.dataTableData.at(-1)).toEqual([createdAtMatch]);
+
+    act(() => {
+      mocks.dateFieldSelectOnValueChange?.("updatedAt");
     });
-    expect(mocks.listByUserIdQueryOptions).toHaveBeenLastCalledWith({
-      from: "2026-01-01",
-      to: "2026-01-31",
-    });
+
+    expect(mocks.dataTableData.at(-1)).toEqual([updatedAtMatch]);
+    expect(
+      mocks.listAllQueryOptions.mock.calls.every((args) => args.length === 0)
+    ).toBe(true);
+    expect(
+      mocks.listByUserIdQueryOptions.mock.calls.every((args) => args.length === 0)
+    ).toBe(true);
   });
 });
