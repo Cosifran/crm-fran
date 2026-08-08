@@ -5,7 +5,6 @@ import {
 	roles,
 	user,
 	type LeadQASessionItem,
-	LEAD_QA_ROLE,
 } from "@crm-fran/db/schema/index";
 import type { Context } from "../../context";
 
@@ -88,17 +87,17 @@ describe("adminEditLeadQASession", () => {
 		await insertUser({ id: adminId, name: "Admin", email: `${adminId}@test.com`, roleId: "role-admin" });
 		await insertLead({ id: leadId });
 
-		const items: LeadQASessionItem[] = [
-			{ question: "Q1", answer: "A1", authorRole: LEAD_QA_ROLE.CALLER, authorId: "u1" },
-			{ question: "Q2", answer: "A2", authorRole: LEAD_QA_ROLE.CLOSER, authorId: "u2" },
+		const questions = [
+			{ questionKey: "q1", question: "Q1", answer: "A1" },
+			{ questionKey: "q2", question: "Q2", answer: "A2" },
 		];
 
 		const updated = await adminEditLeadQASession({
 			ctx: buildContext(adminId, "role-admin", adminPermissions),
-			input: { leadId, items },
+			input: { leadId, isContacted: "Si", questions },
 		});
 
-		expect(updated.questions).toEqual(items);
+		expect(updated.questions).toEqual(questions);
 	});
 
 	it("rejects a caller without wildcard permission", async () => {
@@ -111,7 +110,7 @@ describe("adminEditLeadQASession", () => {
 		await expect(
 			adminEditLeadQASession({
 				ctx: buildContext(callerId, "role-caller", callerPermissions),
-				input: { leadId, items: [] },
+				input: { leadId, isContacted: "Si", questions: [] },
 			}),
 		).rejects.toMatchObject({ code: "FORBIDDEN" });
 
@@ -131,7 +130,7 @@ describe("adminEditLeadQASession", () => {
 		await expect(
 			adminEditLeadQASession({
 				ctx: buildContext(closerId, "role-closer", closerPermissions),
-				input: { leadId, items: [] },
+				input: { leadId, isContacted: "Si", questions: [] },
 			}),
 		).rejects.toMatchObject({ code: "FORBIDDEN" });
 

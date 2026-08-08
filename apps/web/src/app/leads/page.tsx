@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { trpc } from "@/utils/trpc";
 import { useQuery } from "@tanstack/react-query";
 import { authClient } from "@/lib/auth-client";
@@ -18,6 +18,7 @@ import {
 } from "@crm-fran/ui/components/select";
 
 type DateField = "createdAt" | "updatedAt";
+type CloserFilter = "all" | string;
 
 function parseLocalDate(isoDate: string | undefined, endOfDay = false) {
   if (!isoDate) return undefined;
@@ -60,6 +61,7 @@ export default function LeadsPage() {
     to?: string;
   }>();
   const [dateField, setDateField] = useState<DateField>("createdAt");
+  const [selectedCloserId, setSelectedCloserId] = useState<CloserFilter>("all");
 
   const isAdmin = session?.user?.roleId === "role-admin";
 
@@ -76,17 +78,43 @@ export default function LeadsPage() {
 
   const leads = isAdmin ? allLeadsQuery.data : userLeadsQuery.data;
   const isLoading = isAdmin ? allLeadsQuery.isLoading : userLeadsQuery.isLoading;
+  const availableClosers = Array.from(
+    new Map(
+      leads?.flatMap((lead) =>
+        lead.closerId === null
+          ? []
+          : [[lead.closerId, lead.closer?.name ?? "Sin asignar"]]
+      ) ?? []
+    ),
+  ).map(([id, name]) => ({ id, name }));
+  const availableCloserIds = availableClosers.map(({ id }) => id);
+  const activeCloserId =
+    selectedCloserId === "all" || availableCloserIds.includes(selectedCloserId)
+      ? selectedCloserId
+      : "all";
+  const activeCloserName =
+    activeCloserId === "all"
+      ? "Todos los closers"
+      : availableClosers.find(({ id }) => id === activeCloserId)?.name ?? "Sin asignar";
+  useEffect(() => {
+    if (selectedCloserId !== "all" && !availableCloserIds.includes(selectedCloserId)) {
+      setSelectedCloserId("all");
+    }
+  }, [availableCloserIds, selectedCloserId]);
   const fromDate = parseLocalDate(dateRange?.from);
   const toDate = parseLocalDate(dateRange?.to, true);
   const filteredLeads = leads?.filter((lead) => {
-    if (!fromDate && !toDate) return true;
+    let matchesDate = true;
+    if (fromDate || toDate) {
+      const leadDate = new Date(lead[dateField]);
+      matchesDate =
+        !Number.isNaN(leadDate.getTime()) &&
+        (!fromDate || leadDate >= fromDate) &&
+        (!toDate || leadDate <= toDate);
+    }
+    const matchesCloser = activeCloserId === "all" || lead.closerId === activeCloserId;
 
-    const leadDate = new Date(lead[dateField]);
-    return (
-      !Number.isNaN(leadDate.getTime()) &&
-      (!fromDate || leadDate >= fromDate) &&
-      (!toDate || leadDate <= toDate)
-    );
+    return matchesDate && matchesCloser;
   });
 
   const columns = createLeadColumns((lead) => (
@@ -98,7 +126,7 @@ export default function LeadsPage() {
 
   return (
     <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <DateRangePicker
           from={dateRange?.from}
           to={dateRange?.to}
@@ -114,7 +142,7 @@ export default function LeadsPage() {
         >
           <SelectTrigger
             size="sm"
-            className="w-[180px]"
+            className="w-full min-w-0 sm:w-[180px]"
             aria-label="Campo de fecha para filtrar"
           >
             <SelectValue />
@@ -123,6 +151,28 @@ export default function LeadsPage() {
             <SelectGroup>
               <SelectItem value="createdAt">Fecha de creación</SelectItem>
               <SelectItem value="updatedAt">Fecha de actualización</SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+        <Select
+          value={activeCloserId}
+          onValueChange={(value) => setSelectedCloserId(value ?? "all")}
+        >
+          <SelectTrigger
+            size="sm"
+            className="w-full min-w-0 sm:w-[180px]"
+            aria-label="Closer para filtrar"
+          >
+            <SelectValue>{activeCloserName}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem value="all">Todos los closers</SelectItem>
+              {availableClosers.map(({ id, name }) => (
+                <SelectItem key={id} value={id}>
+                  {name}
+                </SelectItem>
+              ))}
             </SelectGroup>
           </SelectContent>
         </Select>

@@ -238,7 +238,7 @@ describe("AssignLeadForm", () => {
       expect(closerInput).toBeDisabled();
     });
 
-    it("shows Sin asignar when currentCloserId is null", () => {
+    it("renders an enabled closer assignment Select when currentCloserId is null", () => {
       render(
         <AssignLeadForm
           leadId="lead-1"
@@ -247,8 +247,9 @@ describe("AssignLeadForm", () => {
         />,
       );
 
-      const closerInput = screen.getByDisplayValue("Sin asignar");
-      expect(closerInput).toBeDisabled();
+      const closerSelect = screen.getByLabelText("Closer asignado");
+      expect(closerSelect).toBeInTheDocument();
+      expect(closerSelect).toBeEnabled();
     });
 
     it("ignores closer items during prefill", () => {

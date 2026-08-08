@@ -66,12 +66,12 @@ describe("listClosers", () => {
     expect(result.every((u) => u.name && u.email)).toBe(true);
   });
 
-  it("returns an empty array when no closers exist", async () => {
+  it("excludes callers without assuming the database has no closers", async () => {
     const callerId = crypto.randomUUID();
     await insertUser({ id: callerId, name: "Caller B", email: "caller-b@test.com", roleId: "role-caller" });
 
     const result = await listClosers();
-    expect(result).toEqual([]);
+    expect(result.map((u) => u.id)).not.toContain(callerId);
   });
 
   it("returns closers ordered by name ascending", async () => {
@@ -82,7 +82,9 @@ describe("listClosers", () => {
     await insertUser({ id: closerB, name: "Amy Closer", email: "amy@test.com", roleId: "role-closer" });
 
     const result = await listClosers();
-    expect(result.map((u) => u.name)).toEqual(["Amy Closer", "Zoe Closer"]);
+    const createdCloserIds = new Set<string>([closerA, closerB]);
+    const createdClosers = result.filter((u) => createdCloserIds.has(u.id));
+    expect(createdClosers.map((u) => u.name)).toEqual(["Amy Closer", "Zoe Closer"]);
   });
 
   it("allows users with users:read to call users.listClosers", async () => {

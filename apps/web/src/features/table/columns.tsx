@@ -40,12 +40,13 @@ export function createLeadColumns(
     },
     {
       accessorKey: "callerId",
-      header: "Caller ID",
+      header: "Caller",
+      cell: ({ row }) => row.original.caller?.name ?? "Sin asignar",
     },
     {
       accessorKey: "closerId",
-      header: "Closer ID",
-      cell: ({ row }) => row.original.closerId || "sin asignar",
+      header: "Closer",
+      cell: ({ row }) => row.original.closer?.name ?? "Sin asignar",
     },
     {
       accessorKey: "createdAt",
