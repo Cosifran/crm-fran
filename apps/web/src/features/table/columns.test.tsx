@@ -4,6 +4,7 @@ import { createLeadColumns } from "./columns";
 type LeadRow = {
   caller?: { id: string; name: string | null } | null;
   closer?: { id: string; name: string | null } | null;
+  updatedAt?: Date | string;
 };
 
 function getColumn(header: string) {
@@ -50,5 +51,29 @@ describe("Lead user columns", () => {
     expect(headers).toContain("Closer");
     expect(headers).not.toContain("Caller ID");
     expect(headers).not.toContain("Closer ID");
+  });
+
+  it("renders the update time and keeps the update date column", () => {
+    const updatedAt = new Date("2026-08-08T14:05:00.000Z");
+    const row = { updatedAt };
+    const columns = createLeadColumns(() => null);
+    const headers = columns.map((column) => column.header);
+    const dateColumn = columns.find(
+      (column) => column.header === "Actualizado en",
+    );
+    const timeColumn = columns.find(
+      (column) => column.header === "Hora de actualización",
+    );
+
+    expect(headers).toContain("Actualizado en");
+    expect(dateColumn?.accessorKey).toBe("updatedAt");
+    expect(timeColumn?.id).toBe("updatedAtTime");
+    expect(timeColumn?.accessorKey).toBeUndefined();
+    expect(renderCell("Hora de actualización", row)).toBe(
+      updatedAt.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    );
   });
 });

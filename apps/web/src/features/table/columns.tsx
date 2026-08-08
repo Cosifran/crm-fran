@@ -59,6 +59,15 @@ export function createLeadColumns(
       cell: ({ row }) => new Date(row.original.updatedAt).toLocaleDateString(),
     },
     {
+      id: "updatedAtTime",
+      header: "Hora de actualización",
+      cell: ({ row }) =>
+        new Date(row.original.updatedAt).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+    },
+    {
       id: "actions",
       header: "Acciones",
       cell: ({ row }) => renderAction(row.original),
