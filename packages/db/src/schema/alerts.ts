@@ -12,7 +12,6 @@ export type AlertKind = (typeof ALERT_KIND)[keyof typeof ALERT_KIND];
 export const ALERT_SEVERITY = {
 	INFO: "info",
 	WARNING: "warning",
-	HIGH: "high",
 	URGENT: "urgent",
 } as const;
 export type AlertSeverity = (typeof ALERT_SEVERITY)[keyof typeof ALERT_SEVERITY];

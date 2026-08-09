@@ -126,7 +126,7 @@ describe("alerts router", () => {
     expect(result.targetUserId).toBe(closerId);
     expect(result.kind).toBe(ALERT_KIND.NO_CONTACT);
     expect(result.message).toBe("No se pudo contactar al lead");
-    expect(result.severity).toBe(ALERT_SEVERITY.HIGH);
+    expect(result.severity).toBe(ALERT_SEVERITY.URGENT);
     expect(result.intervalMinutes).toBe(1440);
     expect(result.occurrences).toBe(0);
     expect(result.nextShowAt).toBeInstanceOf(Date);

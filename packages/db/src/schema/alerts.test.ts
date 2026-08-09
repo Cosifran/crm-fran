@@ -9,10 +9,11 @@ describe("alerts schema", () => {
 	it("exports alert kind and severity constants", () => {
 		expect(ALERT_KIND.NO_CONTACT).toBe("no_contact");
 		expect(ALERT_KIND.FOLLOW_UP).toBe("follow_up");
-		expect(ALERT_SEVERITY.INFO).toBe("info");
-		expect(ALERT_SEVERITY.WARNING).toBe("warning");
-		expect(ALERT_SEVERITY.HIGH).toBe("high");
-		expect(ALERT_SEVERITY.URGENT).toBe("urgent");
+		expect(Object.values(ALERT_SEVERITY)).toEqual([
+			"info",
+			"warning",
+			"urgent",
+		]);
 	});
 
 	it("exports relations", () => {
