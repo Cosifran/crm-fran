@@ -8,7 +8,7 @@ import {
 } from "@crm-fran/ui/components/select";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { Lead } from "../leads/assign-lead-drawer";
-
+import { getCallerResponseStatus } from "../leads/response-status";
 
 export function createLeadColumns(
   renderAction: (lead: Lead) => React.ReactNode,
@@ -33,6 +33,7 @@ export function createLeadColumns(
     {
       accessorKey: "response",
       header: "Respuesta",
+      cell: ({ row }) => getCallerResponseStatus(row.original.questions),
     },
     {
       accessorKey: "feedback",

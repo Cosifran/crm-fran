@@ -125,7 +125,15 @@ describe("assignLead service", () => {
     const updated = await db.query.leads.findFirst({ where: (table, { eq }) => eq(table.id, leadId) });
     expect(updated?.state).toBe(LEAD_STATE.ASIGNADO);
     expect(updated?.callerId).toBe(callerId);
-    expect(updated?.questions).toEqual([]);
+    expect(updated?.questions).toEqual([
+      {
+        questionKey: "isContacted",
+        question: "¿Fué contactado?",
+        answer: "No",
+        authorRole: LEAD_QA_ROLE.CALLER,
+        authorId: callerId,
+      },
+    ]);
 
     const alertRows = await db.select().from(alerts).where(eq(alerts.leadId, leadId));
     expect(alertRows).toHaveLength(1);
@@ -139,14 +147,18 @@ describe("assignLead service", () => {
     expect(alert?.nextShowAt).toBeInstanceOf(Date);
   });
 
-  it("preserves existing questions when isContacted is No", async () => {
+  it("replaces the caller's isContacted answer with No while preserving other questions", async () => {
     const callerId = crypto.randomUUID();
+    const otherCallerId = crypto.randomUUID();
     const leadId = crypto.randomUUID();
 
     await insertUser({ id: callerId, name: "Caller", email: "caller5@test.com", roleId: "role-caller" });
+    await insertUser({ id: otherCallerId, name: "Other Caller", email: "caller6@test.com", roleId: "role-caller" });
 
     const existingQuestions: LeadQASessionItem[] = [
       { questionKey: "isContacted", question: "Q1", answer: "A1", authorRole: LEAD_QA_ROLE.CALLER, authorId: callerId },
+      { questionKey: "budget", question: "Budget?", answer: "500", authorRole: LEAD_QA_ROLE.CALLER, authorId: callerId },
+      { questionKey: "isContacted", question: "Contacted?", answer: "Si", authorRole: LEAD_QA_ROLE.CALLER, authorId: otherCallerId },
       { questionKey: "budget", question: "Budget?", answer: "1000", authorRole: LEAD_QA_ROLE.CLOSER, authorId: "closer-1" },
     ];
 
@@ -164,7 +176,27 @@ describe("assignLead service", () => {
     expect(result.leadId).toBe(leadId);
 
     const updated = await db.query.leads.findFirst({ where: (table, { eq }) => eq(table.id, leadId) });
-    expect(updated?.questions).toEqual(existingQuestions);
+    expect(updated?.questions).toEqual([
+      existingQuestions[1],
+      existingQuestions[2],
+      existingQuestions[3],
+      {
+        questionKey: "isContacted",
+        question: "Q1",
+        answer: "No",
+        authorRole: LEAD_QA_ROLE.CALLER,
+        authorId: callerId,
+      },
+    ]);
+
+    const callerContactedItems = (updated?.questions as LeadQASessionItem[]).filter(
+      (item) =>
+        item.questionKey === "isContacted" &&
+        item.authorRole === LEAD_QA_ROLE.CALLER &&
+        item.authorId === callerId,
+    );
+    expect(callerContactedItems).toHaveLength(1);
+    expect(callerContactedItems[0]?.answer).toBe("No");
   });
 
   it("preserves closer items when caller resubmits with Si", async () => {

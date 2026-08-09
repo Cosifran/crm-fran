@@ -7,6 +7,7 @@ import { DataTable } from "@crm-fran/ui/components/data-table";
 import { createLeadColumns } from "@/features/table/columns";
 import LeadViewDrawer from "@/features/leads/lead-view-drawer";
 import AssignLeadDrawer from "@/features/leads/assign-lead-drawer";
+import { getCallerResponseStatus } from "@/features/leads/response-status";
 import { DateRangePicker } from "@/components/date-range-picker";
 import {
   Select,
@@ -19,6 +20,7 @@ import {
 
 type DateField = "createdAt" | "updatedAt";
 type CloserFilter = "all" | string;
+type ResponseFilter = "all" | "Si" | "No" | "Sin asignar";
 
 function parseLocalDate(isoDate: string | undefined, endOfDay = false) {
   if (!isoDate) return undefined;
@@ -62,6 +64,8 @@ export default function LeadsPage() {
   }>();
   const [dateField, setDateField] = useState<DateField>("createdAt");
   const [selectedCloserId, setSelectedCloserId] = useState<CloserFilter>("all");
+  const [selectedResponse, setSelectedResponse] =
+    useState<ResponseFilter>("all");
 
   const isAdmin = session?.user?.roleId === "role-admin";
 
@@ -113,8 +117,11 @@ export default function LeadsPage() {
         (!toDate || leadDate <= toDate);
     }
     const matchesCloser = activeCloserId === "all" || lead.closerId === activeCloserId;
+    const matchesResponse =
+      selectedResponse === "all" ||
+      getCallerResponseStatus(lead.questions) === selectedResponse;
 
-    return matchesDate && matchesCloser;
+    return matchesDate && matchesCloser && matchesResponse;
   });
 
   const columns = createLeadColumns((lead) => (
@@ -145,7 +152,9 @@ export default function LeadsPage() {
             className="w-full min-w-0 sm:w-[180px]"
             aria-label="Campo de fecha para filtrar"
           >
-            <SelectValue />
+            <SelectValue>
+              {dateField === "createdAt" ? "Fecha de creación" : "Fecha de actualización"}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
@@ -173,6 +182,37 @@ export default function LeadsPage() {
                   {name}
                 </SelectItem>
               ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+        <Select
+          value={selectedResponse}
+          onValueChange={(value) => {
+            if (
+              value === "all" ||
+              value === "Si" ||
+              value === "No" ||
+              value === "Sin asignar"
+            ) {
+              setSelectedResponse(value);
+            }
+          }}
+        >
+          <SelectTrigger
+            size="sm"
+            className="w-full min-w-0 sm:w-[180px]"
+            aria-label="Respuesta para filtrar"
+          >
+            <SelectValue>
+              {selectedResponse === "all" ? "Todas las respuestas" : selectedResponse}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem value="all">Todas las respuestas</SelectItem>
+              <SelectItem value="Si">Si</SelectItem>
+              <SelectItem value="No">No</SelectItem>
+              <SelectItem value="Sin asignar">Sin asignar</SelectItem>
             </SelectGroup>
           </SelectContent>
         </Select>

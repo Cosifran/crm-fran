@@ -14,11 +14,17 @@ const mocks = vi.hoisted(() => ({
   dateFieldSelectOnValueChange: undefined as
     | ((value: string | null) => void)
     | undefined,
+  dateFieldSelectValueLabel: undefined as string | undefined,
   closerSelectOnValueChange: undefined as
     | ((value: string | null) => void)
     | undefined,
   closerSelectValueLabel: undefined as string | undefined,
   closerSelectOptions: [] as { value: string; label: string }[],
+  responseSelectOnValueChange: undefined as
+    | ((value: string | null) => void)
+    | undefined,
+  responseSelectValueLabel: undefined as string | undefined,
+  responseSelectOptions: [] as { value: string; label: string }[],
   dataTableData: [] as unknown[][],
 }));
 
@@ -32,6 +38,13 @@ function getCloserSelectValueLabel(children: ReactNode) {
   return selectValue.props.children == null
     ? undefined
     : String(selectValue.props.children);
+}
+
+function getSelectTriggerAriaLabel(children: ReactNode) {
+  const selectTrigger = Children.toArray(children)[0];
+  if (!isValidElement<{ "aria-label"?: string }>(selectTrigger)) return undefined;
+
+  return selectTrigger.props["aria-label"];
 }
 
 function getCloserSelectOptions(children: ReactNode) {
@@ -92,10 +105,15 @@ vi.mock("@crm-fran/ui/components/select", () => ({
   }) => {
     if (props.value === "createdAt" || props.value === "updatedAt") {
       mocks.dateFieldSelectOnValueChange = props.onValueChange;
-    } else {
+    mocks.dateFieldSelectValueLabel = getCloserSelectValueLabel(props.children);
+    } else if (getSelectTriggerAriaLabel(props.children) === "Closer para filtrar") {
       mocks.closerSelectOnValueChange = props.onValueChange;
       mocks.closerSelectValueLabel = getCloserSelectValueLabel(props.children);
       mocks.closerSelectOptions = getCloserSelectOptions(props.children);
+    } else {
+      mocks.responseSelectOnValueChange = props.onValueChange;
+      mocks.responseSelectValueLabel = getCloserSelectValueLabel(props.children);
+      mocks.responseSelectOptions = getCloserSelectOptions(props.children);
     }
     return null;
   },
@@ -123,9 +141,13 @@ describe("LeadsPage", () => {
     vi.clearAllMocks();
     mocks.dataTableData = [];
     mocks.dateFieldSelectOnValueChange = undefined;
+    mocks.dateFieldSelectValueLabel = undefined;
     mocks.closerSelectOnValueChange = undefined;
     mocks.closerSelectValueLabel = undefined;
     mocks.closerSelectOptions = [];
+    mocks.responseSelectOnValueChange = undefined;
+    mocks.responseSelectValueLabel = undefined;
+    mocks.responseSelectOptions = [];
     mocks.useQuery.mockReturnValue({ data: [], isLoading: false });
   });
 
@@ -166,6 +188,8 @@ describe("LeadsPage", () => {
 
     render(<LeadsPage />);
 
+    expect(mocks.dateFieldSelectValueLabel).toBe("Fecha de creación");
+
     expect(mocks.listAllQueryOptions).toHaveBeenCalledWith();
     expect(mocks.listByUserIdQueryOptions).toHaveBeenCalledWith();
 
@@ -183,6 +207,7 @@ describe("LeadsPage", () => {
     });
 
     expect(mocks.dataTableData.at(-1)).toEqual([updatedAtMatch]);
+    expect(mocks.dateFieldSelectValueLabel).toBe("Fecha de actualización");
     expect(
       mocks.listAllQueryOptions.mock.calls.every((args) => args.length === 0)
     ).toBe(true);
@@ -336,5 +361,92 @@ describe("LeadsPage", () => {
     rerender(<LeadsPage />);
 
     expect(mocks.dataTableData.at(-1)).toEqual([closerALead, closerBLead]);
+  });
+
+  it("filters loaded leads by caller response independently and restores the other filters", () => {
+    mocks.useSession.mockReturnValue({
+      data: { user: { roleId: "role-admin" } },
+      isPending: false,
+    });
+    const callerYes = {
+      id: "caller-yes",
+      closerId: "closer-a",
+      closer: { id: "closer-a", name: "Ana Closer" },
+      createdAt: new Date(2026, 0, 15, 12),
+      updatedAt: new Date(2026, 0, 15, 12),
+      questions: [
+        { questionKey: "isContacted", answer: "Si", authorRole: "caller" },
+      ],
+    };
+    const callerNo = {
+      id: "caller-no",
+      closerId: "closer-a",
+      closer: { id: "closer-a", name: "Ana Closer" },
+      createdAt: new Date(2026, 0, 20, 12),
+      updatedAt: new Date(2026, 0, 20, 12),
+      questions: [
+        { questionKey: "isContacted", answer: "No", authorRole: "caller" },
+      ],
+    };
+    const noCallerResponse = {
+      id: "no-caller-response",
+      closerId: "closer-b",
+      closer: { id: "closer-b", name: "Bruno Closer" },
+      createdAt: new Date(2026, 0, 25, 12),
+      updatedAt: new Date(2026, 0, 25, 12),
+      questions: [
+        { questionKey: "isContacted", answer: "Si", authorRole: "closer" },
+      ],
+    };
+    mocks.useQuery.mockReturnValue({
+      data: [callerYes, callerNo, noCallerResponse],
+      isLoading: false,
+    });
+
+    render(<LeadsPage />);
+
+    expect(mocks.responseSelectOptions).toEqual([
+      { value: "all", label: "Todas las respuestas" },
+      { value: "Si", label: "Si" },
+      { value: "No", label: "No" },
+      { value: "Sin asignar", label: "Sin asignar" },
+    ]);
+    expect(mocks.responseSelectValueLabel).toBe("Todas las respuestas");
+    expect(mocks.dataTableData.at(-1)).toEqual([
+      callerYes,
+      callerNo,
+      noCallerResponse,
+    ]);
+
+    act(() => {
+      mocks.responseSelectOnValueChange?.("Si");
+    });
+
+    expect(mocks.dataTableData.at(-1)).toEqual([callerYes]);
+    expect(mocks.responseSelectValueLabel).toBe("Si");
+
+    act(() => {
+      mocks.responseSelectOnValueChange?.("No");
+    });
+
+    expect(mocks.dataTableData.at(-1)).toEqual([callerNo]);
+    expect(mocks.responseSelectValueLabel).toBe("No");
+
+    act(() => {
+      mocks.responseSelectOnValueChange?.("Sin asignar");
+    });
+
+    expect(mocks.dataTableData.at(-1)).toEqual([noCallerResponse]);
+    expect(mocks.responseSelectValueLabel).toBe("Sin asignar");
+
+    act(() => {
+      mocks.closerSelectOnValueChange?.("closer-a");
+    });
+    act(() => {
+      mocks.responseSelectOnValueChange?.("all");
+    });
+
+    expect(mocks.dataTableData.at(-1)).toEqual([callerYes, callerNo]);
+    expect(mocks.responseSelectValueLabel).toBe("Todas las respuestas");
   });
 });

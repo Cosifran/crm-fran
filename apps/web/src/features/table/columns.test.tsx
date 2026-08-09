@@ -4,6 +4,12 @@ import { createLeadColumns } from "./columns";
 type LeadRow = {
   caller?: { id: string; name: string | null } | null;
   closer?: { id: string; name: string | null } | null;
+  questions?: Array<{
+    questionKey: string;
+    answer: string;
+    authorRole: "caller" | "closer";
+  }>;
+  response?: string;
   updatedAt?: Date | string;
 };
 
@@ -75,5 +81,65 @@ describe("Lead user columns", () => {
         minute: "2-digit",
       }),
     );
+  });
+});
+
+describe("Lead response status column", () => {
+  it("renders Si from a caller isContacted answer", () => {
+    const row = {
+      response: "No",
+      questions: [
+        { questionKey: "isContacted", answer: "Si", authorRole: "caller" as const },
+      ],
+    };
+
+    expect(renderCell("Respuesta", row)).toBe("Si");
+  });
+
+  it("renders No from a caller isContacted answer", () => {
+    const row = {
+      response: "Si",
+      questions: [
+        { questionKey: "isContacted", answer: "No", authorRole: "caller" as const },
+      ],
+    };
+
+    expect(renderCell("Respuesta", row)).toBe("No");
+  });
+
+  it("renders Sin asignar when there is no caller response", () => {
+    expect(renderCell("Respuesta", { questions: [] })).toBe("Sin asignar");
+  });
+
+  it("ignores closer-only isContacted responses", () => {
+    const row = {
+      questions: [
+        { questionKey: "isContacted", answer: "Si", authorRole: "closer" as const },
+      ],
+    };
+
+    expect(renderCell("Respuesta", row)).toBe("Sin asignar");
+  });
+
+  it("uses the latest matching caller isContacted answer", () => {
+    const row = {
+      questions: [
+        { questionKey: "isContacted", answer: "Si", authorRole: "caller" as const },
+        { questionKey: "isDecisionMaker", answer: "No", authorRole: "caller" as const },
+        { questionKey: "isContacted", answer: "No", authorRole: "caller" as const },
+      ],
+    };
+
+    expect(renderCell("Respuesta", row)).toBe("No");
+  });
+
+  it("renders Sin asignar for an unknown caller answer", () => {
+    const row = {
+      questions: [
+        { questionKey: "isContacted", answer: "Maybe", authorRole: "caller" as const },
+      ],
+    };
+
+    expect(renderCell("Respuesta", row)).toBe("Sin asignar");
   });
 });

@@ -73,8 +73,28 @@ export async function assignLead({
 			}));
 			updatedQuestions = [...preservedItems, ...newCallerItems];
 		} else {
-			// "No": preserve all existing questions, no new items appended
-			updatedQuestions = (lead.questions as LeadQASessionItem[]) ?? [];
+			const existingItems = (lead.questions as LeadQASessionItem[]) ?? [];
+			const existingIsContacted = existingItems.find(
+				(item) => item.questionKey === "isContacted",
+			);
+			const preservedItems = existingItems.filter(
+				(item) =>
+					!(
+						item.questionKey === "isContacted" &&
+						item.authorRole === LEAD_QA_ROLE.CALLER &&
+						item.authorId === callerId
+					),
+			);
+			updatedQuestions = [
+				...preservedItems,
+				{
+					questionKey: "isContacted",
+					question: existingIsContacted?.question ?? "¿Fué contactado?",
+					answer: "No",
+					authorRole: LEAD_QA_ROLE.CALLER,
+					authorId: callerId,
+				},
+			];
 		}
 
 		const [updated] = await tx
