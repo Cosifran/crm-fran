@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from "@crm-fran/ui/components/badge";
 import { Button } from "@crm-fran/ui/components/button";
 
+import { normalizeAlertSeverity } from "./alert-importance";
 import type { Alert } from "./use-alerts";
 
 interface AlertCardProps {
@@ -12,10 +13,10 @@ interface AlertCardProps {
   onResolve: (id: string) => void;
 }
 
-const SEVERITY_VARIANT = {
-  urgent: "destructive",
-  warning: "secondary",
-  info: "default",
+const SEVERITY_PRESENTATION = {
+  urgent: { label: "Alta", className: "bg-destructive/10 text-destructive" },
+  warning: { label: "Media", className: "bg-warning/15 text-warning-foreground" },
+  info: { label: "Baja", className: "bg-success/15 text-success-foreground" },
 } as const;
 
 const KIND_LABEL = {
@@ -24,7 +25,10 @@ const KIND_LABEL = {
 } as const;
 
 export function AlertCard({ alert, onDismiss, onResolve }: AlertCardProps) {
-  const severity = alert.severity as keyof typeof SEVERITY_VARIANT;
+  const severity = normalizeAlertSeverity(alert.severity);
+  const presentation = severity
+    ? SEVERITY_PRESENTATION[severity]
+    : { label: alert.severity, className: "" };
   const kind = alert.kind as keyof typeof KIND_LABEL;
 
   return (
@@ -37,8 +41,11 @@ export function AlertCard({ alert, onDismiss, onResolve }: AlertCardProps) {
               {alert.targetUser?.name ?? "Sin asignar"}
             </CardDescription>
           </div>
-          <Badge variant={SEVERITY_VARIANT[severity] ?? "default"}>
-            {alert.severity}
+          <Badge
+            variant={severity ? "outline" : "default"}
+            className={presentation.className}
+          >
+            {presentation.label}
           </Badge>
         </div>
       </CardHeader>
