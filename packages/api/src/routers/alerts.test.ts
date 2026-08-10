@@ -47,7 +47,7 @@ describe("alerts router", () => {
     return input;
   }
 
-  async function insertLead(input: { id: string }) {
+  async function insertLead(input: { id: string; callerId?: string }) {
     created.leadIds.push(input.id);
     await db.insert(leads).values({
       id: input.id,
@@ -55,6 +55,7 @@ describe("alerts router", () => {
       email: `lead-${input.id}@test.com`,
       phone: "123456789",
       state: LEAD_STATE.SIN_ASIGNAR,
+      callerId: input.callerId ?? null,
     });
     return input;
   }
@@ -140,7 +141,7 @@ describe("alerts router", () => {
 
     await insertUser({ id: closerId, name: "Closer A", email: "closer-a@test.com", roleId: "role-closer" });
     await insertUser({ id: otherCloserId, name: "Closer B", email: "closer-b@test.com", roleId: "role-closer" });
-    await insertLead({ id: leadId });
+    await insertLead({ id: leadId, callerId: closerId });
 
     const ownAlertId = await insertAlert({ leadId, targetUserId: closerId });
     const otherAlertId = await insertAlert({ leadId, targetUserId: otherCloserId });
@@ -154,6 +155,10 @@ describe("alerts router", () => {
     expect(result.map((a) => a.id)).toContain(otherAlertId);
     expect(result.map((a) => a.id)).not.toContain(dismissedAlertId);
     expect(result.map((a) => a.id)).not.toContain(resolvedAlertId);
+    expect(result.find((alert) => alert.id === ownAlertId)?.lead?.caller).toMatchObject({
+      id: closerId,
+      name: "Closer A",
+    });
   });
 
   it("counts unresolved alerts for all users", async () => {

@@ -1,9 +1,16 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@crm-fran/ui/components/card";
 import { Badge } from "@crm-fran/ui/components/badge";
 import { Button } from "@crm-fran/ui/components/button";
+import { cn } from "@crm-fran/ui/lib/utils";
 
+import {
+  formatAlertCountdown,
+  getAlertCountdownRemaining,
+} from "./alert-countdown";
 import { normalizeAlertSeverity } from "./alert-importance";
 import type { Alert } from "./use-alerts";
 
@@ -25,11 +32,25 @@ const KIND_LABEL = {
 } as const;
 
 export function AlertCard({ alert, onDismiss, onResolve }: AlertCardProps) {
+  const [now, setNow] = useState(() => Date.now());
   const severity = normalizeAlertSeverity(alert.severity);
   const presentation = severity
     ? SEVERITY_PRESENTATION[severity]
     : { label: alert.severity, className: "" };
   const kind = alert.kind as keyof typeof KIND_LABEL;
+  const remainingMs = getAlertCountdownRemaining(
+    alert.createdAt,
+    alert.kind,
+    now,
+  );
+  const countdown = formatAlertCountdown(remainingMs);
+  const isExpired = remainingMs < 0;
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setNow(Date.now()), 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   return (
     <Card>
@@ -38,26 +59,37 @@ export function AlertCard({ alert, onDismiss, onResolve }: AlertCardProps) {
           <div className="min-w-0 flex flex-col gap-1">
             <CardTitle>{alert.lead?.name ?? "Lead"}</CardTitle>
             <CardDescription>
-              {alert.targetUser?.name ?? "Sin asignar"}
+              Caller: {alert.lead?.caller?.name ?? "Sin caller"}
             </CardDescription>
           </div>
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onDismiss(alert.id)}
+          <div className="flex flex-col items-end gap-1">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onDismiss(alert.id)}
+              >
+                Descartar
+              </Button>
+              <Button size="sm" onClick={() => onResolve(alert.id)}>
+                Resolver
+              </Button>
+              <Badge
+                variant={severity ? "outline" : "default"}
+                className={presentation.className}
+              >
+                {presentation.label}
+              </Badge>
+            </div>
+            <p
+              className={cn(
+                "text-xs tabular-nums text-muted-foreground",
+                isExpired && "text-destructive",
+              )}
+              aria-label={`Tiempo restante: ${countdown}`}
             >
-              Descartar
-            </Button>
-            <Button size="sm" onClick={() => onResolve(alert.id)}>
-              Resolver
-            </Button>
-            <Badge
-              variant={severity ? "outline" : "default"}
-              className={presentation.className}
-            >
-              {presentation.label}
-            </Badge>
+              Tiempo: {countdown}
+            </p>
           </div>
         </div>
       </CardHeader>

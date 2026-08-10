@@ -32,11 +32,15 @@ export async function listAlerts(input: ListAlertsInput) {
 	conditions.push(isNull(alerts.dismissedAt));
 	conditions.push(isNull(alerts.resolvedAt));
 
-	return db.query.alerts.findMany({
-		with: {
-			lead: true,
-			targetUser: true,
-		},
+		return db.query.alerts.findMany({
+			with: {
+				lead: {
+					with: {
+						caller: true,
+					},
+				},
+				targetUser: true,
+			},
 		where: conditions.length > 0 ? (_fields, { and }) => and(...conditions) : undefined,
 		orderBy: asc(alerts.nextShowAt),
 		limit,

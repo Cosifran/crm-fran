@@ -7,12 +7,16 @@ import { useTrpcMutationWithToast } from "@/lib/use-trpc-mutation-with-toast";
 
 export type Alert = {
 	id: string;
-	lead: { name: string } | null;
+	lead: {
+		name: string;
+		caller: { id: string; name: string } | null;
+	} | null;
 	targetUser: { name: string } | null;
 	kind: string;
 	severity: string;
 	message: string;
 	nextShowAt: Date | string;
+	createdAt: Date | string;
 };
 
 export function useAlerts(
@@ -27,16 +31,27 @@ export function useAlerts(
 ) {
 	return useQuery({
 		...trpc.alerts.listAlerts.queryOptions(filters),
-		select: (data) =>
-			data.map((alert) => ({
-				id: alert.id,
-				lead: alert.lead ? { name: alert.lead.name } : null,
+			select: (data) =>
+				data.map((alert) => ({
+					id: alert.id,
+					lead: alert.lead
+						? {
+								name: alert.lead.name,
+								caller: alert.lead.caller
+									? {
+											id: alert.lead.caller.id,
+											name: alert.lead.caller.name,
+										}
+									: null,
+							}
+						: null,
 				targetUser: alert.targetUser ? { name: alert.targetUser.name } : null,
 				kind: alert.kind,
 				severity: alert.severity,
-				message: alert.message,
-				nextShowAt: alert.nextShowAt,
-			})),
+					message: alert.message,
+					nextShowAt: alert.nextShowAt,
+					createdAt: alert.createdAt,
+				})),
 	});
 }
 
