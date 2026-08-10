@@ -31,6 +31,7 @@ const formSchema = z.object({
   productFit: z.string(),
   urgencyReason: z.string(),
   extraInfo: z.string(),
+  closerFeedback: z.string(),
   scheduledDate: z.string(),
   scheduledTime: z.string(),
 });
@@ -45,6 +46,7 @@ const defaultValues = {
   productFit: "",
   urgencyReason: "",
   extraInfo: "",
+  closerFeedback: "",
   scheduledDate: "",
   scheduledTime: "",
 };
@@ -189,6 +191,20 @@ export default function CloserQAForm({
                   .map((error) => (typeof error === "string" ? error : ""))
                   .join(" ")}
               </FieldError>
+            </Field>
+          )}
+        </form.Field>
+
+        <form.Field name="closerFeedback">
+          {(field) => (
+            <Field>
+              <FieldLabel htmlFor="closerFeedback">Feedback del closer</FieldLabel>
+              <Textarea
+                id="closerFeedback"
+                value={field.state.value}
+                className="min-h-24 resize-none"
+                onChange={(event) => field.handleChange(event.target.value)}
+              />
             </Field>
           )}
         </form.Field>
@@ -440,56 +456,66 @@ function buildPayload(
     return { leadId, isContacted: "No" };
   }
 
+  const questions = [
+    {
+      questionKey: "isContacted",
+      question: "¿Fué contactado?",
+      answer: "Si",
+    },
+    {
+      questionKey: "isDecisionMaker",
+      question: "¿Es el decisor?",
+      answer: value.isDecisionMaker === "Si" ? "Si" : "No",
+    },
+    {
+      questionKey: "decisionMakerName",
+      question: "¿Quién es la persona correcta?",
+      answer: value.decisionMakerName,
+    },
+    {
+      questionKey: "financialSource",
+      question: "¿De dónde sale su capacidad económica?",
+      answer: value.financialSource,
+    },
+    {
+      questionKey: "productFit",
+      question: "Producto recomendado",
+      answer: value.productFit,
+    },
+    {
+      questionKey: "urgencyReason",
+      question: "¿De dónde sale la urgencia?",
+      answer: value.urgencyReason,
+    },
+    {
+      questionKey: "extraInfo",
+      question: "Información extra",
+      answer: value.extraInfo,
+    },
+    {
+      questionKey: "scheduledDate",
+      question: "Fecha",
+      answer: value.scheduledDate,
+    },
+    {
+      questionKey: "scheduledTime",
+      question: "Hora",
+      answer: value.scheduledTime,
+    },
+  ];
+
+  if (value.closerFeedback.trim() !== "") {
+    questions.push({
+      questionKey: "closerFeedback",
+      question: "Feedback del closer",
+      answer: value.closerFeedback,
+    });
+  }
+
   return {
     leadId,
     isContacted: "Si",
-    questions: [
-      {
-        questionKey: "isContacted",
-        question: "¿Fué contactado?",
-        answer: "Si",
-      },
-      {
-        questionKey: "isDecisionMaker",
-        question: "¿Es el decisor?",
-        answer: value.isDecisionMaker === "Si" ? "Si" : "No",
-      },
-      {
-        questionKey: "decisionMakerName",
-        question: "¿Quién es la persona correcta?",
-        answer: value.decisionMakerName,
-      },
-      {
-        questionKey: "financialSource",
-        question: "¿De dónde sale su capacidad económica?",
-        answer: value.financialSource,
-      },
-      {
-        questionKey: "productFit",
-        question: "Producto recomendado",
-        answer: value.productFit,
-      },
-      {
-        questionKey: "urgencyReason",
-        question: "¿De dónde sale la urgencia?",
-        answer: value.urgencyReason,
-      },
-      {
-        questionKey: "extraInfo",
-        question: "Información extra",
-        answer: value.extraInfo,
-      },
-      {
-        questionKey: "scheduledDate",
-        question: "Fecha",
-        answer: value.scheduledDate,
-      },
-      {
-        questionKey: "scheduledTime",
-        question: "Hora",
-        answer: value.scheduledTime,
-      },
-    ],
+    questions,
     scheduledDate: value.scheduledDate,
     scheduledTime: value.scheduledTime,
     extraNotes: value.extraInfo,

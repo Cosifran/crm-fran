@@ -17,6 +17,7 @@ import LeadDrawer from "@/components/lead-drawer/lead-drawer";
 
 export interface LeadDetailsData {
   questions: QASessionItem[];
+  feedback?: string;
 }
 
 const QUESTIONS_BY_ROLE = {

@@ -14,7 +14,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@crm-fran/ui/components/sidebar"
-import { CircleAlertIcon, HouseIcon, ChartBarIcon, CameraIcon, FileTextIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, CommandIcon } from "lucide-react"
+import { CircleAlertIcon, HouseIcon, ChartBarIcon, CalendarDaysIcon, CameraIcon, FileTextIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, CommandIcon } from "lucide-react"
 
 const data = {
   user: {
@@ -54,6 +54,11 @@ const data = {
         <CircleAlertIcon
         />
       ),
+    },
+    {
+      title: "Agendas",
+      url: "/agendas",
+      icon: <CalendarDaysIcon />,
     },
     /*  {
        title: "Analitica",

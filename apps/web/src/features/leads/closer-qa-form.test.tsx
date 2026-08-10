@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import CloserQAForm from "./closer-qa-form";
 
@@ -70,5 +71,98 @@ describe("CloserQAForm — integración con el drawer", () => {
     const form = screen.getByTestId("closer-qa-form");
     const submitButtons = form.querySelectorAll('button[type="submit"]');
     expect(submitButtons).toHaveLength(0);
+  });
+
+  it("renders and submits independent closer feedback", async () => {
+    const user = userEvent.setup();
+    render(
+      <QueryClientProvider client={queryClient}>
+        <CloserQAForm
+          leadId="lead-1"
+          leadQuestions={[
+            {
+              questionKey: "isContacted",
+              question: "¿Fue contactado?",
+              answer: "Si",
+              authorRole: "closer",
+              authorId: "closer-1",
+            },
+            {
+              questionKey: "isDecisionMaker",
+              question: "¿Es el decisor?",
+              answer: "Si",
+              authorRole: "closer",
+              authorId: "closer-1",
+            },
+            {
+              questionKey: "decisionMakerName",
+              question: "¿Quién es la persona correcta?",
+              answer: "Decision Maker",
+              authorRole: "closer",
+              authorId: "closer-1",
+            },
+            {
+              questionKey: "financialSource",
+              question: "¿De dónde sale su capacidad económica?",
+              answer: "Salary",
+              authorRole: "closer",
+              authorId: "closer-1",
+            },
+            {
+              questionKey: "productFit",
+              question: "Producto recomendado",
+              answer: "Product 1",
+              authorRole: "closer",
+              authorId: "closer-1",
+            },
+            {
+              questionKey: "urgencyReason",
+              question: "¿De dónde sale la urgencia?",
+              answer: "Soon",
+              authorRole: "closer",
+              authorId: "closer-1",
+            },
+            {
+              questionKey: "scheduledDate",
+              question: "Fecha",
+              answer: "2099-01-01",
+              authorRole: "closer",
+              authorId: "closer-1",
+            },
+            {
+              questionKey: "scheduledTime",
+              question: "Hora",
+              answer: "10:00",
+              authorRole: "closer",
+              authorId: "closer-1",
+            },
+          ]}
+        />
+      </QueryClientProvider>,
+    );
+
+    const feedback = screen.getByLabelText("Feedback del closer");
+    await user.type(feedback, "Llamar nuevamente la próxima semana");
+
+    const form = screen.getByTestId("closer-qa-form");
+    const submitButton = document.createElement("button");
+    submitButton.type = "submit";
+    form.appendChild(submitButton);
+    await user.click(submitButton);
+
+    await waitFor(() => {
+      expect(mocks.mutate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          leadId: "lead-1",
+          questions: expect.arrayContaining([
+            expect.objectContaining({
+              questionKey: "closerFeedback",
+              answer: "Llamar nuevamente la próxima semana",
+            }),
+          ]),
+        }),
+        expect.any(Object),
+      );
+    });
   });
 });
