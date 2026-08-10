@@ -57,6 +57,9 @@ export function useDismissAlert() {
         await queryClient.invalidateQueries({
           queryKey: trpc.alerts.listAlerts.queryKey(),
         });
+        await queryClient.invalidateQueries({
+          queryKey: trpc.alerts.countAlerts.queryKey(),
+        });
       },
     },
     {
@@ -75,6 +78,9 @@ export function useResolveAlert() {
       onSuccess: async () => {
         await queryClient.invalidateQueries({
           queryKey: trpc.alerts.listAlerts.queryKey(),
+        });
+        await queryClient.invalidateQueries({
+          queryKey: trpc.alerts.countAlerts.queryKey(),
         });
       },
     },
