@@ -1,4 +1,4 @@
-import { db, and, eq, isNull } from "@crm-fran/db";
+import { db, isNull } from "@crm-fran/db";
 import { alerts } from "@crm-fran/db/schema/index";
 import type { Permission } from "@crm-fran/db/schema/auth";
 
@@ -7,19 +7,13 @@ interface CountAlertsInput {
 	permissions: Permission[];
 }
 
-export async function countAlerts(input: CountAlertsInput): Promise<number> {
-	const isAdmin =
-		input.permissions.includes("*") ||
-		input.permissions.includes("alerts:*") ||
-		input.permissions.includes("users:read");
-
+export async function countAlerts(_input: CountAlertsInput): Promise<number> {
 	const rows = await db.query.alerts.findMany({
 		where: (_fields, { and }) =>
 			and(
 				...[
 					isNull(alerts.dismissedAt),
 					isNull(alerts.resolvedAt),
-					...(!isAdmin ? [eq(alerts.targetUserId, input.actorId)] : []),
 				],
 			),
 		columns: { id: true },

@@ -133,7 +133,7 @@ describe("alerts router", () => {
     created.alertIds.push(result.id);
   });
 
-  it("lists unresolved alerts scoped to the requesting user", async () => {
+  it("lists unresolved alerts for all users", async () => {
     const closerId = crypto.randomUUID();
     const otherCloserId = crypto.randomUUID();
     const leadId = crypto.randomUUID();
@@ -151,9 +151,27 @@ describe("alerts router", () => {
     const result = await caller.alerts.listAlerts();
 
     expect(result.map((a) => a.id)).toContain(ownAlertId);
-    expect(result.map((a) => a.id)).not.toContain(otherAlertId);
+    expect(result.map((a) => a.id)).toContain(otherAlertId);
     expect(result.map((a) => a.id)).not.toContain(dismissedAlertId);
     expect(result.map((a) => a.id)).not.toContain(resolvedAlertId);
+  });
+
+  it("counts unresolved alerts for all users", async () => {
+    const closerId = crypto.randomUUID();
+    const otherCloserId = crypto.randomUUID();
+    const leadId = crypto.randomUUID();
+
+    await insertUser({ id: closerId, name: "Closer A", email: "closer-a@test.com", roleId: "role-closer" });
+    await insertUser({ id: otherCloserId, name: "Closer B", email: "closer-b@test.com", roleId: "role-closer" });
+    await insertLead({ id: leadId });
+
+    const caller = createCaller(closerId, "role-closer", ["leads:*", "alerts:read"]);
+    const countBeforeInsertion = await caller.alerts.countAlerts();
+
+    await insertAlert({ leadId, targetUserId: closerId });
+    await insertAlert({ leadId, targetUserId: otherCloserId });
+
+    await expect(caller.alerts.countAlerts()).resolves.toBe(countBeforeInsertion + 2);
   });
 
   it("returns all unresolved alerts for admin users", async () => {

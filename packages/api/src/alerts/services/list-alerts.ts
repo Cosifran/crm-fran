@@ -18,10 +18,6 @@ export type AlertRow = Awaited<ReturnType<typeof listAlerts>>[number];
 export async function listAlerts(input: ListAlertsInput) {
 	const limit = Math.min(input.limit ?? 50, 100);
 	const offset = input.offset ?? 0;
-	const isAdmin =
-		input.permissions.includes("*") ||
-		input.permissions.includes("alerts:*") ||
-		input.permissions.includes("users:read");
 
 	const conditions: SQL<unknown>[] = [];
 
@@ -31,10 +27,6 @@ export async function listAlerts(input: ListAlertsInput) {
 
 	if (input.targetUserId) {
 		conditions.push(eq(alerts.targetUserId, input.targetUserId));
-	}
-
-	if (!isAdmin) {
-		conditions.push(eq(alerts.targetUserId, input.actorId));
 	}
 
 	if (!input.includeDismissed) {
