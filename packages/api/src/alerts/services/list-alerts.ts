@@ -29,13 +29,8 @@ export async function listAlerts(input: ListAlertsInput) {
 		conditions.push(eq(alerts.targetUserId, input.targetUserId));
 	}
 
-	if (!input.includeDismissed) {
-		conditions.push(isNull(alerts.dismissedAt));
-	}
-
-	if (!input.includeResolved) {
-		conditions.push(isNull(alerts.resolvedAt));
-	}
+	conditions.push(isNull(alerts.dismissedAt));
+	conditions.push(isNull(alerts.resolvedAt));
 
 	return db.query.alerts.findMany({
 		with: {

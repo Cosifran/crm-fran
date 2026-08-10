@@ -148,7 +148,7 @@ describe("alerts router", () => {
     const resolvedAlertId = await insertAlert({ leadId, targetUserId: closerId, resolvedAt: new Date() });
 
     const caller = createCaller(closerId, "role-closer", ["leads:*", "alerts:read"]);
-    const result = await caller.alerts.listAlerts();
+    const result = await caller.alerts.listAlerts({ includeDismissed: true, includeResolved: true });
 
     expect(result.map((a) => a.id)).toContain(ownAlertId);
     expect(result.map((a) => a.id)).toContain(otherAlertId);
@@ -172,6 +172,26 @@ describe("alerts router", () => {
     await insertAlert({ leadId, targetUserId: otherCloserId });
 
     await expect(caller.alerts.countAlerts()).resolves.toBe(countBeforeInsertion + 2);
+  });
+
+  it("narrows global pending alerts with an explicit targetUserId filter", async () => {
+    const closerId = crypto.randomUUID();
+    const otherCloserId = crypto.randomUUID();
+    const leadId = crypto.randomUUID();
+
+    await insertUser({ id: closerId, name: "Closer A", email: "closer-a@test.com", roleId: "role-closer" });
+    await insertUser({ id: otherCloserId, name: "Closer B", email: "closer-b@test.com", roleId: "role-closer" });
+    await insertLead({ id: leadId });
+
+    const ownAlertId = await insertAlert({ leadId, targetUserId: closerId });
+    const otherAlertId = await insertAlert({ leadId, targetUserId: otherCloserId });
+
+    const caller = createCaller(closerId, "role-closer", ["leads:*", "alerts:read"]);
+    const result = await caller.alerts.listAlerts({ targetUserId: otherCloserId });
+    const resultIds = result.map((alert) => alert.id);
+
+    expect(resultIds).toContain(otherAlertId);
+    expect(resultIds).not.toContain(ownAlertId);
   });
 
   it("returns all unresolved alerts for admin users", async () => {
@@ -238,6 +258,21 @@ describe("alerts router", () => {
 
     await expect(caller.alerts.dismissAlert({ id: alertId })).rejects.toBeInstanceOf(TRPCError);
     await expect(caller.alerts.dismissAlert({ id: alertId })).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("throws FORBIDDEN when resolving an alert owned by another user", async () => {
+    const closerId = crypto.randomUUID();
+    const otherCloserId = crypto.randomUUID();
+    const leadId = crypto.randomUUID();
+
+    await insertUser({ id: closerId, name: "Closer A", email: "closer-a@test.com", roleId: "role-closer" });
+    await insertUser({ id: otherCloserId, name: "Closer B", email: "closer-b@test.com", roleId: "role-closer" });
+    await insertLead({ id: leadId });
+    const alertId = await insertAlert({ leadId, targetUserId: otherCloserId });
+
+    const caller = createCaller(closerId, "role-closer", ["leads:*", "alerts:write"]);
+
+    await expect(caller.alerts.resolveAlert({ id: alertId })).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
   it("throws NOT_FOUND when resolving a non-existent alert", async () => {
