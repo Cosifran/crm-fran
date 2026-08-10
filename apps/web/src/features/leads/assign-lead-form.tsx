@@ -349,7 +349,11 @@ export default function AssignLeadForm({
                 onValueChange={(value) => handleOutcomeChange(value ?? "")}
               >
                 <SelectTrigger id="outcome" data-testid="outcome-trigger">
-                  <SelectValue placeholder="Seleccione una opción" />
+                  <SelectValue>
+                    {OUTCOME_OPTIONS.find(
+                      (option) => option.value === field.state.value,
+                    )?.label ?? "Seleccione una opción"}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {OUTCOME_OPTIONS.map((option) => (
