@@ -1,6 +1,6 @@
 "use client";
 
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@crm-fran/ui/components/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@crm-fran/ui/components/card";
 import { Badge } from "@crm-fran/ui/components/badge";
 import { Button } from "@crm-fran/ui/components/button";
 
@@ -34,19 +34,31 @@ export function AlertCard({ alert, onDismiss, onResolve }: AlertCardProps) {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 flex flex-col gap-1">
             <CardTitle>{alert.lead?.name ?? "Lead"}</CardTitle>
             <CardDescription>
               {alert.targetUser?.name ?? "Sin asignar"}
             </CardDescription>
           </div>
-          <Badge
-            variant={severity ? "outline" : "default"}
-            className={presentation.className}
-          >
-            {presentation.label}
-          </Badge>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onDismiss(alert.id)}
+            >
+              Descartar
+            </Button>
+            <Button size="sm" onClick={() => onResolve(alert.id)}>
+              Resolver
+            </Button>
+            <Badge
+              variant={severity ? "outline" : "default"}
+              className={presentation.className}
+            >
+              {presentation.label}
+            </Badge>
+          </div>
         </div>
       </CardHeader>
 
@@ -59,19 +71,6 @@ export function AlertCard({ alert, onDismiss, onResolve }: AlertCardProps) {
           Próxima: {new Date(alert.nextShowAt).toLocaleString()}
         </p>
       </CardContent>
-
-      <CardFooter className="flex justify-end gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onDismiss(alert.id)}
-        >
-          Descartar
-        </Button>
-        <Button size="sm" onClick={() => onResolve(alert.id)}>
-          Resolver
-        </Button>
-      </CardFooter>
     </Card>
   );
 }
