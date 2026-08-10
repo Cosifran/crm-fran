@@ -48,7 +48,47 @@ const qaSessionInput = z.discriminatedUnion("isContacted", [
   }),
 ]);
 
-export const assignLeadInput = z.discriminatedUnion("isContacted", [
+const callerQuestionsInput = z
+  .array(
+    z.object({
+      questionKey: z.string().min(1),
+      question: z.string().min(1),
+      answer: z.string(),
+    }),
+  )
+  .optional();
+
+export const assignLeadInput = z.union([
+  z.object({
+    leadId: z.string().min(1),
+    isContacted: z.literal("Si"),
+    outcome: z.literal("future_call"),
+    scheduledDate: z.string().date(),
+    scheduledTime: z.string().regex(/^\d{2}:\d{2}$/),
+    alertSeverity: z.enum(["urgent", "warning", "info"]),
+    questions: callerQuestionsInput,
+  }),
+  z.object({
+    leadId: z.string().min(1),
+    isContacted: z.literal("Si"),
+    outcome: z.literal("not_fit"),
+    questions: callerQuestionsInput,
+  }),
+  z.object({
+    leadId: z.string().min(1),
+    isContacted: z.literal("Si"),
+    outcome: z.literal("not_interested"),
+    questions: callerQuestionsInput,
+  }),
+  z.object({
+    leadId: z.string().min(1),
+    isContacted: z.literal("Si"),
+    outcome: z.literal("appointment"),
+    closerId: z.string().min(1),
+    scheduledDate: z.string().date(),
+    scheduledTime: z.string().regex(/^\d{2}:\d{2}$/),
+    questions: callerQuestionsInput,
+  }),
   z.object({
     leadId: z.string().min(1),
     isContacted: z.literal("Si"),

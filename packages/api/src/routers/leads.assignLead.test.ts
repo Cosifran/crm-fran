@@ -1,7 +1,14 @@
 import { describe, expect, it, beforeAll, afterEach } from "vitest";
 import { TRPCError } from "@trpc/server";
 import { db, eq, inArray } from "@crm-fran/db";
-import { alerts, leads, roles, user } from "@crm-fran/db/schema/index";
+import {
+  alerts,
+  leads,
+  roles,
+  user,
+  ALERT_KIND,
+  ALERT_SEVERITY,
+} from "@crm-fran/db/schema/index";
 import { LEAD_STATE } from "@crm-fran/db/schema/state";
 import { LEAD_QA_ROLE, type LeadQASessionItem } from "@crm-fran/db/schema/index";
 import { assignLead } from "../leads/services/assign-lead";
@@ -296,6 +303,113 @@ describe("assignLead service", () => {
     );
     expect(callerAItems).toHaveLength(1);
     expect(callerAItems[0]?.answer).toBe("Si");
+  });
+
+  it("creates one scheduled alert for a future call with selected severity", async () => {
+    const callerId = crypto.randomUUID();
+    const leadId = crypto.randomUUID();
+
+    await insertUser({ id: callerId, name: "Caller", email: "future-call@test.com", roleId: "role-caller" });
+    await insertLead({ id: leadId });
+
+    await assignLead({
+      callerId,
+      input: {
+        leadId,
+        isContacted: "Si",
+        outcome: "future_call",
+        scheduledDate: "2099-01-01",
+        scheduledTime: "10:00",
+        alertSeverity: "warning",
+      },
+    });
+
+    const alertRows = await db.select().from(alerts).where(eq(alerts.leadId, leadId));
+    expect(alertRows).toHaveLength(1);
+    expect(alertRows[0]?.kind).toBe(ALERT_KIND.NO_CONTACT);
+    expect(alertRows[0]?.severity).toBe(ALERT_SEVERITY.WARNING);
+    expect(alertRows[0]?.maxOccurrences).toBe(1);
+    expect(alertRows[0]?.nextShowAt).toEqual(new Date("2099-01-01T10:00"));
+
+    const lead = await db.query.leads.findFirst({ where: (table, { eq }) => eq(table.id, leadId) });
+    expect(lead?.questions).toEqual([
+      expect.objectContaining({
+        questionKey: "callerOutcome",
+        answer: "Llamar a futuro",
+        authorId: callerId,
+      }),
+      expect.objectContaining({
+        questionKey: "scheduledDate",
+        answer: "2099-01-01",
+        authorId: callerId,
+      }),
+      expect.objectContaining({
+        questionKey: "scheduledTime",
+        answer: "10:00",
+        authorId: callerId,
+      }),
+      expect.objectContaining({
+        questionKey: "alertSeverity",
+        answer: "warning",
+        authorId: callerId,
+      }),
+    ]);
+  });
+
+  it("saves an appointment without creating an alert", async () => {
+    const callerId = crypto.randomUUID();
+    const closerId = crypto.randomUUID();
+    const leadId = crypto.randomUUID();
+
+    await insertUser({ id: callerId, name: "Caller", email: "appointment-caller@test.com", roleId: "role-caller" });
+    await insertUser({ id: closerId, name: "Closer", email: "appointment-closer@test.com", roleId: "role-closer" });
+    await insertLead({ id: leadId });
+
+    await assignLead({
+      callerId,
+      input: {
+        leadId,
+        isContacted: "Si",
+        outcome: "appointment",
+        closerId,
+        scheduledDate: "2099-01-01",
+        scheduledTime: "10:00",
+      },
+    });
+
+    const alertRows = await db.select().from(alerts).where(eq(alerts.leadId, leadId));
+    expect(alertRows).toHaveLength(0);
+
+    const lead = await db.query.leads.findFirst({ where: (table, { eq }) => eq(table.id, leadId) });
+    expect(lead?.closerId).toBe(closerId);
+    expect(lead?.questions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ questionKey: "callerOutcome", answer: "Agenda" }),
+        expect.objectContaining({ questionKey: "closerId", answer: closerId }),
+        expect.objectContaining({ questionKey: "scheduledDate", answer: "2099-01-01" }),
+        expect.objectContaining({ questionKey: "scheduledTime", answer: "10:00" }),
+      ]),
+    );
+  });
+
+  it.each([
+    ["not_fit", "No encaja"],
+    ["not_interested", "No interesado"],
+  ] as const)("saves %s without extra answers or alerts", async (outcome, label) => {
+    const callerId = crypto.randomUUID();
+    const leadId = crypto.randomUUID();
+
+    await insertUser({ id: callerId, name: "Caller", email: `${outcome}@test.com`, roleId: "role-caller" });
+    await insertLead({ id: leadId });
+
+    await assignLead({ callerId, input: { leadId, isContacted: "Si", outcome } });
+
+    const alertRows = await db.select().from(alerts).where(eq(alerts.leadId, leadId));
+    expect(alertRows).toHaveLength(0);
+    const lead = await db.query.leads.findFirst({ where: (table, { eq }) => eq(table.id, leadId) });
+    expect(lead?.questions).toEqual([
+      expect.objectContaining({ questionKey: "callerOutcome", answer: label }),
+    ]);
   });
 
   it("rejects old yes/no encoding via Zod schema", () => {

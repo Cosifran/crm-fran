@@ -10,8 +10,14 @@ import {
 	type LeadQASessionItem,
 } from "@crm-fran/db/schema/index";
 import { ALERT_KIND_CONFIG } from "../../alerts/services/config";
+import {
+  getScheduledAt,
+  OUTCOME_LABELS,
+  type CallerOutcomeInput,
+  validateCallerOutcomeInput,
+} from "./caller-outcome";
 
-export type AssignLeadInput = {
+type LegacyAssignLeadInput = {
 	leadId: string;
 	isContacted: "Si" | "No";
 	closerId?: string;
@@ -21,6 +27,14 @@ export type AssignLeadInput = {
 	extraNotes?: string;
 };
 
+type OutcomeAssignLeadInput = { leadId: string; isContacted: "Si" } & CallerOutcomeInput & {
+  questions?: Array<{ questionKey: string; question: string; answer: string }>;
+};
+
+export type AssignLeadInput =
+  | OutcomeAssignLeadInput
+  | LegacyAssignLeadInput;
+
 export async function assignLead({
 	input,
 	callerId,
@@ -28,7 +42,23 @@ export async function assignLead({
 	input: AssignLeadInput;
 	callerId: string;
 }) {
-	const { leadId, isContacted, closerId, questions = [] } = input;
+  const leadId = input.leadId;
+  const isOutcomeInput = "outcome" in input;
+  const isLegacyInput = !isOutcomeInput;
+  const isAppointment = isOutcomeInput && input.outcome === "appointment";
+  const isFutureCall = isOutcomeInput && input.outcome === "future_call";
+
+  if (isOutcomeInput) {
+    const validationErrors = validateCallerOutcomeInput(input);
+    if (validationErrors) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: Object.entries(validationErrors)
+          .map(([field, error]) => `${field}: ${error}`)
+          .join(", "),
+      });
+    }
+  }
 
 	return db.transaction(async (tx) => {
 		const [lead] = await tx.select().from(leads).where(eq(leads.id, leadId));
@@ -40,7 +70,13 @@ export async function assignLead({
 			});
 		}
 
-		if (closerId) {
+    const closerId = isLegacyInput
+      ? input.closerId
+      : isAppointment
+        ? input.closerId
+        : undefined;
+
+    if (closerId) {
 			const [closer] = await tx
 				.select({ id: user.id })
 				.from(user)
@@ -56,7 +92,90 @@ export async function assignLead({
 
 		let updatedQuestions: LeadQASessionItem[];
 
-		if (isContacted === "Si") {
+		if (isOutcomeInput) {
+			const existingItems = (lead.questions as LeadQASessionItem[]) ?? [];
+			const preservedItems = existingItems.filter(
+				(item) =>
+					!(
+						item.authorRole === LEAD_QA_ROLE.CALLER &&
+						item.authorId === callerId
+					),
+			);
+			const outcomeQuestions: LeadQASessionItem[] = [
+				{
+					questionKey: "callerOutcome",
+					question: "¿Qué ha sucedido?",
+					answer: OUTCOME_LABELS[input.outcome],
+					authorRole: LEAD_QA_ROLE.CALLER,
+					authorId: callerId,
+				},
+			];
+			const submittedQuestions = input.questions ?? [];
+			outcomeQuestions.push(
+				...submittedQuestions
+					.filter((question) => question.answer.trim() !== "")
+					.map((question) => ({
+						...question,
+						authorRole: LEAD_QA_ROLE.CALLER,
+						authorId: callerId,
+					})),
+			);
+
+			if (isFutureCall) {
+				outcomeQuestions.push(
+					{
+						questionKey: "scheduledDate",
+						question: "Fecha de llamada futura",
+						answer: input.scheduledDate,
+						authorRole: LEAD_QA_ROLE.CALLER,
+						authorId: callerId,
+					},
+					{
+						questionKey: "scheduledTime",
+						question: "Hora de llamada futura",
+						answer: input.scheduledTime,
+						authorRole: LEAD_QA_ROLE.CALLER,
+						authorId: callerId,
+					},
+					{
+						questionKey: "alertSeverity",
+						question: "Importancia de la alerta",
+						answer: input.alertSeverity,
+						authorRole: LEAD_QA_ROLE.CALLER,
+						authorId: callerId,
+					},
+				);
+			}
+
+			if (isAppointment) {
+				outcomeQuestions.push(
+					{
+						questionKey: "closerId",
+						question: "Closer asignado",
+						answer: input.closerId,
+						authorRole: LEAD_QA_ROLE.CALLER,
+						authorId: callerId,
+					},
+					{
+						questionKey: "scheduledDate",
+						question: "Fecha de agenda",
+						answer: input.scheduledDate,
+						authorRole: LEAD_QA_ROLE.CALLER,
+						authorId: callerId,
+					},
+					{
+						questionKey: "scheduledTime",
+						question: "Hora de agenda",
+						answer: input.scheduledTime,
+						authorRole: LEAD_QA_ROLE.CALLER,
+						authorId: callerId,
+					},
+				);
+			}
+
+			updatedQuestions = [...preservedItems, ...outcomeQuestions];
+		} else if (input.isContacted === "Si") {
+			const questions = input.questions ?? [];
 			// Partition-preserving upsert: remove only current caller's items, keep closer + other callers
 			const existingItems = (lead.questions as LeadQASessionItem[]) ?? [];
 			const preservedItems = existingItems.filter(
@@ -117,7 +236,30 @@ export async function assignLead({
 
 		let alertId: string | undefined;
 
-		if (isContacted === "No") {
+		if (isFutureCall) {
+			const scheduledAt = getScheduledAt(input.scheduledDate, input.scheduledTime);
+			const intervalMinutes = Math.max(
+				1,
+				Math.ceil((scheduledAt.getTime() - Date.now()) / 60_000),
+			);
+			const [alert] = await tx
+				.insert(alerts)
+				.values({
+					id: crypto.randomUUID(),
+					leadId,
+					targetUserId: callerId,
+					kind: ALERT_KIND.NO_CONTACT,
+					message: "Llamar a futuro",
+					severity: input.alertSeverity,
+					intervalMinutes,
+					maxOccurrences: 1,
+					nextShowAt: scheduledAt,
+					occurrences: 0,
+				})
+				.returning({ id: alerts.id });
+
+			alertId = alert?.id;
+		} else if (isLegacyInput && input.isContacted === "No") {
 			const config = ALERT_KIND_CONFIG[ALERT_KIND.NO_CONTACT];
 			const [alert] = await tx
 				.insert(alerts)
@@ -136,7 +278,7 @@ export async function assignLead({
 				.returning({ id: alerts.id });
 
 			alertId = alert?.id;
-		} else if (isContacted === "Si" && closerId) {
+		} else if (isLegacyInput && input.isContacted === "Si" && closerId) {
 			const config = ALERT_KIND_CONFIG[ALERT_KIND.FOLLOW_UP];
 			await tx.insert(alerts).values({
 				id: crypto.randomUUID(),
