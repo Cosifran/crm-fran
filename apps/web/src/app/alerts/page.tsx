@@ -33,11 +33,15 @@ import {
   useResolveAlert,
 } from "@/features/alerts/use-alerts";
 
+import styles from "./alerts.module.css";
+
 export default function AlertsPage() {
   return (
-    <Can permission="alerts:read" fallback={<p>No tenés permisos</p>}>
-      <AlertsInbox />
-    </Can>
+    <div className={styles.theme}>
+      <Can permission="alerts:read" fallback={<p>No tenés permisos</p>}>
+        <AlertsInbox />
+      </Can>
+    </div>
   );
 }
 
@@ -120,7 +124,7 @@ function AlertsInbox() {
                 : selectedCaller?.name ?? "Todos los callers"}
             </SelectValue>
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className={styles.overlayTheme}>
             <SelectItem value="all">Todos los callers</SelectItem>
             {callers.map((caller) => (
               <SelectItem key={caller.id} value={caller.id}>
