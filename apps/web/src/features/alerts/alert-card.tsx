@@ -12,12 +12,17 @@ import {
   getAlertCountdownRemaining,
 } from "./alert-countdown";
 import { normalizeAlertSeverity } from "./alert-importance";
+import {
+  ALERT_TYPE_LABELS,
+  getAlertType,
+  getAppointmentHistory,
+} from "./alert-type";
+import { AlertResolutionDialog } from "./alert-resolution-dialog";
 import type { Alert } from "./use-alerts";
 
 interface AlertCardProps {
   alert: Alert;
   onDismiss: (id: string) => void;
-  onResolve: (id: string) => void;
 }
 
 const SEVERITY_PRESENTATION = {
@@ -31,13 +36,15 @@ const KIND_LABEL = {
   follow_up: "Seguimiento",
 } as const;
 
-export function AlertCard({ alert, onDismiss, onResolve }: AlertCardProps) {
+export function AlertCard({ alert, onDismiss }: AlertCardProps) {
   const [now, setNow] = useState(() => Date.now());
   const severity = normalizeAlertSeverity(alert.severity);
   const presentation = severity
     ? SEVERITY_PRESENTATION[severity]
     : { label: alert.severity, className: "" };
   const kind = alert.kind as keyof typeof KIND_LABEL;
+  const alertType = getAlertType(alert);
+  const appointmentHistory = getAppointmentHistory(alert);
   const remainingMs = getAlertCountdownRemaining(
     alert.createdAt,
     alert.kind,
@@ -71,9 +78,7 @@ export function AlertCard({ alert, onDismiss, onResolve }: AlertCardProps) {
               >
                 Descartar
               </Button>
-              <Button size="sm" onClick={() => onResolve(alert.id)}>
-                Resolver
-              </Button>
+              <AlertResolutionDialog alert={alert} />
               <Badge
                 variant={severity ? "outline" : "default"}
                 className={presentation.className}
@@ -96,9 +101,22 @@ export function AlertCard({ alert, onDismiss, onResolve }: AlertCardProps) {
 
       <CardContent className="flex flex-col gap-1">
         <p className="text-xs font-medium">
-          {KIND_LABEL[kind] ?? alert.kind}
+          {alertType ? ALERT_TYPE_LABELS[alertType] : KIND_LABEL[kind] ?? alert.kind}
         </p>
         <p className="text-xs text-muted-foreground">{alert.message}</p>
+        {appointmentHistory.length > 0 && (
+          <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+            <p className="font-medium text-foreground">Historial de agenda</p>
+            <ol className="flex flex-col gap-1">
+              {appointmentHistory.map((entry, index) => (
+                <li key={`${entry.date}-${entry.time}-${index}`}>
+                  {index === 0 ? "Agenda inicial" : `Reagenda ${index}`}: {entry.date}{" "}
+                  {entry.time}
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
         <p className="text-xs text-muted-foreground">
           Próxima: {new Date(alert.nextShowAt).toLocaleString()}
         </p>

@@ -8,7 +8,14 @@ import { trpc } from "@/utils/trpc";
 import { useTrpcMutationWithToast } from "@/lib/use-trpc-mutation-with-toast";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@crm-fran/ui/components/field";
 import { Input } from "@crm-fran/ui/components/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm-fran/ui/components/select";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@crm-fran/ui/components/select";
 import { Skeleton } from "@crm-fran/ui/components/skeleton";
 
 type CallerOutcome =
@@ -36,19 +43,24 @@ type FormValue = {
 
 type LeadQuestion = {
   questionKey?: string;
-  question: string;
+  question?: string;
   answer: string;
   authorRole: "caller" | "closer";
-  authorId: string | null;
+  authorId?: string | null;
 };
 
 interface AssignLeadFormProps {
   leadId: string;
   onCancel?: () => void;
-  onSuccess?: () => void;
-  leadQuestions?: LeadQuestion[];
+  onSuccess?: (result: { leadId: string; alertId?: string }) => void;
+  leadQuestions?: readonly LeadQuestion[];
   currentCloserId?: string | null;
   onSubmitLabelChange?: (label: string) => void;
+  freshEvent?: boolean;
+  appointmentOutcomeLabel?: "Agenda" | "Reagenda";
+  formId?: string;
+  sourceAlertId?: string;
+  allowedOutcomes?: CallerOutcome[];
 }
 
 const OUTCOME_OPTIONS: { value: CallerOutcome; label: string }[] = [
@@ -86,7 +98,9 @@ const defaultValues: FormValue = {
   alertSeverity: "",
 };
 
-function getInitialValues(leadQuestions: LeadQuestion[] | undefined): FormValue {
+function getInitialValues(
+  leadQuestions: readonly LeadQuestion[] | undefined,
+): FormValue {
   const callerQuestions = (leadQuestions ?? []).filter(
     (question) => question.authorRole === "caller",
   );
@@ -164,9 +178,11 @@ function validateForm(value: FormValue) {
   return Object.keys(fields).length > 0 ? { fields } : undefined;
 }
 
-function buildPayload(value: FormValue, leadId: string) {
+function buildPayload(value: FormValue, leadId: string, sourceAlertId?: string) {
+  const sourceAlert = sourceAlertId ? { sourceAlertId } : {};
+
   if (value.isContacted === "No") {
-    return { leadId, isContacted: "No" as const };
+    return { leadId, ...sourceAlert, isContacted: "No" as const };
   }
 
   const questions = [
@@ -188,6 +204,7 @@ function buildPayload(value: FormValue, leadId: string) {
   if (value.outcome === "future_call") {
     return {
       leadId,
+      ...sourceAlert,
       isContacted: "Si" as const,
       outcome: value.outcome,
       questions,
@@ -200,6 +217,7 @@ function buildPayload(value: FormValue, leadId: string) {
   if (value.outcome === "appointment") {
     return {
       leadId,
+      ...sourceAlert,
       isContacted: "Si" as const,
       outcome: value.outcome,
       questions,
@@ -211,6 +229,7 @@ function buildPayload(value: FormValue, leadId: string) {
 
   return {
     leadId,
+    ...sourceAlert,
     isContacted: "Si" as const,
     outcome: value.outcome as "not_fit" | "not_interested",
     questions,
@@ -223,9 +242,29 @@ export default function AssignLeadForm({
   leadQuestions,
   currentCloserId,
   onSubmitLabelChange,
+  freshEvent = false,
+  appointmentOutcomeLabel = "Agenda",
+  formId = "assign-lead-form",
+  sourceAlertId,
+  allowedOutcomes,
 }: AssignLeadFormProps) {
   const queryClient = useQueryClient();
-  const initialValues = getInitialValues(leadQuestions);
+  const initialValues = freshEvent
+    ? {
+        ...defaultValues,
+        isContacted: "Si" as const,
+        closerId: currentCloserId ?? "",
+      }
+    : getInitialValues(leadQuestions);
+  const outcomeOptions = OUTCOME_OPTIONS
+    .filter(
+      (option) => !allowedOutcomes || allowedOutcomes.includes(option.value),
+    )
+    .map((option) =>
+      option.value === "appointment"
+        ? { ...option, label: appointmentOutcomeLabel }
+        : option,
+    );
   const [isContacted, setIsContacted] = useState<"" | "Si" | "No">(
     initialValues.isContacted,
   );
@@ -253,9 +292,9 @@ export default function AssignLeadForm({
       onSubmit: ({ value }) => validateForm(value),
     },
     onSubmit: async ({ value }) => {
-      mutation.mutate(buildPayload(value, leadId), {
-        onSuccess: () => {
-          onSuccess?.();
+      mutation.mutate(buildPayload(value, leadId, sourceAlertId), {
+        onSuccess: (result) => {
+          onSuccess?.(result);
           queryClient.invalidateQueries({
             queryKey: trpc.leads.listByUserId.queryKey(),
           });
@@ -292,7 +331,7 @@ export default function AssignLeadForm({
 
   const handleOutcomeChange = (value: string) => {
     clearConditionalFields();
-    const nextOutcome = OUTCOME_OPTIONS.some((option) => option.value === value)
+    const nextOutcome = outcomeOptions.some((option) => option.value === value)
       ? (value as CallerOutcome)
       : "";
     setOutcome(nextOutcome);
@@ -302,7 +341,7 @@ export default function AssignLeadForm({
   return (
     <form
       className="mx-auto w-full max-w-lg"
-      id="assign-lead-form"
+      id={formId}
       data-testid="assign-lead-form"
       onSubmit={(event) => {
         event.preventDefault();
@@ -325,8 +364,10 @@ export default function AssignLeadForm({
                   <SelectValue placeholder="Seleccione una opción" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Si">Si</SelectItem>
-                  <SelectItem value="No">No</SelectItem>
+                  <SelectGroup>
+                    <SelectItem value="Si">Si</SelectItem>
+                    <SelectItem value="No">No</SelectItem>
+                  </SelectGroup>
                 </SelectContent>
               </Select>
               <FieldError>
@@ -350,17 +391,19 @@ export default function AssignLeadForm({
               >
                 <SelectTrigger id="outcome" data-testid="outcome-trigger">
                   <SelectValue>
-                    {OUTCOME_OPTIONS.find(
+                    {outcomeOptions.find(
                       (option) => option.value === field.state.value,
                     )?.label ?? "Seleccione una opción"}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {OUTCOME_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
+                  <SelectGroup>
+                    {outcomeOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                 </SelectContent>
               </Select>
               <FieldError>
@@ -385,8 +428,10 @@ export default function AssignLeadForm({
                     <SelectValue placeholder="Seleccione una opción" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Si">Si</SelectItem>
-                    <SelectItem value="No">No</SelectItem>
+                    <SelectGroup>
+                      <SelectItem value="Si">Si</SelectItem>
+                      <SelectItem value="No">No</SelectItem>
+                    </SelectGroup>
                   </SelectContent>
                 </Select>
                 <FieldError>
@@ -526,11 +571,13 @@ export default function AssignLeadForm({
                       <SelectValue placeholder="Seleccione una importancia" />
                     </SelectTrigger>
                     <SelectContent>
-                      {SEVERITY_OPTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
+                      <SelectGroup>
+                        {SEVERITY_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
                     </SelectContent>
                   </Select>
                   <FieldError>
@@ -551,22 +598,24 @@ export default function AssignLeadForm({
                 <Field invalid={field.state.meta.errors.length > 0}>
                   <FieldLabel htmlFor="closerId">Closer asignado</FieldLabel>
                   <Select
-                    value={field.state.value || currentCloserId || ""}
+                    value={field.state.value}
                     onValueChange={(value) => field.handleChange(value ?? "")}
                   >
                     <SelectTrigger id="closerId">
                       <SelectValue placeholder="Seleccione un closer" />
                     </SelectTrigger>
                     <SelectContent>
-                      {closers.isLoading ? (
-                        <Skeleton className="h-8 w-full" />
-                      ) : (
-                        closers.data?.map((closer) => (
-                          <SelectItem key={closer.id} value={closer.id}>
-                            {closer.name}
-                          </SelectItem>
-                        ))
-                      )}
+                      <SelectGroup>
+                        {closers.isLoading ? (
+                          <Skeleton className="h-8 w-full" />
+                        ) : (
+                          closers.data?.map((closer) => (
+                            <SelectItem key={closer.id} value={closer.id}>
+                              {closer.name}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectGroup>
                     </SelectContent>
                   </Select>
                   <FieldError>

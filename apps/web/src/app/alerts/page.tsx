@@ -12,12 +12,18 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@crm-fran/ui/components/select";
 
 import { AlertCard } from "@/features/alerts/alert-card";
+import {
+  type AlertCloserFilter,
+  filterAlertsByCloser,
+  getAlertClosers,
+} from "@/features/alerts/alert-closer";
 import {
   type AlertCallerFilter,
   filterAlertsByCaller,
@@ -28,9 +34,12 @@ import {
   filterAlertsBySeverity,
 } from "@/features/alerts/alert-importance";
 import {
+  type AlertTypeFilter,
+  filterAlertsByType,
+} from "@/features/alerts/alert-type";
+import {
   useAlerts,
   useDismissAlert,
-  useResolveAlert,
 } from "@/features/alerts/use-alerts";
 
 import styles from "./alerts.module.css";
@@ -48,20 +57,32 @@ export default function AlertsPage() {
 function AlertsInbox() {
   const { data, isLoading, isError } = useAlerts();
   const dismiss = useDismissAlert();
-  const resolve = useResolveAlert();
   const [severityFilter, setSeverityFilter] =
     useState<AlertSeverityFilter>("all");
   const [callerFilter, setCallerFilter] =
     useState<AlertCallerFilter>("all");
+  const [typeFilter, setTypeFilter] = useState<AlertTypeFilter>("all");
+  const [closerFilter, setCloserFilter] =
+    useState<AlertCloserFilter>("all");
   const callers = getAlertCallers(data ?? []);
+  const closers = getAlertClosers(data ?? []);
   const selectedCaller = callers.find((caller) => caller.id === callerFilter);
+  const selectedCloser = closers.find((closer) => closer.id === closerFilter);
   const severityFilteredAlerts = filterAlertsBySeverity(
     data ?? [],
     severityFilter,
   );
-  const filteredAlerts = filterAlertsByCaller(
+  const callerFilteredAlerts = filterAlertsByCaller(
     severityFilteredAlerts,
     callerFilter,
+  );
+  const typeFilteredAlerts = filterAlertsByType(
+    callerFilteredAlerts,
+    typeFilter,
+  );
+  const filteredAlerts = filterAlertsByCloser(
+    typeFilteredAlerts,
+    closerFilter,
   );
 
   if (isLoading) {
@@ -83,7 +104,7 @@ function AlertsInbox() {
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
-      <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+      <div className="mx-auto flex w-full max-w-5xl min-w-0 flex-col gap-3 px-2 pt-4 sm:flex-row sm:flex-wrap sm:items-center sm:px-3 sm:pt-5">
         <ToggleGroup
           multiple={false}
           value={[severityFilter]}
@@ -125,12 +146,83 @@ function AlertsInbox() {
             </SelectValue>
           </SelectTrigger>
           <SelectContent className={styles.overlayTheme}>
-            <SelectItem value="all">Todos los callers</SelectItem>
-            {callers.map((caller) => (
-              <SelectItem key={caller.id} value={caller.id}>
-                {caller.name}
-              </SelectItem>
-            ))}
+            <SelectGroup>
+              <SelectItem value="all">Todos los callers</SelectItem>
+              {callers.map((caller) => (
+                <SelectItem key={caller.id} value={caller.id}>
+                  {caller.name}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+
+        <Select
+          value={typeFilter}
+          onValueChange={(value) => {
+            if (
+              value === "all" ||
+              value === "follow_up" ||
+              value === "appointment" ||
+              value === "future_call" ||
+              value === "rescheduled"
+            ) {
+              setTypeFilter(value);
+            }
+          }}
+        >
+          <SelectTrigger
+            size="sm"
+            className="w-full sm:w-44"
+            aria-label="Filtrar alertas por tipo"
+          >
+            <SelectValue>
+              {typeFilter === "all"
+                ? "Todos los tipos"
+                : typeFilter === "follow_up"
+                  ? "Seguimiento"
+                  : typeFilter === "appointment"
+                    ? "Agenda"
+                    : typeFilter === "future_call"
+                      ? "Llamar futuro"
+                      : "Reagenda"}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent className={styles.overlayTheme}>
+            <SelectGroup>
+              <SelectItem value="all">Todos los tipos</SelectItem>
+              <SelectItem value="follow_up">Seguimiento</SelectItem>
+              <SelectItem value="appointment">Agenda</SelectItem>
+              <SelectItem value="future_call">Llamar futuro</SelectItem>
+              <SelectItem value="rescheduled">Reagenda</SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+
+        <Select
+          value={closerFilter}
+          onValueChange={(value) => setCloserFilter(value ?? "all")}
+        >
+          <SelectTrigger
+            size="sm"
+            className="w-full sm:w-52"
+            aria-label="Filtrar alertas por closer"
+          >
+            <SelectValue>
+              {closerFilter === "all"
+                ? "Todos los closers"
+                : selectedCloser?.name ?? "Todos los closers"}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent className={styles.overlayTheme}>
+            <SelectGroup>
+              <SelectItem value="all">Todos los closers</SelectItem>
+              {closers.map((closer) => (
+                <SelectItem key={closer.id} value={closer.id}>
+                  {closer.name}
+                </SelectItem>
+              ))}
+            </SelectGroup>
           </SelectContent>
         </Select>
       </div>
@@ -144,7 +236,6 @@ function AlertsInbox() {
               key={alert.id}
               alert={alert}
               onDismiss={(id) => dismiss.mutate({ id })}
-              onResolve={(id) => resolve.mutate({ id })}
             />
           ))}
         </div>

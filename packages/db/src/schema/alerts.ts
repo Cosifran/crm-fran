@@ -4,9 +4,12 @@ import { user } from "./auth";
 import { leads } from "./leads";
 
 export const ALERT_KIND = {
-	NO_CONTACT: "no_contact",
-	FOLLOW_UP: "follow_up",
-} as const;
+		NO_CONTACT: "no_contact",
+		FOLLOW_UP: "follow_up",
+		FUTURE_CALL: "future_call",
+		APPOINTMENT: "appointment",
+		RESCHEDULED: "rescheduled",
+	} as const;
 export type AlertKind = (typeof ALERT_KIND)[keyof typeof ALERT_KIND];
 
 export const ALERT_SEVERITY = {

@@ -326,7 +326,7 @@ describe("assignLead service", () => {
 
     const alertRows = await db.select().from(alerts).where(eq(alerts.leadId, leadId));
     expect(alertRows).toHaveLength(1);
-    expect(alertRows[0]?.kind).toBe(ALERT_KIND.NO_CONTACT);
+    expect(alertRows[0]?.kind).toBe(ALERT_KIND.FUTURE_CALL);
     expect(alertRows[0]?.severity).toBe(ALERT_SEVERITY.WARNING);
     expect(alertRows[0]?.maxOccurrences).toBe(1);
     expect(alertRows[0]?.nextShowAt).toEqual(new Date("2099-01-01T10:00"));
@@ -356,7 +356,7 @@ describe("assignLead service", () => {
     ]);
   });
 
-  it("saves an appointment without creating an alert", async () => {
+  it("saves an appointment with its first schedule and a closer alert", async () => {
     const callerId = crypto.randomUUID();
     const closerId = crypto.randomUUID();
     const leadId = crypto.randomUUID();
@@ -378,7 +378,10 @@ describe("assignLead service", () => {
     });
 
     const alertRows = await db.select().from(alerts).where(eq(alerts.leadId, leadId));
-    expect(alertRows).toHaveLength(0);
+    expect(alertRows).toHaveLength(1);
+    expect(alertRows[0]?.kind).toBe(ALERT_KIND.APPOINTMENT);
+    expect(alertRows[0]?.targetUserId).toBe(closerId);
+    expect(alertRows[0]?.nextShowAt).toEqual(new Date("2099-01-01T10:00"));
 
     const lead = await db.query.leads.findFirst({ where: (table, { eq }) => eq(table.id, leadId) });
     expect(lead?.closerId).toBe(closerId);
@@ -388,8 +391,213 @@ describe("assignLead service", () => {
         expect.objectContaining({ questionKey: "closerId", answer: closerId }),
         expect.objectContaining({ questionKey: "scheduledDate", answer: "2099-01-01" }),
         expect.objectContaining({ questionKey: "scheduledTime", answer: "10:00" }),
+        expect.objectContaining({ questionKey: "firstAppointmentDate", answer: "2099-01-01" }),
+        expect.objectContaining({ questionKey: "firstAppointmentTime", answer: "10:00" }),
+        expect.objectContaining({ questionKey: "appointmentRescheduled", answer: "No" }),
       ]),
     );
+  });
+
+  it("turns an appointment alert into a reschedule while preserving the first schedule", async () => {
+    const callerId = crypto.randomUUID();
+    const closerId = crypto.randomUUID();
+    const leadId = crypto.randomUUID();
+
+    await insertUser({ id: callerId, name: "Caller", email: "reschedule-caller@test.com", roleId: "role-caller" });
+    await insertUser({ id: closerId, name: "Closer", email: "reschedule-closer@test.com", roleId: "role-closer" });
+    await insertLead({ id: leadId });
+
+    await assignLead({
+      callerId,
+      input: {
+        leadId,
+        isContacted: "Si",
+        outcome: "appointment",
+        closerId,
+        scheduledDate: "2099-01-01",
+        scheduledTime: "10:00",
+      },
+    });
+
+    const [firstAlert] = await db.select().from(alerts).where(eq(alerts.leadId, leadId));
+
+    await assignLead({
+      callerId,
+      input: {
+        leadId,
+        isContacted: "Si",
+        outcome: "appointment",
+        closerId,
+        scheduledDate: "2099-01-02",
+        scheduledTime: "11:00",
+      },
+    });
+
+    const alertRows = await db.select().from(alerts).where(eq(alerts.leadId, leadId));
+    expect(alertRows).toHaveLength(1);
+    expect(alertRows[0]?.id).toBe(firstAlert?.id);
+    expect(alertRows[0]?.kind).toBe(ALERT_KIND.RESCHEDULED);
+    expect(alertRows[0]?.nextShowAt).toEqual(new Date("2099-01-02T11:00"));
+
+    const lead = await db.query.leads.findFirst({ where: (table, { eq }) => eq(table.id, leadId) });
+    expect(lead?.questions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ questionKey: "firstAppointmentDate", answer: "2099-01-01" }),
+        expect.objectContaining({ questionKey: "firstAppointmentTime", answer: "10:00" }),
+        expect.objectContaining({ questionKey: "appointmentRescheduled", answer: "Si" }),
+        expect.objectContaining({ questionKey: "appointmentRescheduledAt" }),
+        expect.objectContaining({
+          questionKey: "appointmentHistory",
+          answer: JSON.stringify([
+            { date: "2099-01-01", time: "10:00" },
+            { date: "2099-01-02", time: "11:00" },
+          ]),
+        }),
+      ]),
+    );
+  });
+
+  it("allows a closer to reschedule without replacing the original caller", async () => {
+    const callerId = crypto.randomUUID();
+    const closerId = crypto.randomUUID();
+    const leadId = crypto.randomUUID();
+
+    await insertUser({
+      id: callerId,
+      name: "Caller",
+      email: `caller-${callerId}@test.com`,
+      roleId: "role-caller",
+    });
+    await insertUser({
+      id: closerId,
+      name: "Closer",
+      email: `closer-${closerId}@test.com`,
+      roleId: "role-closer",
+    });
+    await insertLead({ id: leadId });
+
+    await assignLead({
+      callerId,
+      input: {
+        leadId,
+        isContacted: "Si",
+        outcome: "appointment",
+        closerId,
+        scheduledDate: "2099-01-01",
+        scheduledTime: "10:00",
+      },
+    });
+
+    const [firstAlert] = await db
+      .select()
+      .from(alerts)
+      .where(eq(alerts.leadId, leadId));
+    if (!firstAlert) throw new Error("Expected appointment alert");
+
+    await assignLead({
+      callerId: closerId,
+      authorRole: LEAD_QA_ROLE.CLOSER,
+      permissions: ["alerts:*", "leads:*"],
+      input: {
+        leadId,
+        sourceAlertId: firstAlert.id,
+        isContacted: "Si",
+        outcome: "appointment",
+        closerId,
+        scheduledDate: "2099-01-02",
+        scheduledTime: "11:00",
+      },
+    });
+
+    const lead = await db.query.leads.findFirst({
+      where: (table, { eq }) => eq(table.id, leadId),
+    });
+    const [updatedAlert] = await db
+      .select()
+      .from(alerts)
+      .where(eq(alerts.leadId, leadId));
+
+    expect(lead?.callerId).toBe(callerId);
+    expect(updatedAlert?.id).toBe(firstAlert?.id);
+    expect(updatedAlert?.kind).toBe(ALERT_KIND.RESCHEDULED);
+    expect(updatedAlert?.resolvedAt).toBeNull();
+    expect(lead?.questions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          questionKey: "scheduledDate",
+          answer: "2099-01-02",
+          authorRole: LEAD_QA_ROLE.CLOSER,
+          authorId: closerId,
+        }),
+        expect.objectContaining({
+          questionKey: "appointmentHistory",
+          answer: JSON.stringify([
+            { date: "2099-01-01", time: "10:00" },
+            { date: "2099-01-02", time: "11:00" },
+          ]),
+        }),
+      ]),
+    );
+  });
+
+  it("resolves the source alert when the recorded outcome is terminal", async () => {
+    const callerId = crypto.randomUUID();
+    const closerId = crypto.randomUUID();
+    const leadId = crypto.randomUUID();
+
+    await insertUser({
+      id: callerId,
+      name: "Caller",
+      email: `terminal-caller-${callerId}@test.com`,
+      roleId: "role-caller",
+    });
+    await insertUser({
+      id: closerId,
+      name: "Closer",
+      email: `terminal-closer-${closerId}@test.com`,
+      roleId: "role-closer",
+    });
+    await insertLead({ id: leadId });
+
+    await assignLead({
+      callerId,
+      input: {
+        leadId,
+        isContacted: "Si",
+        outcome: "appointment",
+        closerId,
+        scheduledDate: "2099-01-01",
+        scheduledTime: "10:00",
+      },
+    });
+
+    const [sourceAlert] = await db
+      .select()
+      .from(alerts)
+      .where(eq(alerts.leadId, leadId));
+    if (!sourceAlert) throw new Error("Expected appointment alert");
+
+    await assignLead({
+      callerId,
+      authorRole: LEAD_QA_ROLE.CALLER,
+      permissions: ["alerts:*", "leads:*"],
+      input: {
+        leadId,
+        sourceAlertId: sourceAlert.id,
+        isContacted: "Si",
+        outcome: "not_fit",
+      },
+    });
+
+    const resolved = await db.query.alerts.findFirst({
+      where: (table, { eq }) => eq(table.id, sourceAlert.id),
+    });
+    const lead = await db.query.leads.findFirst({
+      where: (table, { eq }) => eq(table.id, leadId),
+    });
+
+    expect(resolved?.resolvedAt).toBeInstanceOf(Date);
+    expect(lead?.callerId).toBe(callerId);
   });
 
   it.each([

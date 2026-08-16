@@ -108,7 +108,11 @@ export const assignLeadInput = z.union([
     leadId: z.string().min(1),
     isContacted: z.literal("No"),
   }),
-]);
+]).and(
+  z.object({
+    sourceAlertId: z.string().min(1).optional(),
+  }),
+);
 
 export const leadsRouter = router({
   listAll: permittedProcedure(["leads:read"])
@@ -139,6 +143,11 @@ export const leadsRouter = router({
       return await assignLead({
         input,
         callerId: ctx.session.user.id,
+        authorRole:
+          ctx.session.user.roleId === "role-closer"
+            ? "closer"
+            : "caller",
+        permissions: ctx.permissions,
       });
     }),
 

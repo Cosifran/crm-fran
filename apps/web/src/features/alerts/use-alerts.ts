@@ -6,11 +6,20 @@ import { trpc } from "@/utils/trpc";
 import { useTrpcMutationWithToast } from "@/lib/use-trpc-mutation-with-toast";
 
 export type Alert = {
-	id: string;
-	lead: {
-		name: string;
-		caller: { id: string; name: string } | null;
-	} | null;
+		id: string;
+			lead: {
+				id: string;
+				name: string;
+			caller: { id: string; name: string } | null;
+			closer: { id: string; name: string } | null;
+				questions: Array<{
+					questionKey: string;
+					question: string;
+					answer: string;
+					authorRole: "caller" | "closer";
+					authorId: string | null;
+			}>;
+		} | null;
 	targetUser: { name: string } | null;
 	kind: string;
 	severity: string;
@@ -35,15 +44,29 @@ export function useAlerts(
 				data.map((alert) => ({
 					id: alert.id,
 					lead: alert.lead
-						? {
-								name: alert.lead.name,
-								caller: alert.lead.caller
+							? {
+									id: alert.lead.id,
+									name: alert.lead.name,
+									caller: alert.lead.caller
 									? {
 											id: alert.lead.caller.id,
 											name: alert.lead.caller.name,
 										}
-									: null,
-							}
+										: null,
+									closer: alert.lead.closer
+										? {
+												id: alert.lead.closer.id,
+												name: alert.lead.closer.name,
+											}
+										: null,
+									questions: alert.lead.questions.map((question) => ({
+											questionKey: question.questionKey,
+											question: question.question,
+											answer: question.answer,
+											authorRole: question.authorRole,
+											authorId: question.authorId,
+									})),
+								}
 						: null,
 				targetUser: alert.targetUser ? { name: alert.targetUser.name } : null,
 				kind: alert.kind,

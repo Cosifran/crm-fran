@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { db, eq } from "@crm-fran/db";
+import { and, db, eq, inArray, isNull } from "@crm-fran/db";
 import {
 	alerts,
 	leads,
@@ -9,8 +9,11 @@ import {
 	LEAD_QA_ROLE,
 	type LeadQASessionItem,
 } from "@crm-fran/db/schema/index";
+import type { Permission } from "@crm-fran/db/schema/auth";
 import { ALERT_KIND_CONFIG } from "../../alerts/services/config";
+import { hasPermission } from "../../permissions";
 import {
+  buildAppointmentTrackingQuestions,
   getScheduledAt,
   OUTCOME_LABELS,
   type CallerOutcomeInput,
@@ -19,6 +22,7 @@ import {
 
 type LegacyAssignLeadInput = {
 	leadId: string;
+	sourceAlertId?: string;
 	isContacted: "Si" | "No";
 	closerId?: string;
 	scheduledDate?: string;
@@ -27,7 +31,7 @@ type LegacyAssignLeadInput = {
 	extraNotes?: string;
 };
 
-type OutcomeAssignLeadInput = { leadId: string; isContacted: "Si" } & CallerOutcomeInput & {
+type OutcomeAssignLeadInput = { leadId: string; sourceAlertId?: string; isContacted: "Si" } & CallerOutcomeInput & {
   questions?: Array<{ questionKey: string; question: string; answer: string }>;
 };
 
@@ -38,9 +42,13 @@ export type AssignLeadInput =
 export async function assignLead({
 	input,
 	callerId,
+	authorRole = LEAD_QA_ROLE.CALLER,
+	permissions = [],
 }: {
 	input: AssignLeadInput;
 	callerId: string;
+	authorRole?: "caller" | "closer";
+	permissions?: Permission[];
 }) {
   const leadId = input.leadId;
   const isOutcomeInput = "outcome" in input;
@@ -61,6 +69,27 @@ export async function assignLead({
   }
 
 	return db.transaction(async (tx) => {
+		let sourceAlertTargetUserId: string | null | undefined;
+
+		if (input.sourceAlertId) {
+			const [sourceAlert] = await tx
+				.select()
+				.from(alerts)
+				.where(eq(alerts.id, input.sourceAlertId));
+
+			if (!sourceAlert || sourceAlert.leadId !== leadId) {
+				throw new TRPCError({ code: "NOT_FOUND", message: "Alert not found" });
+			}
+			sourceAlertTargetUserId = sourceAlert.targetUserId;
+
+			if (sourceAlert.resolvedAt) {
+				throw new TRPCError({
+					code: "BAD_REQUEST",
+					message: "Alert is already resolved",
+				});
+			}
+		}
+
 		const [lead] = await tx.select().from(leads).where(eq(leads.id, leadId));
 
 		if (!lead) {
@@ -97,7 +126,7 @@ export async function assignLead({
 			const preservedItems = existingItems.filter(
 				(item) =>
 					!(
-						item.authorRole === LEAD_QA_ROLE.CALLER &&
+						item.authorRole === authorRole &&
 						item.authorId === callerId
 					),
 			);
@@ -106,7 +135,7 @@ export async function assignLead({
 					questionKey: "callerOutcome",
 					question: "¿Qué ha sucedido?",
 					answer: OUTCOME_LABELS[input.outcome],
-					authorRole: LEAD_QA_ROLE.CALLER,
+					authorRole: authorRole,
 					authorId: callerId,
 				},
 			];
@@ -116,61 +145,83 @@ export async function assignLead({
 					.filter((question) => question.answer.trim() !== "")
 					.map((question) => ({
 						...question,
-						authorRole: LEAD_QA_ROLE.CALLER,
+						authorRole: authorRole,
 						authorId: callerId,
 					})),
 			);
 
-			if (isFutureCall) {
+			if (
+				isFutureCall &&
+				input.scheduledDate &&
+				input.scheduledTime &&
+				input.alertSeverity
+			) {
 				outcomeQuestions.push(
 					{
 						questionKey: "scheduledDate",
 						question: "Fecha de llamada futura",
 						answer: input.scheduledDate,
-						authorRole: LEAD_QA_ROLE.CALLER,
+						authorRole: authorRole,
 						authorId: callerId,
 					},
 					{
 						questionKey: "scheduledTime",
 						question: "Hora de llamada futura",
 						answer: input.scheduledTime,
-						authorRole: LEAD_QA_ROLE.CALLER,
+						authorRole: authorRole,
 						authorId: callerId,
 					},
 					{
 						questionKey: "alertSeverity",
 						question: "Importancia de la alerta",
 						answer: input.alertSeverity,
-						authorRole: LEAD_QA_ROLE.CALLER,
+						authorRole: authorRole,
 						authorId: callerId,
 					},
 				);
 			}
 
-			if (isAppointment) {
-				outcomeQuestions.push(
+			if (
+				isAppointment &&
+				input.scheduledDate &&
+				input.scheduledTime &&
+				input.closerId
+			) {
+					const trackingQuestions = buildAppointmentTrackingQuestions({
+						existingQuestions: existingItems,
+						callerId,
+						scheduledDate: input.scheduledDate,
+						scheduledTime: input.scheduledTime,
+						changedAt: new Date().toISOString(),
+					});
+					outcomeQuestions.push(
 					{
 						questionKey: "closerId",
 						question: "Closer asignado",
 						answer: input.closerId,
-						authorRole: LEAD_QA_ROLE.CALLER,
+						authorRole: authorRole,
 						authorId: callerId,
 					},
 					{
 						questionKey: "scheduledDate",
 						question: "Fecha de agenda",
 						answer: input.scheduledDate,
-						authorRole: LEAD_QA_ROLE.CALLER,
+						authorRole: authorRole,
 						authorId: callerId,
 					},
 					{
 						questionKey: "scheduledTime",
 						question: "Hora de agenda",
 						answer: input.scheduledTime,
-						authorRole: LEAD_QA_ROLE.CALLER,
+						authorRole: authorRole,
 						authorId: callerId,
-					},
-				);
+						},
+						...trackingQuestions.map((question) => ({
+							...question,
+							authorRole: authorRole,
+							authorId: callerId,
+						})),
+					);
 			}
 
 			updatedQuestions = [...preservedItems, ...outcomeQuestions];
@@ -181,13 +232,13 @@ export async function assignLead({
 			const preservedItems = existingItems.filter(
 				(item) =>
 					!(
-						item.authorRole === LEAD_QA_ROLE.CALLER &&
+						item.authorRole === authorRole &&
 						item.authorId === callerId
 					),
 			);
 			const newCallerItems: LeadQASessionItem[] = questions.map((q) => ({
 				...q,
-				authorRole: LEAD_QA_ROLE.CALLER,
+				authorRole: authorRole,
 				authorId: callerId,
 			}));
 			updatedQuestions = [...preservedItems, ...newCallerItems];
@@ -200,7 +251,7 @@ export async function assignLead({
 				(item) =>
 					!(
 						item.questionKey === "isContacted" &&
-						item.authorRole === LEAD_QA_ROLE.CALLER &&
+						item.authorRole === authorRole &&
 						item.authorId === callerId
 					),
 			);
@@ -210,17 +261,30 @@ export async function assignLead({
 					questionKey: "isContacted",
 					question: existingIsContacted?.question ?? "¿Fué contactado?",
 					answer: "No",
-					authorRole: LEAD_QA_ROLE.CALLER,
+					authorRole: authorRole,
 					authorId: callerId,
 				},
 			];
+		}
+
+		if (
+			input.sourceAlertId &&
+			!hasPermission(permissions, ["*"]) &&
+			sourceAlertTargetUserId !== callerId &&
+			lead.callerId !== callerId
+		) {
+			throw new TRPCError({
+				code: "FORBIDDEN",
+				message: "You do not have permission to resolve this alert",
+			});
 		}
 
 		const [updated] = await tx
 			.update(leads)
 			.set({
 				state: LEAD_STATE.ASIGNADO,
-				callerId,
+				callerId:
+					authorRole === LEAD_QA_ROLE.CLOSER ? lead.callerId : callerId,
 				closerId: closerId ?? lead.closerId,
 				questions: updatedQuestions,
 			})
@@ -236,7 +300,12 @@ export async function assignLead({
 
 		let alertId: string | undefined;
 
-		if (isFutureCall) {
+		if (
+			isFutureCall &&
+			input.scheduledDate &&
+			input.scheduledTime &&
+			input.alertSeverity
+		) {
 			const scheduledAt = getScheduledAt(input.scheduledDate, input.scheduledTime);
 			const intervalMinutes = Math.max(
 				1,
@@ -248,7 +317,7 @@ export async function assignLead({
 					id: crypto.randomUUID(),
 					leadId,
 					targetUserId: callerId,
-					kind: ALERT_KIND.NO_CONTACT,
+					kind: ALERT_KIND.FUTURE_CALL,
 					message: "Llamar a futuro",
 					severity: input.alertSeverity,
 					intervalMinutes,
@@ -259,6 +328,77 @@ export async function assignLead({
 				.returning({ id: alerts.id });
 
 			alertId = alert?.id;
+		} else if (
+			isAppointment &&
+			input.scheduledDate &&
+			input.scheduledTime &&
+			input.closerId
+		) {
+				const scheduledAt = getScheduledAt(input.scheduledDate, input.scheduledTime);
+				const intervalMinutes = Math.max(
+					1,
+					Math.ceil((scheduledAt.getTime() - Date.now()) / 60_000),
+				);
+				const isRescheduled = updatedQuestions.some(
+					(question) =>
+						question.questionKey === "appointmentRescheduled" &&
+						question.authorRole === authorRole &&
+						question.authorId === callerId &&
+						question.answer === "Si",
+				);
+				const kind = isRescheduled
+					? ALERT_KIND.RESCHEDULED
+					: ALERT_KIND.APPOINTMENT;
+				const config = ALERT_KIND_CONFIG[kind];
+				const [existingAlert] = await tx
+					.select({ id: alerts.id })
+					.from(alerts)
+					.where(
+						and(
+							eq(alerts.leadId, leadId),
+							inArray(alerts.kind, [
+								ALERT_KIND.APPOINTMENT,
+								ALERT_KIND.RESCHEDULED,
+							]),
+							isNull(alerts.dismissedAt),
+							isNull(alerts.resolvedAt),
+						),
+					)
+					.limit(1);
+
+				if (existingAlert) {
+					await tx
+						.update(alerts)
+						.set({
+							targetUserId: input.closerId,
+							kind,
+							message: config.message,
+							severity: config.severity,
+							intervalMinutes,
+							maxOccurrences: 1,
+							nextShowAt: scheduledAt,
+							occurrences: 0,
+						})
+						.where(eq(alerts.id, existingAlert.id));
+					alertId = existingAlert.id;
+				} else {
+					const [alert] = await tx
+						.insert(alerts)
+						.values({
+							id: crypto.randomUUID(),
+							leadId,
+							targetUserId: input.closerId,
+							kind,
+							message: config.message,
+							severity: config.severity,
+							intervalMinutes,
+							maxOccurrences: 1,
+							nextShowAt: scheduledAt,
+							occurrences: 0,
+						})
+						.returning({ id: alerts.id });
+					alertId = alert?.id;
+				}
 		} else if (isLegacyInput && input.isContacted === "No") {
 			const config = ALERT_KIND_CONFIG[ALERT_KIND.NO_CONTACT];
 			const [alert] = await tx
@@ -292,6 +432,13 @@ export async function assignLead({
 				nextShowAt: new Date(Date.now() + config.intervalMinutes * 60_000),
 				occurrences: 0,
 			});
+		}
+
+		if (input.sourceAlertId && alertId !== input.sourceAlertId) {
+			await tx
+				.update(alerts)
+				.set({ resolvedAt: new Date() })
+				.where(eq(alerts.id, input.sourceAlertId));
 		}
 
 		return { leadId: updated.id, alertId };

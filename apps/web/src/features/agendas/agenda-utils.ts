@@ -1,7 +1,9 @@
 export type AgendaQuestion = {
   questionKey?: string;
+  question?: string;
   answer: string;
   authorRole: "caller" | "closer";
+  authorId?: string | null;
 };
 
 export type AgendaLeadInput = {
@@ -36,6 +38,18 @@ export function getLatestCallerQuestionAnswer(
   return undefined;
 }
 
+export function getLatestAgendaQuestionAnswer(
+  questions: readonly AgendaQuestion[],
+  questionKey: string,
+): string | undefined {
+  for (let index = questions.length - 1; index >= 0; index -= 1) {
+    const question = questions[index];
+    if (question?.questionKey === questionKey) return question.answer;
+  }
+
+  return undefined;
+}
+
 export function filterAgendaLeads(
   leads: readonly AgendaLeadInput[],
 ): AgendaLead[] {
@@ -50,10 +64,10 @@ export function filterAgendaLeads(
       {
         ...lead,
         scheduledDate:
-          getLatestCallerQuestionAnswer(lead.questions, "scheduledDate") ??
+          getLatestAgendaQuestionAnswer(lead.questions, "scheduledDate") ??
           "Sin asignar",
         scheduledTime:
-          getLatestCallerQuestionAnswer(lead.questions, "scheduledTime") ??
+          getLatestAgendaQuestionAnswer(lead.questions, "scheduledTime") ??
           "Sin asignar",
       },
     ];

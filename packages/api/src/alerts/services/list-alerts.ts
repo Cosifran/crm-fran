@@ -34,10 +34,11 @@ export async function listAlerts(input: ListAlertsInput) {
 
 		return db.query.alerts.findMany({
 			with: {
-				lead: {
-					with: {
-						caller: true,
-					},
+					lead: {
+						with: {
+							caller: true,
+							closer: true,
+						},
 				},
 				targetUser: true,
 			},

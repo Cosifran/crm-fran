@@ -10,6 +10,7 @@ import { Can } from "@crm-fran/ui/permissions/can";
 import { trpc } from "@/utils/trpc";
 import { createAgendaColumns } from "@/features/agendas/agenda-columns";
 import { filterAgendaLeads } from "@/features/agendas/agenda-utils";
+import { AgendaRescheduleDialog } from "@/features/agendas/agenda-reschedule-dialog";
 import LeadViewDrawer from "@/features/leads/lead-view-drawer";
 import AssignLeadDrawer, {
   type Lead,
@@ -50,8 +51,18 @@ function AgendasPageContent() {
   const agendaColumns = createAgendaColumns((lead) => (
     <div className="flex gap-2">
       <LeadViewDrawer
-        lead={{ questions: lead.questions, feedback: lead.feedback }}
+        lead={{
+          questions: lead.questions.map((question) => ({
+            questionKey: question.questionKey ?? "",
+            question: question.question ?? question.questionKey ?? "",
+            answer: question.answer,
+            authorRole: question.authorRole,
+            authorId: question.authorId ?? null,
+          })),
+          feedback: lead.feedback,
+        }}
       />
+      <AgendaRescheduleDialog lead={lead} />
       <AssignLeadDrawer lead={lead as unknown as Lead} />
     </div>
   ));
