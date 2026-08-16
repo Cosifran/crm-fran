@@ -1,14 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Can } from "@crm-fran/ui/permissions/can";
 import { Skeleton } from "@crm-fran/ui/components/skeleton";
 import { Empty } from "@crm-fran/ui/components/empty";
-import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@crm-fran/ui/components/toggle-group";
 import {
   Select,
   SelectContent,
@@ -33,12 +29,18 @@ import {
   type AlertSeverityFilter,
   filterAlertsBySeverity,
 } from "@/features/alerts/alert-importance";
+import { AlertPreferencesDialog } from "@/features/alerts/alert-preferences-dialog";
+import {
+  DEFAULT_ALERT_RELEVANCE_PREFERENCES,
+  getEffectiveAlertSeverity,
+} from "@/features/alerts/alert-relevance";
 import {
   type AlertTypeFilter,
   filterAlertsByType,
 } from "@/features/alerts/alert-type";
 import {
   useAlerts,
+  useAlertPreferences,
   useDismissAlert,
 } from "@/features/alerts/use-alerts";
 
@@ -56,7 +58,9 @@ export default function AlertsPage() {
 
 function AlertsInbox() {
   const { data, isLoading, isError } = useAlerts();
+  const preferencesQuery = useAlertPreferences();
   const dismiss = useDismissAlert();
+  const [filterNow, setFilterNow] = useState(() => Date.now());
   const [severityFilter, setSeverityFilter] =
     useState<AlertSeverityFilter>("all");
   const [callerFilter, setCallerFilter] =
@@ -64,12 +68,20 @@ function AlertsInbox() {
   const [typeFilter, setTypeFilter] = useState<AlertTypeFilter>("all");
   const [closerFilter, setCloserFilter] =
     useState<AlertCloserFilter>("all");
+  const relevancePreferences =
+    preferencesQuery.data ?? DEFAULT_ALERT_RELEVANCE_PREFERENCES;
+  const alertsWithEffectiveSeverity = (data ?? []).map((alert) => ({
+    ...alert,
+    severity:
+      getEffectiveAlertSeverity(alert, relevancePreferences, filterNow) ??
+      alert.severity,
+  }));
   const callers = getAlertCallers(data ?? []);
   const closers = getAlertClosers(data ?? []);
   const selectedCaller = callers.find((caller) => caller.id === callerFilter);
   const selectedCloser = closers.find((closer) => closer.id === closerFilter);
   const severityFilteredAlerts = filterAlertsBySeverity(
-    data ?? [],
+    alertsWithEffectiveSeverity,
     severityFilter,
   );
   const callerFilteredAlerts = filterAlertsByCaller(
@@ -84,6 +96,11 @@ function AlertsInbox() {
     typeFilteredAlerts,
     closerFilter,
   );
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setFilterNow(Date.now()), 60_000);
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   if (isLoading) {
     return (
@@ -105,30 +122,43 @@ function AlertsInbox() {
   return (
     <div className="flex min-w-0 flex-col gap-4">
       <div className="mx-auto flex w-full max-w-5xl min-w-0 flex-col gap-3 px-2 pt-4 sm:flex-row sm:flex-wrap sm:items-center sm:px-3 sm:pt-5">
-        <ToggleGroup
-          multiple={false}
-          value={[severityFilter]}
+        <Select
+          value={severityFilter}
           onValueChange={(value) => {
-            const nextValue = value[0];
             if (
-              nextValue === "all" ||
-              nextValue === "urgent" ||
-              nextValue === "warning" ||
-              nextValue === "info"
+              value === "all" ||
+              value === "urgent" ||
+              value === "warning" ||
+              value === "info"
             ) {
-              setSeverityFilter(nextValue);
+              setSeverityFilter(value);
             }
           }}
-          variant="outline"
-          size="sm"
-          className="max-w-full overflow-x-auto"
-          aria-label="Filtrar alertas por importancia"
         >
-          <ToggleGroupItem value="all">Todas</ToggleGroupItem>
-          <ToggleGroupItem value="urgent">Alta</ToggleGroupItem>
-          <ToggleGroupItem value="warning">Media</ToggleGroupItem>
-          <ToggleGroupItem value="info">Baja</ToggleGroupItem>
-        </ToggleGroup>
+          <SelectTrigger
+            size="sm"
+            className="w-full sm:w-44"
+            aria-label="Filtrar alertas por relevancia"
+          >
+            <SelectValue>
+              {severityFilter === "all"
+                ? "Toda relevancia"
+                : severityFilter === "urgent"
+                  ? "Alta"
+                  : severityFilter === "warning"
+                    ? "Media"
+                    : "Baja"}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent className={styles.overlayTheme}>
+            <SelectGroup>
+              <SelectItem value="all">Toda relevancia</SelectItem>
+              <SelectItem value="urgent">Alta</SelectItem>
+              <SelectItem value="warning">Media</SelectItem>
+              <SelectItem value="info">Baja</SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
 
         <Select
           value={callerFilter}
@@ -225,6 +255,8 @@ function AlertsInbox() {
             </SelectGroup>
           </SelectContent>
         </Select>
+
+        <AlertPreferencesDialog preferences={relevancePreferences} />
       </div>
 
       {filteredAlerts.length === 0 ? (
@@ -236,6 +268,7 @@ function AlertsInbox() {
               key={alert.id}
               alert={alert}
               onDismiss={(id) => dismiss.mutate({ id })}
+              relevancePreferences={relevancePreferences}
             />
           ))}
         </div>

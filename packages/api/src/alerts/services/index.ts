@@ -4,3 +4,7 @@ export { dismissAlert } from "./dismiss-alert";
 export { listAlerts } from "./list-alerts";
 export { resolveAlert } from "./resolve-alert";
 export { processRecurringAlerts } from "./process-recurring";
+export {
+  getAlertPreferences,
+  updateAlertPreferences,
+} from "./alert-preferences";

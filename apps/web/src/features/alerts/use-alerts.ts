@@ -85,6 +85,43 @@ export function useAlertsCount() {
 	});
 }
 
+export function useAlertPreferences() {
+  return useQuery({
+    ...trpc.alerts.getPreferences.queryOptions(),
+    select: (preferences) => ({
+      mode: preferences.relevanceMode,
+      urgentThresholdHours: preferences.urgentThresholdHours,
+      warningThresholdHours: preferences.warningThresholdHours,
+      conditionSeverities: {
+        no_contact: preferences.noContactSeverity,
+        follow_up: preferences.followUpSeverity,
+        future_call: preferences.futureCallSeverity,
+        appointment: preferences.appointmentSeverity,
+        rescheduled: preferences.rescheduledSeverity,
+      },
+    }),
+  });
+}
+
+export function useUpdateAlertPreferences() {
+  const queryClient = useQueryClient();
+
+  return useTrpcMutationWithToast(
+    {
+      ...trpc.alerts.updatePreferences.mutationOptions(),
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({
+          queryKey: trpc.alerts.getPreferences.queryKey(),
+        });
+      },
+    },
+    {
+      success: "Configuración de alertas guardada",
+      error: "Error al guardar la configuración de alertas",
+    },
+  );
+}
+
 export function useDismissAlert() {
   const queryClient = useQueryClient();
 

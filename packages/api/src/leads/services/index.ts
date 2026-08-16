@@ -8,6 +8,7 @@ import { isCloserOf } from "./is-closer-of";
 import { hasCloserSession } from "./has-closer-session";
 import { recordCloserAnswers } from "./record-closer-answers";
 import { adminEditLeadQASession } from "./admin-edit-lead-qa-session";
+import { getPersonalStatistics } from "./personal-statistics";
 
 export {
 	getAll,
@@ -20,4 +21,5 @@ export {
 	hasCloserSession,
 	recordCloserAnswers,
 	adminEditLeadQASession,
+	getPersonalStatistics,
 };

@@ -13,6 +13,10 @@ import {
 } from "./alert-countdown";
 import { normalizeAlertSeverity } from "./alert-importance";
 import {
+  getEffectiveAlertSeverity,
+  type AlertRelevancePreferences,
+} from "./alert-relevance";
+import {
   ALERT_TYPE_LABELS,
   getAlertType,
   getAppointmentHistory,
@@ -23,6 +27,7 @@ import type { Alert } from "./use-alerts";
 interface AlertCardProps {
   alert: Alert;
   onDismiss: (id: string) => void;
+  relevancePreferences: AlertRelevancePreferences;
 }
 
 const SEVERITY_PRESENTATION = {
@@ -36,9 +41,15 @@ const KIND_LABEL = {
   follow_up: "Seguimiento",
 } as const;
 
-export function AlertCard({ alert, onDismiss }: AlertCardProps) {
+export function AlertCard({
+  alert,
+  onDismiss,
+  relevancePreferences,
+}: AlertCardProps) {
   const [now, setNow] = useState(() => Date.now());
-  const severity = normalizeAlertSeverity(alert.severity);
+  const severity =
+    getEffectiveAlertSeverity(alert, relevancePreferences, now) ??
+    normalizeAlertSeverity(alert.severity);
   const presentation = severity
     ? SEVERITY_PRESENTATION[severity]
     : { label: alert.severity, className: "" };

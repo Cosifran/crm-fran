@@ -8,8 +8,14 @@ import {
 	listAlerts,
 	resolveAlert,
 	processRecurringAlerts,
+	getAlertPreferences,
+	updateAlertPreferences,
 } from "../alerts/services/index";
-import { ALERT_KIND, ALERT_SEVERITY } from "@crm-fran/db/schema/index";
+import {
+	ALERT_KIND,
+	ALERT_RELEVANCE_MODE,
+	ALERT_SEVERITY,
+} from "@crm-fran/db/schema/index";
 
 const createAlertInput = z.object({
 	leadId: z.string().min(1),
@@ -36,7 +42,36 @@ const alertIdInput = z.object({
 	id: z.string().min(1),
 });
 
+export const alertPreferencesInput = z
+	.object({
+		relevanceMode: z.nativeEnum(ALERT_RELEVANCE_MODE),
+		urgentThresholdHours: z.number().int().min(0).max(720),
+		warningThresholdHours: z.number().int().min(1).max(720),
+		noContactSeverity: z.nativeEnum(ALERT_SEVERITY),
+		followUpSeverity: z.nativeEnum(ALERT_SEVERITY),
+		futureCallSeverity: z.nativeEnum(ALERT_SEVERITY),
+		appointmentSeverity: z.nativeEnum(ALERT_SEVERITY),
+		rescheduledSeverity: z.nativeEnum(ALERT_SEVERITY),
+	})
+	.refine(
+		(value) => value.warningThresholdHours > value.urgentThresholdHours,
+		{
+			message: "Warning threshold must be greater than urgent threshold",
+			path: ["warningThresholdHours"],
+		},
+	);
+
 export const alertsRouter = router({
+	getPreferences: protectedProcedure.query(async ({ ctx }) => {
+		return await getAlertPreferences(ctx.session.user.id);
+	}),
+
+	updatePreferences: protectedProcedure
+		.input(alertPreferencesInput)
+		.mutation(async ({ ctx, input }) => {
+			return await updateAlertPreferences(ctx.session.user.id, input);
+		}),
+
 	createAlert: permittedProcedure(["alerts:write"])
 		.input(createAlertInput)
 		.mutation(async ({ input }) => {

@@ -45,6 +45,8 @@ export interface Lead {
 
 interface AssignLeadDrawerProps {
     lead: Lead;
+    triggerLabel?: string;
+    mode?: "default" | "agenda-feedback";
 }
 
 // ── Mock data (fase 1: UI estático) ──────────────────────────────────────────
@@ -95,6 +97,8 @@ function resolveRole(
 
 export default function AssignLeadDrawer({
     lead,
+    triggerLabel,
+    mode = "default",
 }: AssignLeadDrawerProps) {
     const [open, setOpen] = useState(false);
     // Tab activo solo aplica al rol admin; los otros roles lo ignoran.
@@ -119,12 +123,16 @@ export default function AssignLeadDrawer({
         permissions,
         (session?.user as { roleId?: string } | undefined)?.roleId,
     );
+    const isAgendaFeedback = mode === "agenda-feedback";
+    const showsCloserFeedback =
+      role === "role-closer" || (isAgendaFeedback && role === "role-admin");
 
     console.log(session?.user, "session?.user");
 
     // El id del form que el botón Guardar del drawer debe disparar.
-    const submitFormId =
-        role === "role-admin"
+    const submitFormId = showsCloserFeedback
+      ? "closer-qa-form"
+      : role === "role-admin"
             ? adminTab === "caller"
                 ? "admin-caller-form"
                 : "admin-closer-form"
@@ -145,18 +153,28 @@ export default function AssignLeadDrawer({
         },
     };
 
-    const { title, description } = titleByRole[role];
+    const { title, description } = isAgendaFeedback
+      ? {
+          title: "Feedback de agenda",
+          description: "Registra qué ha ocurrido con esta agenda.",
+        }
+      : titleByRole[role];
 
     console.log(lead, "lead");
+
+    if (isAgendaFeedback && role === "role-caller") {
+      return null;
+    }
 
     return (
       <>
         <Button
           variant="outline"
           onClick={() => setOpen(true)}
-          aria-label="Abrir drawer"
+          aria-label={triggerLabel ?? "Abrir drawer"}
         >
           <UserRoundPlus />
+          {triggerLabel}
         </Button>
 
         <LeadDrawer
@@ -167,14 +185,14 @@ export default function AssignLeadDrawer({
           type="edit"
           submitFormId={submitFormId}
           submitLabel={
-            role === "role-closer"
+            showsCloserFeedback
               ? closerSubmitLabel
               : role === "role-caller"
                 ? callerSubmitLabel
                 : "Guardar"
           }
         >
-          {role === "role-admin" && (
+          {role === "role-admin" && !isAgendaFeedback && (
             <div className="space-y-4">
               <Tabs
                 value={adminTab}
@@ -199,9 +217,10 @@ export default function AssignLeadDrawer({
             </div>
           )}
 
-          {role === "role-closer" && (
+          {showsCloserFeedback && (
             <CloserQAForm
               leadId={lead.id}
+              currentCloserId={lead.closerId}
               leadQuestions={lead.questions.filter(
                 (q) => q.authorRole === "closer",
               )}
@@ -211,7 +230,7 @@ export default function AssignLeadDrawer({
             />
           )}
 
-          {role === "role-caller" && (
+          {role === "role-caller" && !isAgendaFeedback && (
             <AssignLeadForm
               leadId={lead.id}
               onCancel={() => setOpen(false)}

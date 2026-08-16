@@ -15,6 +15,9 @@ const mocks = vi.hoisted(() => ({
   recordCloserAnswersMutationOptions: vi.fn(() => ({
     mutationKey: ["leads", "recordCloserAnswers"],
   })),
+  assignLeadMutationOptions: vi.fn(() => ({
+    mutationKey: ["leads", "assignLead"],
+  })),
 }));
 
 vi.mock("@/utils/trpc", () => ({
@@ -22,6 +25,15 @@ vi.mock("@/utils/trpc", () => ({
     leads: {
       recordCloserAnswers: {
         mutationOptions: mocks.recordCloserAnswersMutationOptions,
+      },
+      assignLead: {
+        mutationOptions: mocks.assignLeadMutationOptions,
+      },
+      listAll: {
+        queryKey: vi.fn(() => ["leads", "listAll"]),
+      },
+      listByUserId: {
+        queryKey: vi.fn(() => ["leads", "listByUserId"]),
       },
     },
   },
@@ -59,6 +71,7 @@ describe("CloserQAForm — integración con el drawer", () => {
     expect(form).toBeInTheDocument();
     expect(form.tagName).toBe("FORM");
     expect(form).toHaveAttribute("id", "closer-qa-form");
+    expect(screen.getByLabelText("¿Qué ha ocurrido?")).toBeInTheDocument();
   });
 
   it("does NOT render any submit button of its own (el padre controla el submit)", () => {
@@ -84,6 +97,13 @@ describe("CloserQAForm — integración con el drawer", () => {
               questionKey: "isContacted",
               question: "¿Fue contactado?",
               answer: "Si",
+              authorRole: "closer",
+              authorId: "closer-1",
+            },
+            {
+              questionKey: "closerOutcome",
+              question: "Resultado de la agenda",
+              answer: "Venta",
               authorRole: "closer",
               authorId: "closer-1",
             },
@@ -156,6 +176,10 @@ describe("CloserQAForm — integración con el drawer", () => {
           leadId: "lead-1",
           questions: expect.arrayContaining([
             expect.objectContaining({
+              questionKey: "closerOutcome",
+              answer: "Venta",
+            }),
+            expect.objectContaining({
               questionKey: "closerFeedback",
               answer: "Llamar nuevamente la próxima semana",
             }),
@@ -164,5 +188,35 @@ describe("CloserQAForm — integración con el drawer", () => {
         expect.any(Object),
       );
     });
+  });
+
+  it("shows No interesado as a structured agenda outcome", () => {
+    render(
+      <QueryClientProvider client={queryClient}>
+        <CloserQAForm
+          leadId="lead-1"
+          leadQuestions={[
+            {
+              questionKey: "isContacted",
+              question: "¿Fue contactado?",
+              answer: "Si",
+              authorRole: "closer",
+              authorId: "closer-1",
+            },
+            {
+              questionKey: "closerOutcome",
+              question: "Resultado de la agenda",
+              answer: "No interesado",
+              authorRole: "closer",
+              authorId: "closer-1",
+            },
+          ]}
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByLabelText("¿Qué ha ocurrido?")).toHaveTextContent(
+      "No interesado",
+    );
   });
 });

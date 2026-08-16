@@ -1,5 +1,12 @@
-import { relations } from "drizzle-orm";
-import { pgTable, text, timestamp, integer, index } from "drizzle-orm/pg-core";
+import { relations, sql } from "drizzle-orm";
+import {
+	check,
+	index,
+	integer,
+	pgTable,
+	text,
+	timestamp,
+} from "drizzle-orm/pg-core";
 import { user } from "./auth";
 import { leads } from "./leads";
 
@@ -18,6 +25,87 @@ export const ALERT_SEVERITY = {
 	URGENT: "urgent",
 } as const;
 export type AlertSeverity = (typeof ALERT_SEVERITY)[keyof typeof ALERT_SEVERITY];
+
+export const ALERT_RELEVANCE_MODE = {
+	CONDITION: "condition",
+	TIME: "time",
+} as const;
+export type AlertRelevanceMode =
+	(typeof ALERT_RELEVANCE_MODE)[keyof typeof ALERT_RELEVANCE_MODE];
+
+export const alertPreferences = pgTable(
+	"alert_preferences",
+	{
+		userId: text("user_id")
+			.primaryKey()
+			.references(() => user.id, { onDelete: "cascade" }),
+		relevanceMode: text("relevance_mode")
+			.$type<AlertRelevanceMode>()
+			.default(ALERT_RELEVANCE_MODE.CONDITION)
+			.notNull(),
+		urgentThresholdHours: integer("urgent_threshold_hours").default(2).notNull(),
+		warningThresholdHours: integer("warning_threshold_hours").default(6).notNull(),
+		noContactSeverity: text("no_contact_severity")
+			.$type<AlertSeverity>()
+			.default(ALERT_SEVERITY.URGENT)
+			.notNull(),
+		followUpSeverity: text("follow_up_severity")
+			.$type<AlertSeverity>()
+			.default(ALERT_SEVERITY.INFO)
+			.notNull(),
+		futureCallSeverity: text("future_call_severity")
+			.$type<AlertSeverity>()
+			.default(ALERT_SEVERITY.INFO)
+			.notNull(),
+		appointmentSeverity: text("appointment_severity")
+			.$type<AlertSeverity>()
+			.default(ALERT_SEVERITY.INFO)
+			.notNull(),
+		rescheduledSeverity: text("rescheduled_severity")
+			.$type<AlertSeverity>()
+			.default(ALERT_SEVERITY.INFO)
+			.notNull(),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+		updatedAt: timestamp("updated_at")
+			.defaultNow()
+			.$onUpdate(() => new Date())
+			.notNull(),
+	},
+	(table) => [
+		check(
+			"alert_preferences_relevance_mode_check",
+			sql`${table.relevanceMode} IN ('condition', 'time')`,
+		),
+		check(
+			"alert_preferences_urgent_threshold_check",
+			sql`${table.urgentThresholdHours} >= 0`,
+		),
+		check(
+			"alert_preferences_warning_threshold_check",
+			sql`${table.warningThresholdHours} > ${table.urgentThresholdHours}`,
+		),
+		check(
+			"alert_preferences_no_contact_severity_check",
+			sql`${table.noContactSeverity} IN ('info', 'warning', 'urgent')`,
+		),
+		check(
+			"alert_preferences_follow_up_severity_check",
+			sql`${table.followUpSeverity} IN ('info', 'warning', 'urgent')`,
+		),
+		check(
+			"alert_preferences_future_call_severity_check",
+			sql`${table.futureCallSeverity} IN ('info', 'warning', 'urgent')`,
+		),
+		check(
+			"alert_preferences_appointment_severity_check",
+			sql`${table.appointmentSeverity} IN ('info', 'warning', 'urgent')`,
+		),
+		check(
+			"alert_preferences_rescheduled_severity_check",
+			sql`${table.rescheduledSeverity} IN ('info', 'warning', 'urgent')`,
+		),
+	],
+);
 
 export const alerts = pgTable(
 	"alerts",

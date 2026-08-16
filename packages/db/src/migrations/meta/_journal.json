@@ -64,6 +64,20 @@
       "when": 1785284628235,
       "tag": "0008_backfill_lead_qa_role",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786887656837,
+      "tag": "0009_alert_preferences",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786889400000,
+      "tag": "0010_alert_condition_relevance",
+      "breakpoints": true
     }
   ]
 }

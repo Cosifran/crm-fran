@@ -11,6 +11,7 @@ import { ALERT_KIND_CONFIG } from "../../alerts/services/config";
 
 import type { Context } from "../../context";
 import { isCloserOf } from "./is-closer-of";
+import { hasPermission } from "../../permissions";
 
 export type RecordCloserAnswersInput = {
   leadId: string;
@@ -50,7 +51,10 @@ export async function recordCloserAnswers({
       });
     }
 
-    if (!isCloserOf(lead, ctx.session.user.id)) {
+    if (
+      !isCloserOf(lead, ctx.session.user.id) &&
+      !hasPermission(ctx.permissions, ["*"])
+    ) {
       throw new TRPCError({
         code: "FORBIDDEN",
         message: "Only the assigned closer can record answers",

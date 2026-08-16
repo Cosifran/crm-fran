@@ -63,7 +63,11 @@ function AgendasPageContent() {
         }}
       />
       <AgendaRescheduleDialog lead={lead} />
-      <AssignLeadDrawer lead={lead as unknown as Lead} />
+      <AssignLeadDrawer
+        lead={lead as unknown as Lead}
+        triggerLabel="Feedback"
+        mode="agenda-feedback"
+      />
     </div>
   ));
 

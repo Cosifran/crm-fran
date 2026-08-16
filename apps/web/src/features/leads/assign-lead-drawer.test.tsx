@@ -163,6 +163,37 @@ describe("AssignLeadDrawer — orquesta submitFormId por rol", () => {
     expect(submitButton).toHaveAttribute("form", "closer-qa-form");
   });
 
+  it("shows a named Feedback trigger when used from Agendas", () => {
+    setupRole("role-closer");
+
+    render(<AssignLeadDrawer lead={baseLead} triggerLabel="Feedback" />);
+
+    expect(
+      screen.getByRole("button", { name: "Feedback" }),
+    ).toBeInTheDocument();
+  });
+
+  it("admin: opens the real closer feedback form from Agendas", async () => {
+    setupRole("role-admin");
+    const user = userEvent.setup();
+
+    render(
+      <AssignLeadDrawer
+        lead={baseLead}
+        triggerLabel="Feedback"
+        mode="agenda-feedback"
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Feedback" }));
+
+    expect(screen.getByTestId("closer-qa-form")).toBeInTheDocument();
+    expect(screen.queryByTestId("admin-caller-form")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /guardar/i })).toHaveAttribute(
+      "form",
+      "closer-qa-form",
+    );
+  });
+
   it("admin: el form activo del footer refleja el activeTab inicial", async () => {
     setupRole("role-admin");
     const user = userEvent.setup();

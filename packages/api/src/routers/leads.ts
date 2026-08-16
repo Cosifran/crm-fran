@@ -9,6 +9,7 @@ import {
   getWithoutAssigned,
   recordCloserAnswers,
   adminEditLeadQASession,
+  getPersonalStatistics,
 } from "../leads/services/index";
 import { permittedProcedure } from "@crm-fran/api/trpc/trpc";
 
@@ -45,6 +46,15 @@ const qaSessionInput = z.discriminatedUnion("isContacted", [
   z.object({
     leadId: z.string().min(1),
     isContacted: z.literal("No"),
+    questions: z
+      .array(
+        z.object({
+          questionKey: z.string().min(1),
+          question: z.string().min(1),
+          answer: z.string().min(1),
+        }),
+      )
+      .optional(),
   }),
 ]);
 
@@ -57,6 +67,21 @@ const callerQuestionsInput = z
     }),
   )
   .optional();
+
+export const personalStatisticsInput = z
+  .object({
+    callerId: z.string().min(1).optional(),
+    closerId: z.string().min(1).optional(),
+    from: z.string().date().optional(),
+    to: z.string().date().optional(),
+  })
+  .refine((value) => !(value.callerId && value.closerId), {
+    message: "Caller and closer filters cannot be combined",
+  })
+  .refine((value) => !(value.from && value.to && value.from > value.to), {
+    message: "From date must be before or equal to to date",
+    path: ["to"],
+  });
 
 export const assignLeadInput = z.union([
   z.object({
@@ -115,6 +140,12 @@ export const assignLeadInput = z.union([
 );
 
 export const leadsRouter = router({
+	personalStatistics: permittedProcedure(["leads:read"])
+		.input(personalStatisticsInput)
+		.query(async ({ input }) => {
+			return await getPersonalStatistics(input);
+		}),
+
   listAll: permittedProcedure(["leads:read"])
     .input(dateRangeInput)
     .query(async ({ input }) => {
