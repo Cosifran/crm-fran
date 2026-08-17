@@ -1,9 +1,14 @@
 import { TRPCError } from "@trpc/server";
 import { db, eq } from "@crm-fran/db";
-import { leads, type LeadQASessionItem } from "@crm-fran/db/schema/index";
+import {
+  leads,
+  LEAD_ACTIVITY_KIND,
+  type LeadQASessionItem,
+} from "@crm-fran/db/schema/index";
 
 import { hasPermission } from "../../permissions";
 import type { Context } from "../../context";
+import { appendLeadActivity } from "./lead-activity";
 
 export type AdminEditLeadQASessionInput = {
   leadId: string;
@@ -51,13 +56,24 @@ export async function adminEditLeadQASession({
       .where(eq(leads.id, leadId))
       .returning();
 
-    if (!updated) {
+		if (!updated) {
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
         message: "Failed to update lead",
       });
-    }
+		}
 
-    return updated;
+		await appendLeadActivity(tx, {
+			leadId,
+			actorId: ctx.session?.user.id,
+			actorRole: "admin",
+			kind: LEAD_ACTIVITY_KIND.CALLER_FEEDBACK,
+			title: "Sesión editada por administración",
+			description: "Se actualizaron las respuestas registradas del lead",
+			metadata: { questions },
+			dedupeKey: `admin_feedback:${leadId}:${new Date().toISOString()}`,
+		});
+
+		return updated;
   });
 }

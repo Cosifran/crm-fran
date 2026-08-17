@@ -112,6 +112,7 @@ function AgendasPageContent() {
     <div className="flex gap-2">
       <LeadViewDrawer
         lead={{
+          id: lead.id,
           questions: lead.questions.map((question) => ({
             questionKey: question.questionKey ?? "",
             question: question.question ?? question.questionKey ?? "",

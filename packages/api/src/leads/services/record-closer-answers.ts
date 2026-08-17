@@ -7,14 +7,16 @@ import {
   LEAD_QA_ROLE,
 	  type LeadQASessionItem,
 	  rankingEvents,
-	  RANKING_METRIC,
-	} from "@crm-fran/db/schema/index";
+		  RANKING_METRIC,
+		  LEAD_ACTIVITY_KIND,
+		} from "@crm-fran/db/schema/index";
 import { ALERT_KIND_CONFIG } from "../../alerts/services/config";
 
 import type { Context } from "../../context";
 import { isCloserOf } from "./is-closer-of";
 import { hasPermission } from "../../permissions";
 import { deriveCloserRankingMetrics } from "../../rankings/ranking-metrics";
+import { appendLeadActivity } from "./lead-activity";
 
 export type RecordCloserAnswersInput = {
   leadId: string;
@@ -41,7 +43,8 @@ export async function recordCloserAnswers({
 
   const { leadId, isContacted, questions = [] } = input;
 
-  return db.transaction(async (tx) => {
+	  return db.transaction(async (tx) => {
+	    const activityOccurredAt = new Date();
     const [lead] = await tx
       .select()
       .from(leads)
@@ -105,6 +108,18 @@ export async function recordCloserAnswers({
       });
 	    }
 
+	    await appendLeadActivity(tx, {
+	      leadId,
+	      actorId: ctx.session.user.id,
+	      actorRole: LEAD_QA_ROLE.CLOSER,
+	      kind: LEAD_ACTIVITY_KIND.CLOSER_FEEDBACK,
+	      title: "Feedback del closer registrado",
+	      description: nextOutcome ?? (isContacted === "Si" ? "Lead contactado" : "Lead no contactado"),
+	      metadata: { questions: updatedQuestions },
+	      dedupeKey: `closer_feedback:${leadId}:${ctx.session.user.id}:${activityOccurredAt.toISOString()}`,
+	      occurredAt: activityOccurredAt,
+	    });
+
 	    if (nextOutcome !== previousOutcome) {
 	      const metrics = deriveCloserRankingMetrics(previousOutcome, nextOutcome);
 	      const eventValues = metrics.flatMap((metric) => {
@@ -145,10 +160,28 @@ export async function recordCloserAnswers({
           nextShowAt: new Date(Date.now() + config.intervalMinutes * 60_000),
           occurrences: 0,
         })
-        .returning({ id: alerts.id });
+        .returning();
 
-      alertId = alert?.id;
-    }
+	      alertId = alert?.id;
+	      if (alert) {
+	        await appendLeadActivity(tx, {
+	          leadId,
+	          actorId: ctx.session.user.id,
+	          actorRole: LEAD_QA_ROLE.CLOSER,
+	          kind: LEAD_ACTIVITY_KIND.ALERT_CREATED,
+	          title: "Alerta creada",
+	          description: alert.message,
+	          metadata: {
+	            alertId: alert.id,
+	            alertKind: alert.kind,
+	            severity: alert.severity,
+	            targetUserId: alert.targetUserId,
+	          },
+	          dedupeKey: `alert_created:${alert.id}`,
+	          occurredAt: activityOccurredAt,
+	        });
+	      }
+	    }
 
     return { leadId: updated.id, alertId };
   });

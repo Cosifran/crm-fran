@@ -1,8 +1,14 @@
 import { TRPCError } from "@trpc/server";
 import { eq, db } from "@crm-fran/db";
-import { leads, rankingEvents, RANKING_METRIC } from "@crm-fran/db/schema/index";
+import {
+  leads,
+  rankingEvents,
+  RANKING_METRIC,
+  LEAD_ACTIVITY_KIND,
+} from "@crm-fran/db/schema/index";
 
 import { hasUnworkedLead } from "./has-unworked-lead";
+import { appendLeadActivity } from "./lead-activity";
 
 /**
  * Asigna un lead a un caller para que empiece a trabajarlo.
@@ -35,6 +41,16 @@ export async function assignLeadToCaller({id, userId}: {id: string, userId: stri
         leadId: id,
         dedupeKey: `${RANKING_METRIC.CALLER_LEAD_TAKEN}:${id}:${userId}:initial`,
       }).onConflictDoNothing();
+      await appendLeadActivity(tx, {
+        leadId: id,
+        actorId: userId,
+        actorRole: "caller",
+        kind: LEAD_ACTIVITY_KIND.CALLER_ASSIGNED,
+        title: "Caller asignado",
+        description: "El caller tomó el lead",
+        metadata: { userId },
+        dedupeKey: `caller_assigned:${id}:${userId}:${lead.updatedAt.toISOString()}`,
+      });
     }
     return lead ?? null;
   });

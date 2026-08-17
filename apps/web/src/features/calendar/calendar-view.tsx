@@ -276,7 +276,11 @@ export function CalendarView() {
                         <LeadViewDrawer
                           key={entry.id}
                           callerOnly
-                          lead={{ questions: entry.questions ?? [], feedback: entry.feedback }}
+                          lead={{
+                            id: entry.id,
+                            questions: entry.questions ?? [],
+                            feedback: entry.feedback,
+                          }}
                           trigger={trigger}
                           triggerAriaLabel={`Ver feedback del caller de ${entry.title}`}
                         />

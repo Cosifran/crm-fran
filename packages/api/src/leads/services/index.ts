@@ -11,6 +11,7 @@ import { adminEditLeadQASession } from "./admin-edit-lead-qa-session";
 import { getPersonalStatistics } from "./personal-statistics";
 import { createLead } from "./create-lead";
 import { setLeadType } from "./set-lead-type";
+import { getLeadActivity } from "./lead-activity";
 
 export {
 	getAll,
@@ -26,4 +27,5 @@ export {
 	getPersonalStatistics,
 	createLead,
 	setLeadType,
+	getLeadActivity,
 };

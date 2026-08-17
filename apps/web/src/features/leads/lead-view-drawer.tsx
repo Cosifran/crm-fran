@@ -15,8 +15,10 @@ import {
 } from "@crm-fran/ui/components/tabs";
 import { Label } from "@crm-fran/ui/components/label";
 import LeadDrawer from "@/components/lead-drawer/lead-drawer";
+import { LeadActivityTimeline } from "./lead-activity-timeline";
 
 export interface LeadDetailsData {
+  id: string;
   questions: QASessionItem[];
   feedback?: string;
 }
@@ -85,11 +87,26 @@ export default function LeadViewDrawer({
         description="Datos registrados durante la llamada."
         type="view"
       >
-        <ReadOnlyQAView
-          callerAnswers={callerItems}
-          closerAnswers={closerItems}
-          callerOnly={callerOnly}
-        />
+        <Tabs defaultValue="details" className="w-full">
+          <TabsList className="w-full" variant="line">
+            <TabsTrigger value="details" className="flex-1">
+              Información
+            </TabsTrigger>
+            <TabsTrigger value="activity" className="flex-1">
+              Actividad
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="details" className="pt-4">
+            <ReadOnlyQAView
+              callerAnswers={callerItems}
+              closerAnswers={closerItems}
+              callerOnly={callerOnly}
+            />
+          </TabsContent>
+          <TabsContent value="activity" className="pt-4">
+            <LeadActivityTimeline leadId={lead.id} enabled={open} />
+          </TabsContent>
+        </Tabs>
       </LeadDrawer>
     </>
   );

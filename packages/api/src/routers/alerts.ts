@@ -74,8 +74,8 @@ export const alertsRouter = router({
 
 	createAlert: permittedProcedure(["alerts:write"])
 		.input(createAlertInput)
-		.mutation(async ({ input }) => {
-			return await createAlert(input);
+		.mutation(async ({ ctx, input }) => {
+			return await createAlert({ ...input, actorId: ctx.session.user.id });
 		}),
 
 	countAlerts: permittedProcedure(["alerts:read"]).query(async ({ ctx }) => {

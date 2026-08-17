@@ -12,6 +12,7 @@ import {
   getPersonalStatistics,
   createLead,
   setLeadType,
+  getLeadActivity,
 } from "../leads/services/index";
 import { permittedProcedure } from "@crm-fran/api/trpc/trpc";
 
@@ -143,6 +144,12 @@ export const assignLeadInput = z.union([
 );
 
 export const leadsRouter = router({
+	activity: permittedProcedure(["leads:read"])
+		.input(idInput)
+		.query(async ({ input }) => {
+			return await getLeadActivity(input.id);
+		}),
+
 	personalStatistics: permittedProcedure(["leads:read"])
 		.input(personalStatisticsInput)
 		.query(async ({ input }) => {
@@ -204,8 +211,8 @@ export const leadsRouter = router({
         type: z.enum(["maestra", "vsl"]),
       }),
     )
-    .mutation(async ({ input }) => {
-      return await setLeadType(input);
+    .mutation(async ({ ctx, input }) => {
+      return await setLeadType({ ...input, actorId: ctx.session.user.id });
     }),
 
   create: permittedProcedure(["leads:write"])

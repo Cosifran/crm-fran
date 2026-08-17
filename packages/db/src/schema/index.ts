@@ -1,5 +1,6 @@
 export * from "./auth";
 export * from "./leads";
+export * from "./lead-activity";
 export * from "./alerts";
 export * from "./calendar";
 export * from "./messages";

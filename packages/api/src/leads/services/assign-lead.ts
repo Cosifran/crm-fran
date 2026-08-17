@@ -8,9 +8,10 @@ import {
 	ALERT_KIND,
 	LEAD_QA_ROLE,
 		type LeadQASessionItem,
-		rankingEvents,
-		RANKING_METRIC,
-	} from "@crm-fran/db/schema/index";
+			rankingEvents,
+			RANKING_METRIC,
+			LEAD_ACTIVITY_KIND,
+		} from "@crm-fran/db/schema/index";
 import type { Permission } from "@crm-fran/db/schema/auth";
 import { ALERT_KIND_CONFIG } from "../../alerts/services/config";
 import { hasPermission } from "../../permissions";
@@ -22,6 +23,7 @@ import {
   validateCallerOutcomeInput,
 	} from "./caller-outcome";
 import { deriveCloserRankingMetrics } from "../../rankings/ranking-metrics";
+import { appendLeadActivity } from "./lead-activity";
 
 type LegacyAssignLeadInput = {
 	leadId: string;
@@ -71,7 +73,8 @@ export async function assignLead({
     }
   }
 
-	return db.transaction(async (tx) => {
+		return db.transaction(async (tx) => {
+			const activityOccurredAt = new Date();
 		let sourceAlertTargetUserId: string | null | undefined;
 
 		if (input.sourceAlertId) {
@@ -294,7 +297,7 @@ export async function assignLead({
 			.where(eq(leads.id, leadId))
 			.returning();
 
-			if (!updated) {
+				if (!updated) {
 			throw new TRPCError({
 				code: "INTERNAL_SERVER_ERROR",
 				message: "Failed to update lead",
@@ -337,6 +340,104 @@ export async function assignLead({
 				}
 			}
 
+				if (lead.state !== updated.state) {
+					await appendLeadActivity(tx, {
+						leadId,
+						actorId: callerId,
+						actorRole: authorRole,
+						kind: LEAD_ACTIVITY_KIND.STATE_CHANGED,
+						title: "Estado actualizado",
+						description: `${lead.state} → ${updated.state}`,
+						metadata: { previousState: lead.state, state: updated.state },
+						dedupeKey: `state_changed:${leadId}:${activityOccurredAt.toISOString()}`,
+						occurredAt: activityOccurredAt,
+					});
+				}
+
+				if (updated.callerId && lead.callerId !== updated.callerId) {
+					await appendLeadActivity(tx, {
+						leadId,
+						actorId: updated.callerId,
+						actorRole: LEAD_QA_ROLE.CALLER,
+						kind: LEAD_ACTIVITY_KIND.CALLER_ASSIGNED,
+						title: "Caller asignado",
+						description: "El caller comenzó a trabajar el lead",
+						metadata: { userId: updated.callerId },
+						dedupeKey: `caller_assigned:${leadId}:${updated.callerId}:${activityOccurredAt.toISOString()}`,
+						occurredAt: activityOccurredAt,
+					});
+				}
+
+				if (updated.closerId && lead.closerId !== updated.closerId) {
+					await appendLeadActivity(tx, {
+						leadId,
+						actorId: callerId,
+						actorRole: authorRole,
+						kind: LEAD_ACTIVITY_KIND.CLOSER_ASSIGNED,
+						title: "Closer asignado",
+						description: "El lead fue asignado a un closer",
+						metadata: { userId: updated.closerId },
+						dedupeKey: `closer_assigned:${leadId}:${updated.closerId}:${activityOccurredAt.toISOString()}`,
+						occurredAt: activityOccurredAt,
+					});
+				}
+
+				await appendLeadActivity(tx, {
+					leadId,
+					actorId: callerId,
+					actorRole: authorRole,
+					kind:
+						authorRole === LEAD_QA_ROLE.CLOSER
+							? LEAD_ACTIVITY_KIND.CLOSER_FEEDBACK
+							: LEAD_ACTIVITY_KIND.CALLER_FEEDBACK,
+					title:
+						authorRole === LEAD_QA_ROLE.CLOSER
+							? "Feedback del closer registrado"
+							: "Feedback del caller registrado",
+					description: isOutcomeInput
+						? OUTCOME_LABELS[input.outcome]
+						: input.isContacted === "Si"
+							? "Lead contactado"
+							: "Lead no contactado",
+					metadata: {
+						questions: updatedQuestions.filter(
+							(question) =>
+								question.authorRole === authorRole &&
+								question.authorId === callerId,
+						),
+					},
+					dedupeKey: `${authorRole}_feedback:${leadId}:${callerId}:${activityOccurredAt.toISOString()}`,
+					occurredAt: activityOccurredAt,
+				});
+
+				if (
+					isAppointment &&
+					input.scheduledDate &&
+					input.scheduledTime
+				) {
+					const rescheduled = updatedQuestions.some(
+						(question) =>
+							question.questionKey === "appointmentRescheduled" &&
+							question.answer === "Si",
+					);
+					await appendLeadActivity(tx, {
+						leadId,
+						actorId: callerId,
+						actorRole: authorRole,
+						kind: rescheduled
+							? LEAD_ACTIVITY_KIND.APPOINTMENT_RESCHEDULED
+							: LEAD_ACTIVITY_KIND.APPOINTMENT_SCHEDULED,
+						title: rescheduled ? "Agenda reprogramada" : "Agenda programada",
+						description: `${input.scheduledDate} a las ${input.scheduledTime}`,
+						metadata: {
+							scheduledDate: input.scheduledDate,
+							scheduledTime: input.scheduledTime,
+							closerId: input.closerId,
+						},
+						dedupeKey: `appointment:${leadId}:${input.scheduledDate}:${input.scheduledTime}`,
+						occurredAt: activityOccurredAt,
+					});
+				}
 		let alertId: string | undefined;
 
 		if (
@@ -473,13 +574,49 @@ export async function assignLead({
 			});
 		}
 
-		if (input.sourceAlertId && alertId !== input.sourceAlertId) {
-			await tx
+			if (input.sourceAlertId && alertId !== input.sourceAlertId) {
+				await tx
 				.update(alerts)
 				.set({ resolvedAt: new Date() })
-				.where(eq(alerts.id, input.sourceAlertId));
-		}
+					.where(eq(alerts.id, input.sourceAlertId));
+				await appendLeadActivity(tx, {
+					leadId,
+					actorId: callerId,
+					actorRole: authorRole,
+					kind: LEAD_ACTIVITY_KIND.ALERT_RESOLVED,
+					title: "Alerta resuelta",
+					description: "La alerta se resolvió al registrar el resultado",
+					metadata: { alertId: input.sourceAlertId },
+					dedupeKey: `alert_resolved:${input.sourceAlertId}`,
+					occurredAt: activityOccurredAt,
+				});
+			}
 
-		return { leadId: updated.id, alertId };
+			if (alertId) {
+				const [activityAlert] = await tx
+					.select()
+					.from(alerts)
+					.where(eq(alerts.id, alertId));
+				if (activityAlert) {
+					await appendLeadActivity(tx, {
+						leadId,
+						actorId: callerId,
+						actorRole: authorRole,
+						kind: LEAD_ACTIVITY_KIND.ALERT_CREATED,
+						title: "Alerta creada",
+						description: activityAlert.message,
+						metadata: {
+							alertId,
+							alertKind: activityAlert.kind,
+							severity: activityAlert.severity,
+							targetUserId: activityAlert.targetUserId,
+						},
+						dedupeKey: `alert_created:${alertId}`,
+						occurredAt: activityOccurredAt,
+					});
+				}
+			}
+
+			return { leadId: updated.id, alertId };
 	});
 }

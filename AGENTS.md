@@ -1,196 +1,265 @@
-## 🧠 Contexto del mentor
-Actúa como un **senior developer con 10+ años de experiencia en Next.js, React y arquitectura fullstack**.
-Tu rol es ser mi **mentor técnico exigente**, no un asistente que resuelve problemas.
+# Guía de trabajo para `crm-fran`
 
-**Nota sobre el modelo**: sos un modelo con menos contexto implícito que otros agentes (menos "magia" de inferencia). Por eso las reglas de este archivo son explícitas a propósito — seguilas de forma literal, no las reinterpretes ni las suavices porque "parecen redundantes".
+Este archivo define cómo colaborar, diseñar e implementar cambios en este repositorio. La prioridad es entregar software claro, comprobable y fácil de evolucionar sin introducir abstracciones antes de necesitarlas.
 
----
+## 1. Prioridades
 
-## 👤 Mi perfil
-- Nivel actual: mid
-- Stack: Next.js 16 (App Router), React 19, TypeScript, tRPC v11, Drizzle ORM, Better Auth, Tailwind v4, shadcn/ui.
-- Objetivo: mejorar arquitectura, código limpio, buenas prácticas y patrones de diseño.
+Cuando dos reglas parezcan competir, seguir este orden:
 
----
+1. Correctitud, seguridad y reglas de negocio.
+2. Claridad y facilidad de cambio.
+3. Simplicidad de la solución actual.
+4. Consistencia con la arquitectura existente.
+5. Rendimiento respaldado por mediciones.
 
-## 🧭 Cómo quiero aprender (basado en neurociencia del aprendizaje)
+No sacrificar correctitud por velocidad ni agregar complejidad para necesidades hipotéticas.
 
-Estos 5 principios gobiernan CÓMO me enseñás. No son decorativos: cada uno se traduce en una regla de comportamiento concreta más abajo.
 
-1. **Recuperación activa** — Extraer información de mi cabeza fortalece más que recibirla. Por eso nunca me das la solución antes de que yo intente generar una respuesta propia.
-2. **Repetición espaciada** — Olvido rápido si no repaso. Por eso cada sesión empieza retomando algo de la anterior, no arrancando de cero.
-3. **Alternancia enfocado/difuso** — Los bloqueos mentales no se resuelven a fuerza de más concentración. Por eso me sugerís pausas activas en vez de insistir cuando estoy trabado.
-4. **Metacognición** — Necesito saber qué entendí y qué no. Por eso cada sesión cierra con una autoevaluación mía, no con un resumen tuyo.
-5. **Consolidación** — Lo que se estudia justo antes de una pausa larga (o del cierre del día) se fija mejor. Por eso el cierre de sesión deja anotado el concepto más difícil, para retomarlo primero la próxima vez.
+## 3. Principios de diseño
 
----
+### KISS y YAGNI
 
-## 🚫 Anti-patrones que debes evitar
-- No me des bloques de código completos sin que yo lo haya intentado antes.
-- No me sobreexpliques si ya demostré que entiendo el concepto.
-- No me dejes en tutorial hell: si detecto que repito patrones sin entender, desafíame.
-- **No uses analogías por defecto.** Explicá primero en términos técnicos directos. Solo usá una analogía si (a) yo la pido explícitamente, o (b) fallé en entender la explicación técnica dos veces seguidas. Si usás una, que sea una sola frase, no un párrafo, y no la extiendas ni la repitas en respuestas siguientes.
-- **No asumas que tu conocimiento de una API/librería está actualizado.** Antes de sugerir una API, contrastala contra las versiones listadas en "Arquitectura del proyecto". Si no estás seguro de que tu sugerencia es válida para esa versión exacta, decilo explícitamente ("no estoy seguro de que esto sea válido en tRPC v11, verificalo en la doc oficial") en vez de responder con confianza falsa.
-- No arranques una sesión nueva como si fuera la primera vez que hablamos del proyecto: primero pedime o retomá el resumen de la sesión anterior (ver "Estructura de sesión").
+- Elegir la solución más simple que satisfaga los requisitos actuales y preserve una evolución segura.
+- No crear capas, servicios, repositorios genéricos, eventos, cachés ni infraestructura distribuida «por si acaso».
+- Una abstracción debe resolver una variación o un problema presente y demostrable.
 
-## 🔍 Formato de tus respuestas
-- **Code review**: señala línea por línea con ✅ bueno / ⚠️ mejorable / ❌ incorrecto.
-- **Conceptos nuevos**: explicación técnica directa primero. Analogía SOLO si aplica el criterio de "Anti-patrones". Marcá con 🔎 cuando una sugerencia dependa de una versión/API que no podés verificar con certeza.
-- **Siguientes pasos**: termina siempre con una pregunta o un reto para mí, nunca con un resumen hecho por vos de lo que "aprendí".
+### DRY con criterio
 
----
+- Evitar duplicar conocimiento o reglas de negocio, no cualquier parecido textual.
+- No extraer una abstracción hasta que el concepto compartido sea estable.
+- Preferir dos implementaciones claras antes que una abstracción incorrecta que acople casos distintos.
 
-## 🗓️ Estructura de sesión
+### Regla del Boy Scout
 
-**Apertura (recuperación activa + repetición espaciada)**
-- Si vengo con una nota de cierre de la sesión anterior, empezá preguntándome que te explique yo primero ese concepto antes de avanzar a algo nuevo.
-- Si no traigo nota, preguntame: "¿qué fue lo último que trabajamos y qué recordás de eso?" antes de entrar en tema nuevo.
+- Mejorar nombres, tipos o estructura cuando estén directamente relacionados con el cambio.
+- No mezclar refactorizaciones ajenas que amplíen innecesariamente el alcance o dificulten la revisión.
 
-**Desarrollo (modo enfocado)**
-- Trabajamos en bloques acotados sobre una sola fase del problema a la vez (ver Reglas de comportamiento).
+### Trade-offs explícitos
 
-**Pausa (modo difuso)**
-- Si detectás bloqueo prolongado (regla 8), sugerí una pausa corta en vez de seguir dando pistas.
+Las decisiones relevantes deben indicar:
 
-**Cierre (metacognición + consolidación)**
-- Terminá la sesión preguntándome, en este orden:
-  1. "¿Qué fue lo que más te costó hoy?"
-  2. "¿Cómo lo explicarías con tus propias palabras?"
-  3. "¿Qué método vas a usar la próxima vez para que sea más fácil?"
-- Con mis respuestas, generá una nota corta de 3-4 líneas con el concepto más difícil del día, para que yo la guarde y la pegue al inicio de la próxima sesión.
+- problema actual;
+- opción elegida y motivo;
+- coste o limitación aceptada;
+- señal concreta que justificaría revisar la decisión.
 
----
+## 4. Arquitectura objetivo: monolito modular
 
-## 🏗️ Arquitectura del proyecto
-- **Monorepo**: pnpm 11 + Turborepo. Workspaces en `apps/*` y `packages/*`.
-- **Framework**: Next.js 16 (App Router), React 19.2.6. **No es Pages Router**.
-- **Idioma**: TypeScript estricto. `verbatimModuleSyntax`, `noUncheckedIndexedAccess`, `noUnusedLocals` activados.
-- **API**: tRPC v11 (`@trpc/server` + `@trpc/tanstack-react-query`). Routers en `packages/api/src/routers/`.
-- **Base de datos**: PostgreSQL + Drizzle ORM (`drizzle-orm` + `drizzle-kit`). Schema en `packages/db/src/schema/`.
-- **Auth**: Better Auth 1.6.11 con Drizzle adapter. Instancia en `packages/auth/src/index.ts`.
-- **UI**: shadcn/ui (estilo `base-lyra`) sobre Base UI + Tailwind CSS v4 + next-themes + Sonner (toasts).
-- **Formularios**: TanStack React Form + Zod v4 para validación.
-- **Estado**: TanStack React Query v5 (client-side data fetching via tRPC).
-- **React Compiler**: activado en `next.config.ts`. No uses `useMemo`/`useCallback` manuales.
-- **Env**: validado con `@t3-oss/env-core` en `packages/env/` (server + web entries).
-- **Puerto dev**: 3001 (no 3000).
+`crm-fran` es una aplicación full-stack desplegada como una unidad. No tratarla como microservicios ni forzar una Clean Architecture ceremonial.
 
----
+La separación se aplica según la complejidad de cada feature:
 
-## 📂 Estructura clave
+1. **Presentación y entrega**: Next.js App Router, React y componentes UI.
+2. **Límite de aplicación**: routers y procedures de tRPC; validan, autorizan y coordinan el caso de uso.
+3. **Dominio**: reglas de negocio puras cuando la feature tiene comportamiento significativo.
+4. **Infraestructura**: Drizzle/PostgreSQL, Better Auth y servicios externos.
 
-### Apps
-- `apps/web/` — Aplicación Next.js fullstack (única app desplegable).
-  - `src/app/` — App Router: `layout.tsx`, `page.tsx`, `dashboard/`, `login/`.
-  - `src/app/api/auth/[...all]/route.ts` — Handler de Better Auth.
-  - `src/app/api/trpc/[trpc]/route.ts` — Handler de tRPC (fetch adapter).
-  - `src/components/` — Componentes de la app (header, providers, forms).
-  - `src/lib/auth-client.ts` — Cliente de auth con `inferAdditionalFields`.
-  - `src/utils/trpc.ts` — Cliente tRPC con `createTRPCOptionsProxy` + QueryClient.
+### Regla de dependencias
 
-### Packages
-- `packages/api/` (`@crm-fran/api`) — Routers tRPC, context, procedures (public/protected).
-- `packages/auth/` (`@crm-fran/auth`) — Instancia de Better Auth + singleton `auth`.
-- `packages/db/` (`@crm-fran/db`) — Schema Drizzle, migrations, `createDb()` + singleton `db`.
-- `packages/env/` (`@crm-fran/env`) — Validación de env con `@t3-oss/env` (server + web).
-- `packages/ui/` (`@crm-fran/ui`) — Primitivos shadcn/ui + `globals.css` + `cn()` utility.
-- `packages/config/` (`@crm-fran/config`) — `tsconfig.base.json` compartido.
-- `packages/tests/` — Placeholder para tests de integración cross-package.
+- El dominio no importa React, Next.js, tRPC, Drizzle, Better Auth ni detalles de transporte.
+- La presentación no contiene reglas de negocio ni autorización confiable.
+- Los routers tRPC no deben acumular consultas, transformaciones y reglas complejas en una sola función.
+- La infraestructura implementa detalles requeridos por la aplicación; no define las políticas del negocio.
+- `packages/db` no depende de `packages/api` ni de `apps/web`.
+- `packages/ui` no depende de features específicas de `apps/web`.
 
-### Aliases
-- `@/*` → `apps/web/src/*`
-- `@crm-fran/ui/*` → `packages/ui/src/*`
+### Cuándo extraer un caso de uso
 
----
+Una procedure tRPC puede consultar Drizzle directamente para CRUD simple. Extraer un caso de uso o módulo de dominio cuando exista al menos una de estas señales:
 
-## 🚀 Comandos de desarrollo
-**Root (Turborepo)**:
-- `pnpm dev` — Dev paralelo de todos los packages.
-- `pnpm dev:web` — Solo la app Next.js.
-- `pnpm build` — Build de producción.
-- `pnpm check-types` — Typecheck project-wide (`tsc --noEmit`).
+- varias reglas o decisiones de negocio;
+- la misma operación es utilizada por más de un punto de entrada;
+- combinaciones de permisos, estados o transiciones;
+- necesidad de probar la regla sin transporte ni base de datos;
+- coordinación de varias escrituras o servicios.
 
-**Base de datos**:
-- `pnpm db:push` — Push schema a DB (dev rápido).
-- `pnpm db:generate` — Generar migration SQL.
-- `pnpm db:migrate` — Correr migrations.
-- `pnpm db:studio` — Drizzle Studio (UI para DB).
+No crear interfaces o puertos para cada consulta. Introducirlos cuando exista más de una implementación, un límite externo inestable o una necesidad real de aislamiento en pruebas.
 
-**Testing**:
-- `pnpm -r test` — Correr tests en todos los packages (Vitest).
-- **No hay tests escritos aún**. Config existe (`vitest.workspace.ts` + `passWithNoTests`).
+## 5. Responsabilidad por área
 
-**No hay lint ni formatter configurados** (turbo.json declara `lint` task pero ningún package lo implementa).
+| Área | Responsabilidad | No debe contener |
+| --- | --- | --- |
+| `apps/web/src/app/` | Rutas, layouts, Server Components y handlers de Next.js | Reglas de negocio duplicadas |
+| `apps/web/src/components/` | Componentes específicos de la aplicación | Acceso directo a la base de datos |
+| `packages/api/` | Contratos tRPC, autorización y coordinación de casos de uso | UI o detalles de navegación |
+| `packages/db/` | Schema, migraciones y acceso PostgreSQL con Drizzle | Reglas dependientes de HTTP o React |
+| `packages/auth/` | Configuración y adaptación de Better Auth | Autorización exclusiva del cliente |
+| `packages/ui/` | Primitivos visuales reutilizables | Lógica específica de leads o CRM |
+| `packages/env/` | Validación tipada de variables de entorno | Lecturas dispersas de `process.env` |
 
----
+Colocar el código específico de una feature cerca de esa feature. Promoverlo a un paquete compartido solo cuando tenga consumidores reales y una responsabilidad estable.
 
-## ⚠️ Gotchas y trampas comunes
-1. **Puerto 3001**: La app corre en `localhost:3001`, no 3000. `BETTER_AUTH_URL` y `CORS_ORIGIN` reflejan esto.
-2. **Env file location**: `.env` está en `apps/web/.env`, no en root. `packages/db/drizzle.config.ts` lo carga explícitamente desde `../../apps/web/.env`.
-3. **Migrations check-in**: Las migrations están commiteadas en `packages/db/src/migrations/`. Después de cambiar el schema, correr `pnpm db:generate` y commitear el SQL.
-4. **Schema drift**: El schema actual define `user.roleId` (FK a `roles.id`) pero la migration `0001` agregó un `role text` plano. Puede necesitar re-generar migrations.
-5. **React Compiler**: Con `reactCompiler: true` en `next.config.ts`, no agregues `useMemo`/`useCallback` manuales para performance.
-6. **typedRoutes**: Activado en Next.js. Usá `Link href` tipado, no strings sueltos.
-7. **verbatimModuleSyntax**: Todo import de solo tipo **debe** usar `import type { ... }`. Importar un tipo como valor es error de compilación.
-8. **noUncheckedIndexedAccess**: Acceso a arrays/records retorna `T | undefined`. No hagas `arr[0].field` sin guardar.
-9. **tRPC context**: `createContext(req)` recibe `NextRequest` (no `req, res` como Pages Router). Lee session via `auth.api.getSession({ headers: req.headers })`.
-10. **Better Auth singleton**: `export const auth = createAuth()` en `packages/auth/src/index.ts`. El cliente usa `inferAdditionalFields<typeof auth>()` para tipar campos adicionales (`roleId`, `leadActive`, `scoring`).
-11. **pnpm catalog**: Muchas versiones están en el `catalog:` de `pnpm-workspace.yaml`. Para actualizar, editá el catalog, no las versiones por package.
-12. **Self-hosted backend**: No hay servidor separado. tRPC y auth viven dentro de Next.js route handlers (`app/api/`).
-13. **.env commiteado**: `apps/web/.env` está trackeado en git con credenciales de dev. Verificar antes de push a producción.
+## 6. Clean Code aplicable
 
----
+### Nombres
 
-## 🎯 Patrones de código
-- **tRPC routers**: Definidos en `packages/api/src/routers/`. Exportan `appRouter` combinado. Usan `publicProcedure` o `protectedProcedure` (que valida `ctx.session`).
-- **Auth**: Better Auth con Drizzle adapter. Schema en `packages/db/src/schema/auth.ts` (tablas `user`, `session`, `account`, `verification` + custom `roles`).
-- **Components**: shadcn/ui primitives en `packages/ui/src/components/`. Componentes de app en `apps/web/src/components/`.
-- **Forms**: TanStack React Form + Zod v4 schemas. Ver `sign-up-form.tsx` como referencia.
-- **Data fetching**: tRPC client en `apps/web/src/utils/trpc.ts`. Usar `trpc.[router].[procedure].useQuery()` o `.useMutation()`.
-- **Server components**: Pueden leer session directamente via `auth.api.getSession()`. Ver `dashboard/page.tsx`.
+- Usar nombres que expresen intención de negocio: `assignLead`, `eligibleCloserIds`, `leadStatus`.
+- Evitar nombres genéricos como `data`, `item`, `manager`, `helper` o `utils` cuando oculten el concepto.
+- Nombrar booleanos como preguntas: `isActive`, `hasPermission`, `canAssignLead`.
 
----
+### Funciones
 
-## 🔒 Variables de entorno
-**Location**: `apps/web/.env`
+- Una función debe tener una responsabilidad y operar en un único nivel de abstracción.
+- Mantener pequeñas las funciones porque la responsabilidad es acotada, no por un límite arbitrario de líneas.
+- Reducir argumentos posicionales; usar un objeto cuando los parámetros forman un concepto cohesivo.
+- Separar cálculo puro de efectos secundarios cuando mejore la comprensión o las pruebas.
+- Evitar flags booleanos que cambien completamente el comportamiento; suelen señalar dos operaciones distintas.
 
-**Server-side** (validadas en `packages/env/src/server.ts`):
-- `DATABASE_URL` — PostgreSQL connection string.
-- `BETTER_AUTH_SECRET` — Min 32 chars.
-- `BETTER_AUTH_URL` — Base URL (dev: `http://localhost:3001`).
-- `CORS_ORIGIN` — Trusted origins (dev: `http://localhost:3001`).
-- `NODE_ENV` — `development` / `production` / `test`.
+### Comentarios y documentación
 
-**Client-side**: `packages/env/src/web.ts` está vacío (placeholder para futuras `NEXT_PUBLIC_*`).
+- El código debe explicar qué hace; los comentarios deben explicar por qué existe una decisión no evidente.
+- No comentar sintaxis ni conservar código muerto comentado.
+- Documentar contratos, invariantes, decisiones de seguridad y trade-offs importantes.
 
----
+### Errores
 
-## 📋 Tareas comunes
-- **Agregar un router tRPC**: Crear en `packages/api/src/routers/`, agregar a `appRouter` en `routers/index.ts`. Usar `publicProcedure` o `protectedProcedure`.
-- **Agregar una tabla Drizzle**: Editar `packages/db/src/schema/`, agregar export en `schema/index.ts`. Correr `pnpm db:generate` y `pnpm db:migrate`.
-- **Agregar una página**: Crear en `apps/web/src/app/[route]/page.tsx`. Si necesita auth, leer session en server component y redirigir a `/login` si no hay user.
-- **Agregar un componente UI**: Si es primitivo reutilizable, va en `packages/ui/src/components/`. Si es específico de la app, en `apps/web/src/components/`.
-- **Cambiar estilos**: Tailwind v4 + shadcn tokens en `packages/ui/src/styles/globals.css`. Usar `cn()` de `packages/ui/src/lib/utils.ts` para clases condicionales.
+- No silenciar errores ni usar `catch` vacío.
+- Añadir contexto útil sin exponer credenciales ni datos sensibles.
+- Traducir errores técnicos a errores de aplicación en el límite apropiado.
+- Modelar resultados esperables del negocio de forma explícita; reservar excepciones para fallos excepcionales.
 
----
+## 7. TypeScript, React y Next.js
 
-## 🧪 Testing
-**Runner**: Vitest 4.1.8 con `vitest.workspace.ts` (cubre `apps/*` y `packages/*`).
-**Estado actual**: **Cero tests escritos**. Todos los packages tienen `passWithNoTests: true`.
-**Config**: Cada package tiene su `vitest.config.ts` con `include: ["src/**/*.test.ts"]`.
-**No hay E2E** (no Playwright/Cypress).
-Si querés agregar tests, preguntá primero qué preferís: Vitest + Testing Library, Playwright, o Cypress. No asumas.
+- Mantener TypeScript estricto; no introducir `any` ni assertions para ocultar errores de diseño.
+- Con `verbatimModuleSyntax`, usar `import type` para imports exclusivamente de tipos.
+- Con `noUncheckedIndexedAccess`, manejar explícitamente valores posiblemente ausentes.
+- Validar datos desconocidos en los límites con Zod; no validar repetidamente valores ya confiables.
+- Preferir Server Components. Añadir `"use client"` solo cuando se necesiten estado, efectos, eventos o APIs del navegador.
+- No usar `useMemo` ni `useCallback` como optimización rutinaria: React Compiler está activado.
+- Evitar `useEffect` para derivar estado que puede calcularse durante el render.
+- Mantener el estado cerca del consumidor; no crear estado global sin consumidores y requisitos claros.
+- Usar rutas compatibles con `typedRoutes` y componentes `Link` tipados.
+- Evitar waterfalls: iniciar trabajo independiente en paralelo y resolverlo en el límite adecuado.
 
----
+## 8. tRPC y contratos de aplicación
 
-## 📚 Recursos útiles
-- `turbo.json` — Config de tasks de Turborepo.
-- `pnpm-workspace.yaml` — Workspace globs + catalog de versiones.
-- `packages/config/tsconfig.base.json` — Config base de TypeScript (strict).
-- `apps/web/next.config.ts` — Config de Next.js con React Compiler y typedRoutes.
-- `packages/db/drizzle.config.ts` — Config de Drizzle Kit para migrations.
-- `openspec/` — Workflow de SDD (Spec-Driven Development) separado.
+- Usar Zod v4 para validar inputs externos.
+- Usar `protectedProcedure` para operaciones autenticadas y verificar permisos de negocio en el servidor.
+- Mantener las procedures como adaptadores: validar, autorizar, invocar lógica y mapear el resultado.
+- No confiar en restricciones de UI para autorización.
+- No exponer detalles accidentales de Drizzle o de la base de datos como contrato público.
+- Definir inputs y outputs según el lenguaje de la feature, no según la forma interna de una tabla.
+- Evitar routers genéricos o factories complejas mientras no exista repetición estable.
 
----
+## 9. Drizzle y PostgreSQL
 
-**Última actualización**: 2026-07-17
+- Tratar el schema de Drizzle y las migraciones registradas como una unidad de cambio.
+- Después de modificar el schema, ejecutar `pnpm db:generate`, revisar el SQL y versionar la migración.
+- Usar transacciones cuando varias escrituras deban ser atómicas.
+- Definir constraints de base de datos para invariantes que deban cumplirse con independencia de la aplicación.
+- Agregar índices a partir de patrones reales de consulta y evidencia, no por intuición.
+- Seleccionar solo las columnas necesarias en rutas sensibles al rendimiento.
+- Evitar el patrón Repository genérico sobre Drizzle: reduce sus ventajas tipadas y suele añadir indirección sin aislamiento real.
+
+## 10. Seguridad y autenticación
+
+- Better Auth autentica; las reglas de autorización pertenecen al servidor y al dominio de la aplicación.
+- Verificar sesión y permisos en cada operación protegida.
+- Nunca usar datos del cliente como autoridad para roles, ownership o transiciones permitidas.
+- No registrar secretos, tokens, cookies, credenciales ni payloads sensibles.
+- `apps/web/.env` contiene credenciales de desarrollo y está versionado: revisar este riesgo antes de cualquier despliegue o publicación.
+
+## 11. Pruebas y verificación
+
+Aplicar RED → GREEN → REFACTOR para nuevas reglas de negocio y correcciones de bugs:
+
+1. escribir una prueba que falle por la razón correcta;
+2. implementar el mínimo necesario para hacerla pasar;
+3. mejorar el diseño conservando la prueba en verde.
+
+Estrategia proporcional:
+
+- **Reglas puras**: tests unitarios con Vitest.
+- **Procedures y persistencia**: tests de integración cuando el contrato o la consulta sean relevantes.
+- **Componentes interactivos**: Testing Library cuando el comportamiento no pueda cubrirse en una capa inferior.
+- **Flujos críticos completos**: proponer E2E antes de incorporar Playwright o Cypress; todavía no están configurados.
+
+No probar detalles internos ni perseguir cobertura sin significado. Cada prueba debe proteger un comportamiento o una regresión plausible.
+
+Comandos disponibles:
+
+- `pnpm -r test`
+- `pnpm check-types`
+- `pnpm build`
+
+No afirmar que un cambio funciona sin ejecutar la verificación aplicable o declarar explícitamente qué quedó sin comprobar.
+
+## 12. Sistemas distribuidos y escalabilidad
+
+El sistema actual es un monolito modular. CAP, Saga, balanceadores y consistencia distribuida solo aplican cuando existen límites de red y estado distribuido reales.
+
+- Medir antes de optimizar.
+- Preferir primero consultas correctas, índices adecuados y reducción de trabajo innecesario.
+- Introducir caché solo con una política explícita de ownership, invalidación, TTL y tolerancia a datos obsoletos.
+- Escalar verticalmente mientras sea la opción más simple y suficiente; escalar horizontalmente cuando capacidad, disponibilidad o aislamiento lo justifiquen.
+- Usar transacciones PostgreSQL dentro del monolito.
+- Considerar Saga únicamente para operaciones que crucen servicios independientes sin una transacción compartida.
+- Para cada dependencia remota futura, definir timeout, reintentos limitados, idempotencia y observabilidad.
+
+No diseñar una arquitectura distribuida para aparentar escalabilidad. La distribución añade fallos parciales, latencia y consistencia eventual que deben justificarse.
+
+## 13. Flujo de implementación
+
+1. Identificar el comportamiento solicitado y sus invariantes.
+2. Inspeccionar el código y los contratos existentes antes de proponer cambios.
+3. Elegir la solución más simple y declarar cualquier trade-off relevante.
+4. Crear la prueba fallida cuando corresponda.
+5. Implementar un cambio cohesivo y acotado.
+6. Refactorizar sin ampliar el alcance.
+7. Ejecutar tests y typecheck aplicables; ejecutar build cuando el cambio afecte integración o entrega.
+8. Revisar el diff para detectar código muerto, duplicación de conocimiento, cambios accidentales y secretos.
+
+No mezclar en una misma entrega una feature, una migración arquitectónica y limpieza no relacionada.
+
+## 14. Revisión de código
+
+En revisiones, clasificar observaciones como:
+
+- ✅ **Correcto**: decisión clara y coherente con los contratos.
+- ⚠️ **Mejorable**: deuda o claridad insuficiente sin fallo demostrado.
+- ❌ **Incorrecto**: bug, vulnerabilidad, ruptura contractual o incumplimiento verificable.
+
+Cada hallazgo debe incluir evidencia, impacto y corrección sugerida. Priorizar comportamiento y diseño sobre preferencias estilísticas.
+
+### Checklist
+
+- [ ] Los nombres expresan intención de negocio.
+- [ ] Cada módulo tiene una responsabilidad clara.
+- [ ] Las dependencias respetan los límites descritos.
+- [ ] No se añadieron abstracciones sin una necesidad actual.
+- [ ] La autorización se verifica en el servidor.
+- [ ] Los inputs externos se validan.
+- [ ] Schema y migración permanecen alineados.
+- [ ] Las reglas nuevas o corregidas tienen pruebas proporcionales.
+- [ ] No se introdujeron secretos ni logs sensibles.
+- [ ] La verificación ejecutada está documentada.
+
+## 15. Contexto técnico verificado
+
+- Monorepo con pnpm 11.6.0 y Turborepo.
+- Next.js 16.2, App Router, React 19.2.6 y React Compiler.
+- TypeScript estricto con `verbatimModuleSyntax`, `noUncheckedIndexedAccess` y `noUnusedLocals`.
+- tRPC v11 con TanStack React Query v5.
+- PostgreSQL con Drizzle ORM y Drizzle Kit.
+- Better Auth 1.6.11 con Drizzle adapter.
+- Tailwind CSS v4, shadcn/ui `base-lyra`, Base UI, next-themes y Sonner.
+- TanStack React Form y Zod v4.
+- Aplicación desplegable única en `apps/web`; API y auth se sirven mediante Route Handlers de Next.js.
+- Puerto local: `3001`.
+- Variables de entorno: `apps/web/.env`.
+- Migraciones: `packages/db/src/migrations/`.
+- No existe lint ni formatter configurado actualmente.
+- Vitest 4.1.8 está configurado, pero la cobertura del proyecto sigue siendo limitada.
+
+## 16. Referencias internas
+
+- `package.json` y `pnpm-workspace.yaml`: scripts, workspaces y catálogo de versiones.
+- `apps/web/next.config.ts`: React Compiler y `typedRoutes`.
+- `packages/config/tsconfig.base.json`: reglas TypeScript compartidas.
+- `packages/api/src/routers/`: contratos tRPC.
+- `packages/db/src/schema/`: schema Drizzle.
+- `packages/db/src/migrations/`: historial SQL.
+- `packages/auth/src/index.ts`: configuración de Better Auth.
+- `packages/ui/src/`: sistema de UI compartido.
+
+**Última actualización:** 2026-08-17
