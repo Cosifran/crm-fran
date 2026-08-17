@@ -4,6 +4,7 @@ import { usersRouter } from "./users";
 import { alertsRouter } from "./alerts";
 import { calendarRouter } from "./calendar";
 import { messagesRouter } from "./messages";
+import { rankingsRouter } from "./rankings";
 import { permittedProcedure } from "@crm-fran/api/trpc/trpc";
 import { publicProcedure, router } from "../index";
 
@@ -32,5 +33,6 @@ export const appRouter = router({
   alerts: alertsRouter,
   calendar: calendarRouter,
   messages: messagesRouter,
+  rankings: rankingsRouter,
 });
 export type AppRouter = typeof appRouter;

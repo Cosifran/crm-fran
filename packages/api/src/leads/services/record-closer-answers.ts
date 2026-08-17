@@ -5,13 +5,16 @@ import {
   leads,
   ALERT_KIND,
   LEAD_QA_ROLE,
-  type LeadQASessionItem,
-} from "@crm-fran/db/schema/index";
+	  type LeadQASessionItem,
+	  rankingEvents,
+	  RANKING_METRIC,
+	} from "@crm-fran/db/schema/index";
 import { ALERT_KIND_CONFIG } from "../../alerts/services/config";
 
 import type { Context } from "../../context";
 import { isCloserOf } from "./is-closer-of";
 import { hasPermission } from "../../permissions";
+import { deriveCloserRankingMetrics } from "../../rankings/ranking-metrics";
 
 export type RecordCloserAnswersInput = {
   leadId: string;
@@ -61,7 +64,17 @@ export async function recordCloserAnswers({
       });
     }
 
-    const allItems = (lead.questions ?? []) as LeadQASessionItem[];
+	    const allItems = (lead.questions ?? []) as LeadQASessionItem[];
+	    const previousOutcome = [...allItems]
+	      .reverse()
+	      .find(
+	        (item) =>
+	          item.authorRole === LEAD_QA_ROLE.CLOSER &&
+	          item.questionKey === "closerOutcome",
+	      )?.answer;
+	    const nextOutcome = questions.find(
+	      (question) => question.questionKey === "closerOutcome",
+	    )?.answer;
 
     const preservedItems = allItems.filter(
       (item) =>
@@ -85,12 +98,34 @@ export async function recordCloserAnswers({
       .where(eq(leads.id, input.leadId))
       .returning();
 
-    if (!updated) {
+	    if (!updated) {
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
         message: "Failed to update lead",
       });
-    }
+	    }
+
+	    if (nextOutcome !== previousOutcome) {
+	      const metrics = deriveCloserRankingMetrics(previousOutcome, nextOutcome);
+	      const eventValues = metrics.flatMap((metric) => {
+	        const creditedUserId =
+	          metric === RANKING_METRIC.CALLER_SHOW
+	            ? lead.callerId
+	            : ctx.session?.user.id;
+	        return creditedUserId
+	          ? [{
+	              id: crypto.randomUUID(),
+	              metric,
+	              userId: creditedUserId,
+	              leadId,
+	              dedupeKey: `${metric}:${leadId}:${creditedUserId}:${previousOutcome ?? "none"}:${nextOutcome ?? "none"}`,
+	            }]
+	          : [];
+	      });
+	      if (eventValues.length > 0) {
+	        await tx.insert(rankingEvents).values(eventValues).onConflictDoNothing();
+	      }
+	    }
 
     let alertId: string | undefined;
 

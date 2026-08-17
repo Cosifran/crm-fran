@@ -7,8 +7,10 @@ import {
 	LEAD_STATE,
 	ALERT_KIND,
 	LEAD_QA_ROLE,
-	type LeadQASessionItem,
-} from "@crm-fran/db/schema/index";
+		type LeadQASessionItem,
+		rankingEvents,
+		RANKING_METRIC,
+	} from "@crm-fran/db/schema/index";
 import type { Permission } from "@crm-fran/db/schema/auth";
 import { ALERT_KIND_CONFIG } from "../../alerts/services/config";
 import { hasPermission } from "../../permissions";
@@ -18,7 +20,8 @@ import {
   OUTCOME_LABELS,
   type CallerOutcomeInput,
   validateCallerOutcomeInput,
-} from "./caller-outcome";
+	} from "./caller-outcome";
+import { deriveCloserRankingMetrics } from "../../rankings/ranking-metrics";
 
 type LegacyAssignLeadInput = {
 	leadId: string;
@@ -291,12 +294,48 @@ export async function assignLead({
 			.where(eq(leads.id, leadId))
 			.returning();
 
-		if (!updated) {
+			if (!updated) {
 			throw new TRPCError({
 				code: "INTERNAL_SERVER_ERROR",
 				message: "Failed to update lead",
 			});
-		}
+			}
+
+			if (isAppointment && authorRole === LEAD_QA_ROLE.CALLER) {
+				await tx.insert(rankingEvents).values({
+					id: crypto.randomUUID(),
+					metric: RANKING_METRIC.CALLER_APPOINTMENT,
+					userId: callerId,
+					leadId,
+					dedupeKey: `${RANKING_METRIC.CALLER_APPOINTMENT}:${leadId}:${callerId}:initial`,
+				}).onConflictDoNothing();
+			}
+
+			if (authorRole === LEAD_QA_ROLE.CLOSER) {
+				const previousOutcome = [...((lead.questions ?? []) as LeadQASessionItem[])]
+					.reverse()
+					.find((item) => item.authorRole === LEAD_QA_ROLE.CLOSER && item.questionKey === "closerOutcome")?.answer;
+				const nextOutcome = input.questions?.find(
+					(question) => question.questionKey === "closerOutcome",
+				)?.answer;
+				const metrics = deriveCloserRankingMetrics(previousOutcome, nextOutcome);
+				const eventValues = metrics.flatMap((metric) => {
+					const creditedUserId =
+						metric === RANKING_METRIC.CALLER_SHOW ? lead.callerId : callerId;
+					return creditedUserId
+						? [{
+							id: crypto.randomUUID(),
+							metric,
+							userId: creditedUserId,
+							leadId,
+							dedupeKey: `${metric}:${leadId}:${creditedUserId}:${previousOutcome ?? "none"}:${nextOutcome ?? "none"}:${input.scheduledDate ?? ""}:${input.scheduledTime ?? ""}`,
+						}]
+						: [];
+				});
+				if (eventValues.length > 0) {
+					await tx.insert(rankingEvents).values(eventValues).onConflictDoNothing();
+				}
+			}
 
 		let alertId: string | undefined;
 

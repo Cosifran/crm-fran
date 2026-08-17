@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { eq, db } from "@crm-fran/db";
-import { leads } from "@crm-fran/db/schema/index";
+import { leads, rankingEvents, RANKING_METRIC } from "@crm-fran/db/schema/index";
 
 import { hasUnworkedLead } from "./has-unworked-lead";
 
@@ -13,7 +13,8 @@ import { hasUnworkedLead } from "./has-unworked-lead";
  * (típicamente "Asignado" al closer, vía `assignLead`).
  */
 export async function assignLeadToCaller({id, userId}: {id: string, userId: string}){
-    const callerLeads = await db
+  return db.transaction(async (tx) => {
+    const callerLeads = await tx
         .select({ state: leads.state })
         .from(leads)
         .where(eq(leads.callerId, userId));
@@ -25,6 +26,16 @@ export async function assignLeadToCaller({id, userId}: {id: string, userId: stri
         });
     }
 
-    const [lead] = await db.update(leads).set({ callerId: userId }).where(eq(leads.id, id)).returning();
+    const [lead] = await tx.update(leads).set({ callerId: userId }).where(eq(leads.id, id)).returning();
+    if (lead) {
+      await tx.insert(rankingEvents).values({
+        id: crypto.randomUUID(),
+        metric: RANKING_METRIC.CALLER_LEAD_TAKEN,
+        userId,
+        leadId: id,
+        dedupeKey: `${RANKING_METRIC.CALLER_LEAD_TAKEN}:${id}:${userId}:initial`,
+      }).onConflictDoNothing();
+    }
     return lead ?? null;
+  });
 }

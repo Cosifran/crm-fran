@@ -14,7 +14,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@crm-fran/ui/components/sidebar"
-import { CircleAlertIcon, HouseIcon, ChartBarIcon, CalendarDaysIcon, ChartNoAxesCombinedIcon, CameraIcon, FileTextIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, CommandIcon, MessageSquareIcon } from "lucide-react"
+import { CircleAlertIcon, HouseIcon, ChartBarIcon, CalendarDaysIcon, ChartNoAxesCombinedIcon, CameraIcon, FileTextIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, CommandIcon, MessageSquareIcon, TrophyIcon } from "lucide-react"
 
 const data = {
   user: {
@@ -85,6 +85,11 @@ const data = {
       title: "Mensajes",
       url: "/messages",
       icon: <MessageSquareIcon />,
+    },
+    {
+      title: "Rankings",
+      url: "/rankings",
+      icon: <TrophyIcon />,
     },
     {
       title: "Estadísticas personales",
