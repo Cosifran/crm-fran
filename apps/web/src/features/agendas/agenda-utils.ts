@@ -21,6 +21,8 @@ export type AgendaLead = AgendaLeadInput & {
   scheduledTime: string;
 };
 
+export type AgendaCloser = { id: string; name: string };
+
 export function getLatestCallerQuestionAnswer(
   questions: readonly AgendaQuestion[],
   questionKey: string,
@@ -72,4 +74,50 @@ export function filterAgendaLeads(
       },
     ];
   });
+}
+
+export function filterAgendaLeadsByCloser(
+  leads: readonly AgendaLead[],
+  closerId: string,
+): AgendaLead[] {
+  if (closerId === "all") return [...leads];
+
+  return leads.filter((lead) => lead.closer?.id === closerId);
+}
+
+export function filterAgendaLeadsByDateRange(
+  leads: readonly AgendaLead[],
+  from: string,
+  to: string,
+): AgendaLead[] {
+  if (!from && !to) return [...leads];
+
+  return leads.filter(
+    (lead) =>
+      lead.scheduledDate !== "Sin asignar" &&
+      (!from || lead.scheduledDate >= from) &&
+      (!to || lead.scheduledDate <= to),
+  );
+}
+
+export function formatLocalDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+export function getAgendaClosers(
+  leads: readonly AgendaLead[],
+): AgendaCloser[] {
+  const closers = new Map<string, AgendaCloser>();
+
+  for (const lead of leads) {
+    if (lead.closer) closers.set(lead.closer.id, lead.closer);
+  }
+
+  return [...closers.values()].sort((first, second) =>
+    first.name.localeCompare(second.name),
+  );
 }

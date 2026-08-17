@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { filterAgendaLeads, type AgendaQuestion } from "./agenda-utils";
+import {
+  filterAgendaLeads,
+  filterAgendaLeadsByCloser,
+  filterAgendaLeadsByDateRange,
+  formatLocalDate,
+  getAgendaClosers,
+  type AgendaQuestion,
+} from "./agenda-utils";
 
 const lead = (questions: AgendaQuestion[]) => ({
   id: "lead-1",
@@ -51,5 +58,91 @@ describe("agenda lead helpers", () => {
         ]),
       ]),
     ).toEqual([]);
+  });
+
+  it("filters agendas by closer without changing the unfiltered result", () => {
+    const firstLead = lead([
+      {
+        questionKey: "callerOutcome",
+        answer: "Agenda",
+        authorRole: "caller",
+      },
+    ]);
+    const secondLead = {
+      ...firstLead,
+      id: "lead-2",
+      closer: { id: "closer-2", name: "Closer 2" },
+    };
+    const agendas = filterAgendaLeads([firstLead, secondLead]);
+
+    expect(filterAgendaLeadsByCloser(agendas, "all")).toEqual(agendas);
+    expect(filterAgendaLeadsByCloser(agendas, "closer-2")).toEqual([
+      expect.objectContaining({ id: "lead-2" }),
+    ]);
+  });
+
+  it("returns each agenda closer once and sorts them by name", () => {
+    const agendas = filterAgendaLeads([
+      lead([
+        {
+          questionKey: "callerOutcome",
+          answer: "Agenda",
+          authorRole: "caller",
+        },
+      ]),
+      {
+        ...lead([
+          {
+            questionKey: "callerOutcome",
+            answer: "Agenda",
+            authorRole: "caller",
+          },
+        ]),
+        id: "lead-2",
+      },
+      {
+        ...lead([
+          {
+            questionKey: "callerOutcome",
+            answer: "Agenda",
+            authorRole: "caller",
+          },
+        ]),
+        id: "lead-3",
+        closer: { id: "closer-0", name: "Ana" },
+      },
+    ]);
+
+    expect(getAgendaClosers(agendas)).toEqual([
+      { id: "closer-0", name: "Ana" },
+      { id: "closer-1", name: "Closer 1" },
+    ]);
+  });
+
+  it("filters agendas by an inclusive scheduled date interval", () => {
+    const [baseAgenda] = filterAgendaLeads([
+      lead([
+        {
+          questionKey: "callerOutcome",
+          answer: "Agenda",
+          authorRole: "caller",
+        },
+      ]),
+    ]);
+    if (!baseAgenda) throw new Error("Expected agenda fixture");
+
+    const agendas = [
+      { ...baseAgenda, scheduledDate: "2026-08-17" },
+      { ...baseAgenda, id: "lead-2", scheduledDate: "2026-08-18" },
+      { ...baseAgenda, id: "lead-3", scheduledDate: "2026-08-19" },
+    ];
+
+    expect(
+      filterAgendaLeadsByDateRange(agendas, "2026-08-17", "2026-08-18"),
+    ).toMatchObject([{ id: "lead-1" }, { id: "lead-2" }]);
+  });
+
+  it("formats quick-filter dates in the local calendar timezone", () => {
+    expect(formatLocalDate(new Date(2026, 7, 17, 23, 30))).toBe("2026-08-17");
   });
 });
