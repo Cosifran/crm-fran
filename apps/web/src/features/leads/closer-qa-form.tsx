@@ -6,6 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import type { QASessionItem } from "@/app/types";
 import { trpc } from "@/utils/trpc";
+import { requiresScheduledContact } from "./closer-follow-up";
 import { useTrpcMutationWithToast } from "@/lib/use-trpc-mutation-with-toast";
 import { Input } from "@crm-fran/ui/components/input";
 import { Textarea } from "@crm-fran/ui/components/textarea";
@@ -425,12 +426,16 @@ export default function CloserQAForm({
               )}
             </form.Field>
 
-            {closerOutcome === "Reagenda" && (
+            {requiresScheduledContact(closerOutcome) && (
             <div className="grid grid-cols-2 gap-4">
               <form.Field name="scheduledDate">
                 {(field) => (
                   <Field invalid={field.state.meta.errors.length > 0}>
-                    <FieldLabel htmlFor="scheduledDate">Fecha</FieldLabel>
+                    <FieldLabel htmlFor="scheduledDate">
+                      {closerOutcome === "Seguimiento"
+                        ? "Fecha del próximo contacto"
+                        : "Fecha"}
+                    </FieldLabel>
                     <Input
                       id="scheduledDate"
                       type="date"
@@ -503,10 +508,10 @@ function validateCloserAnswers(value: FormValue) {
       fieldErrors.urgencyReason = ["Requerido"];
     }
 
-    if (value.closerOutcome === "Reagenda" && value.scheduledDate === "") {
+    if (requiresScheduledContact(value.closerOutcome) && value.scheduledDate === "") {
       fieldErrors.scheduledDate = ["Requerido"];
     }
-    if (value.closerOutcome === "Reagenda" && value.scheduledTime === "") {
+    if (requiresScheduledContact(value.closerOutcome) && value.scheduledTime === "") {
       fieldErrors.scheduledTime = ["Requerido"];
     }
   }

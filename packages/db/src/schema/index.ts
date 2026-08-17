@@ -5,4 +5,5 @@ export * from "./alerts";
 export * from "./calendar";
 export * from "./messages";
 export * from "./rankings";
+export * from "./quality-controls";
 export * from "./state";

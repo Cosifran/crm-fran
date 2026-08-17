@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { ArrowDownIcon, UsersRoundIcon } from "lucide-react";
 
 import { Badge } from "@crm-fran/ui/components/badge";
@@ -85,6 +85,7 @@ export function ConversionFunnel() {
       type: type === "all" ? undefined : type,
     }),
     enabled: !invalidInterval,
+    placeholderData: keepPreviousData,
   });
   const selected = funnel.data?.stages.find((stage) => stage.key === selectedStage);
 
