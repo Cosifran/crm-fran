@@ -24,8 +24,9 @@ export interface Lead {
     id: string;
     name: string;
     email: string;
-    phone: string;
-    state: string;
+	phone: string;
+	type: "maestra" | "vsl";
+	state: string;
     response: string;
     feedback: string;
     questions: {

@@ -9,6 +9,8 @@ import { hasCloserSession } from "./has-closer-session";
 import { recordCloserAnswers } from "./record-closer-answers";
 import { adminEditLeadQASession } from "./admin-edit-lead-qa-session";
 import { getPersonalStatistics } from "./personal-statistics";
+import { createLead } from "./create-lead";
+import { setLeadType } from "./set-lead-type";
 
 export {
 	getAll,
@@ -22,4 +24,6 @@ export {
 	recordCloserAnswers,
 	adminEditLeadQASession,
 	getPersonalStatistics,
+	createLead,
+	setLeadType,
 };

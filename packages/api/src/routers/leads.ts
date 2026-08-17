@@ -10,14 +10,17 @@ import {
   recordCloserAnswers,
   adminEditLeadQASession,
   getPersonalStatistics,
+  createLead,
+  setLeadType,
 } from "../leads/services/index";
 import { permittedProcedure } from "@crm-fran/api/trpc/trpc";
 
 const idInput = z.object({ id: z.string() });
-const createLeadInput = z.object({
+export const createLeadInput = z.object({
   name: z.string(),
   email: z.email(),
   phone: z.string(),
+  type: z.enum(["maestra", "vsl"]).default("maestra"),
 });
 const updateLeadInput = createLeadInput.partial().extend({ id: z.string() });
 
@@ -152,9 +155,11 @@ export const leadsRouter = router({
     return await getAll({ dateRange: input });
   }),
 
-  listWithoutAssigned: permittedProcedure(["leads:read"]).query(async () => {
-    return await getWithoutAssigned();
-  }),
+  listWithoutAssigned: permittedProcedure(["leads:read"])
+    .input(z.object({ type: z.enum(["maestra", "vsl"]) }))
+    .query(async ({ input }) => {
+      return await getWithoutAssigned(input);
+    }),
 
   getById: permittedProcedure(["leads:read"])
     .input(idInput)
@@ -192,10 +197,21 @@ export const leadsRouter = router({
       return await assignLeadToCaller({ id: input.id, userId: ctx.session.user.id });
     }),
 
+  setType: permittedProcedure(["leads:write"])
+    .input(
+      z.object({
+        id: z.string().min(1),
+        type: z.enum(["maestra", "vsl"]),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      return await setLeadType(input);
+    }),
+
   create: permittedProcedure(["leads:write"])
     .input(createLeadInput)
     .mutation(async ({ input }) => {
-      return { id: "stub", ...input };
+      return await createLead(input);
     }),
 
   update: permittedProcedure(["leads:write"])

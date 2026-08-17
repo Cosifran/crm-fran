@@ -10,6 +10,7 @@ export const leadWithUsersSelect = {
   name: leads.name,
   email: leads.email,
   phone: leads.phone,
+  type: leads.type,
   state: leads.state,
   questions: leads.questions,
   response: leads.response,

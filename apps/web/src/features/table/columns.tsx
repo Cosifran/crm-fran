@@ -12,8 +12,9 @@ import { getCallerResponseStatus } from "../leads/response-status";
 
 export function createLeadColumns(
   renderAction: (lead: Lead) => React.ReactNode,
+  options: { variant?: "assigned" | "available" } = {},
 ): ColumnDef<any>[] {
-  return [
+  const columns: ColumnDef<any>[] = [
     {
       accessorKey: "name",
       header: "Nombre",
@@ -74,4 +75,19 @@ export function createLeadColumns(
       cell: ({ row }) => renderAction(row.original),
     },
   ];
+
+  if (options.variant !== "available") return columns;
+
+  const assignedOnlyHeaders = new Set([
+    "Respuesta",
+    "Feedback",
+    "Caller",
+    "Closer",
+  ]);
+
+  return columns.filter(
+    (column) =>
+      typeof column.header !== "string" ||
+      !assignedOnlyHeaders.has(column.header),
+  );
 }

@@ -1,6 +1,7 @@
 import { act, render } from "@testing-library/react";
 import { Children, isValidElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { AssignedLeadsTable } from "@/features/leads/assigned-leads-table";
 import LeadsPage from "./page";
 
 const mocks = vi.hoisted(() => ({
@@ -166,6 +167,84 @@ describe("LeadsPage", () => {
     );
   });
 
+  it("adds horizontal breathing room around the assigned lead filters", () => {
+    mocks.useSession.mockReturnValue({
+      data: { user: { roleId: "role-caller" } },
+      isPending: false,
+    });
+
+    const { container } = render(<LeadsPage />);
+
+    expect(
+      container.querySelector('[data-slot="assigned-lead-filters"]'),
+    ).toHaveClass("px-4", "lg:px-6");
+  });
+
+  it("keeps assigned VSL leads out of Leads personales", () => {
+    mocks.useSession.mockReturnValue({
+      data: { user: { roleId: "role-caller" } },
+      isPending: false,
+    });
+    const maestraLead = {
+      id: "maestra-lead",
+      type: "maestra",
+      callerId: "caller-1",
+      closerId: null,
+      questions: [],
+      createdAt: new Date(2026, 0, 15, 12),
+      updatedAt: new Date(2026, 0, 15, 12),
+    };
+    const vslLead = {
+      ...maestraLead,
+      id: "vsl-lead",
+      type: "vsl",
+    };
+    mocks.useQuery.mockReturnValue({
+      data: [maestraLead, vslLead],
+      isLoading: false,
+    });
+
+    render(<LeadsPage />);
+
+    expect(mocks.dataTableData.at(-1)).toEqual([maestraLead]);
+  });
+
+  it("shows only assigned VSL leads in the VSL assigned section", () => {
+    mocks.useSession.mockReturnValue({
+      data: { user: { roleId: "role-admin" } },
+      isPending: false,
+    });
+    const assignedVslLead = {
+      id: "assigned-vsl",
+      type: "vsl",
+      callerId: "caller-1",
+      closerId: null,
+      questions: [],
+      createdAt: new Date(2026, 0, 15, 12),
+      updatedAt: new Date(2026, 0, 15, 12),
+    };
+    const availableVslLead = {
+      ...assignedVslLead,
+      id: "available-vsl",
+      callerId: null,
+    };
+    mocks.useQuery.mockReturnValue({
+      data: [assignedVslLead, availableVslLead],
+      isLoading: false,
+    });
+
+    render(
+      <AssignedLeadsTable
+        type="vsl"
+        title="Leads VSL asignados"
+        description="Assigned VSL leads"
+        assignedOnly
+      />,
+    );
+
+    expect(mocks.dataTableData.at(-1)).toEqual([assignedVslLead]);
+  });
+
   it("filters loaded leads locally when the selected date field changes", () => {
     mocks.useSession.mockReturnValue({
       data: { user: { roleId: "role-admin" } },
@@ -173,11 +252,13 @@ describe("LeadsPage", () => {
     });
     const createdAtMatch = {
       id: "created-at-match",
+      type: "maestra",
       createdAt: new Date(2026, 0, 15, 12),
       updatedAt: new Date(2026, 1, 15, 12),
     };
     const updatedAtMatch = {
       id: "updated-at-match",
+      type: "maestra",
       createdAt: new Date(2026, 1, 15, 12),
       updatedAt: new Date(2026, 0, 15, 12),
     };
@@ -223,6 +304,7 @@ describe("LeadsPage", () => {
     });
     const closerAMatch = {
       id: "closer-a-match",
+      type: "maestra",
       closerId: "closer-a",
       closer: { id: "closer-a", name: "Ana Closer" },
       createdAt: new Date(2026, 0, 15, 12),
@@ -230,6 +312,7 @@ describe("LeadsPage", () => {
     };
     const closerADuplicate = {
       id: "closer-a-duplicate",
+      type: "maestra",
       closerId: "closer-a",
       closer: { id: "closer-a", name: "Ana Closer" },
       createdAt: new Date(2026, 0, 16, 12),
@@ -237,6 +320,7 @@ describe("LeadsPage", () => {
     };
     const closerBWithoutName = {
       id: "closer-b-without-name",
+      type: "maestra",
       closerId: "closer-b",
       closer: { id: "closer-b" },
       createdAt: new Date(2026, 0, 19, 12),
@@ -244,6 +328,7 @@ describe("LeadsPage", () => {
     };
     const closerBMatch = {
       id: "closer-b-match",
+      type: "maestra",
       closerId: "closer-b",
       closer: null,
       createdAt: new Date(2026, 0, 20, 12),
@@ -251,6 +336,7 @@ describe("LeadsPage", () => {
     };
     const unassignedLead = {
       id: "unassigned-lead",
+      type: "maestra",
       closerId: null,
       createdAt: new Date(2026, 0, 25, 12),
       updatedAt: new Date(2026, 0, 25, 12),
@@ -328,12 +414,14 @@ describe("LeadsPage", () => {
     });
     const closerALead = {
       id: "closer-a-lead",
+      type: "maestra",
       closerId: "closer-a",
       createdAt: new Date(2026, 0, 15, 12),
       updatedAt: new Date(2026, 0, 15, 12),
     };
     const closerBLead = {
       id: "closer-b-lead",
+      type: "maestra",
       closerId: "closer-b",
       createdAt: new Date(2026, 0, 20, 12),
       updatedAt: new Date(2026, 0, 20, 12),
@@ -370,6 +458,7 @@ describe("LeadsPage", () => {
     });
     const callerYes = {
       id: "caller-yes",
+      type: "maestra",
       closerId: "closer-a",
       closer: { id: "closer-a", name: "Ana Closer" },
       createdAt: new Date(2026, 0, 15, 12),
@@ -380,6 +469,7 @@ describe("LeadsPage", () => {
     };
     const callerNo = {
       id: "caller-no",
+      type: "maestra",
       closerId: "closer-a",
       closer: { id: "closer-a", name: "Ana Closer" },
       createdAt: new Date(2026, 0, 20, 12),
@@ -390,6 +480,7 @@ describe("LeadsPage", () => {
     };
     const noCallerResponse = {
       id: "no-caller-response",
+      type: "maestra",
       closerId: "closer-b",
       closer: { id: "closer-b", name: "Bruno Closer" },
       createdAt: new Date(2026, 0, 25, 12),

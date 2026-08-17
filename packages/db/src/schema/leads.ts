@@ -1,5 +1,6 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
+	check,
   pgTable,
   text,
   json,
@@ -12,6 +13,13 @@ export const LEAD_QA_ROLE = {
   CALLER: "caller",
   CLOSER: "closer",
 } as const;
+
+export const LEAD_TYPE = {
+	MAESTRA: "maestra",
+	VSL: "vsl",
+} as const;
+
+export type LeadType = (typeof LEAD_TYPE)[keyof typeof LEAD_TYPE];
 
 export type LeadQARole = (typeof LEAD_QA_ROLE)[keyof typeof LEAD_QA_ROLE];
 
@@ -30,6 +38,10 @@ export const leads = pgTable("leads", {
     name: text("name").notNull(),
     email: text("email").notNull().unique(),
     phone: text("phone").notNull(),
+	type: text("type")
+		.$type<LeadType>()
+		.default(LEAD_TYPE.MAESTRA)
+		.notNull(),
     questions: json("questions")
       .$type<LeadQASession>()
       .default([])
@@ -47,7 +59,9 @@ export const leads = pgTable("leads", {
       .defaultNow()
       .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
-})
+}, (table) => [
+	check("leads_type_check", sql`${table.type} IN ('maestra', 'vsl')`),
+])
 
 export const leadsRelations = relations(leads, ({ one }) => ({
     caller: one(user, {
@@ -61,4 +75,3 @@ export const leadsRelations = relations(leads, ({ one }) => ({
         relationName: "closer"
     }),
 }))
-    

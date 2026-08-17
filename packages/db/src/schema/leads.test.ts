@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
 	leads,
+	LEAD_TYPE,
 	LEAD_QA_ROLE,
+	type LeadType,
 	type LeadQARole,
 	type LeadQASessionItem,
 	type LeadQASession,
@@ -9,6 +11,13 @@ import {
 import { LEAD_STATE } from "./state";
 
 describe("leads schema", () => {
+	it("defines the imported lead types and defaults legacy rows to maestra", () => {
+		const leadType: LeadType = LEAD_TYPE.VSL;
+		expect(leadType).toBe("vsl");
+		expect(LEAD_TYPE.MAESTRA).toBe("maestra");
+		expect(leads.type.default).toBe(LEAD_TYPE.MAESTRA);
+	});
+
 	it("exports LEAD_QA_ROLE and LeadQARole", () => {
 		const role: LeadQARole = LEAD_QA_ROLE.CALLER;
 		expect(role).toBe("caller");

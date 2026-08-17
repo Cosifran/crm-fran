@@ -30,6 +30,18 @@ function renderCell(header: string, row: LeadRow) {
 }
 
 describe("Lead user columns", () => {
+  it("omits assignment and feedback columns from available lead queues", () => {
+    const headers = createLeadColumns(() => null, {
+      variant: "available",
+    }).map((column) => column.header);
+
+    expect(headers).not.toContain("Respuesta");
+    expect(headers).not.toContain("Feedback");
+    expect(headers).not.toContain("Caller");
+    expect(headers).not.toContain("Closer");
+    expect(headers).toContain("Acciones");
+  });
+
   it("renders caller and closer names for assigned users", () => {
     const row = {
       caller: { id: "caller-1", name: "Ana Caller" },

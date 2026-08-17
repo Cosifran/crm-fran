@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { Eye } from "lucide-react";
 import type { QASessionItem } from "@/app/types";
 import { CALLER_QUESTIONS, CLOSER_QUESTIONS } from "./qa-questions";
@@ -50,9 +51,15 @@ function buildAnswersMap(items: QASessionItem[]): Record<string, string> {
 }
 
 export default function LeadViewDrawer({
-  lead: lead,
+  lead,
+  trigger,
+  triggerAriaLabel,
+  callerOnly = false,
 }: {
   lead: LeadDetailsData;
+  trigger?: ReactNode;
+  triggerAriaLabel?: string;
+  callerOnly?: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -62,8 +69,13 @@ export default function LeadViewDrawer({
 
   return (
     <>
-      <Button variant="outline" size="icon" onClick={() => setOpen(true)}>
-        <Eye className="size-4" />
+      <Button
+        variant={trigger ? "default" : "outline"}
+        size={trigger ? "default" : "icon"}
+        aria-label={triggerAriaLabel}
+        onClick={() => setOpen(true)}
+      >
+        {trigger ?? <Eye data-icon="inline-start" />}
       </Button>
 
       <LeadDrawer
@@ -76,6 +88,7 @@ export default function LeadViewDrawer({
         <ReadOnlyQAView
           callerAnswers={callerItems}
           closerAnswers={closerItems}
+          callerOnly={callerOnly}
         />
       </LeadDrawer>
     </>
@@ -85,10 +98,25 @@ export default function LeadViewDrawer({
 function ReadOnlyQAView({
   callerAnswers,
   closerAnswers,
+  callerOnly,
 }: {
   callerAnswers: QASessionItem[];
   closerAnswers: QASessionItem[];
+  callerOnly: boolean;
 }) {
+  if (callerOnly) {
+    return (
+      <div className="flex flex-col gap-3">
+        <Label className="text-base font-semibold">Sesión del caller</Label>
+        <ReadOnlySession
+          role="caller"
+          items={callerAnswers}
+          emptyMessage="Aún no se registraron respuestas del caller"
+        />
+      </div>
+    );
+  }
+
   return (
     <>
       {/* Mobile: tabs */}

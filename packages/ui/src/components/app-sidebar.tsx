@@ -40,7 +40,23 @@ const data = {
        ),
      }, */
     {
-      title: "Leads",
+      title: "Leads generales",
+      url: "/general-leads",
+      icon: (
+        <DatabaseIcon
+        />
+      ),
+    },
+    {
+      title: "Leads VSL",
+      url: "/vsl-leads",
+      icon: (
+        <CalendarDaysIcon
+        />
+      ),
+    },
+    {
+      title: "Leads personales",
       url: "/leads",
       icon: (
         <ChartBarIcon
@@ -58,6 +74,11 @@ const data = {
     {
       title: "Agendas",
       url: "/agendas",
+      icon: <CalendarDaysIcon />,
+    },
+    {
+      title: "Calendario",
+      url: "/calendar",
       icon: <CalendarDaysIcon />,
     },
     {
