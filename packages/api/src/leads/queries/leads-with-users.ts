@@ -15,6 +15,8 @@ export const leadWithUsersSelect = {
   questions: leads.questions,
   response: leads.response,
   feedback: leads.feedback,
+  poolStatus: leads.poolStatus,
+  noContactImpactCount: leads.noContactImpactCount,
   callerId: leads.callerId,
   closerId: leads.closerId,
   createdAt: leads.createdAt,

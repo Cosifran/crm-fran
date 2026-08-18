@@ -50,4 +50,9 @@ describe("leads schema", () => {
 	it("state default is the sin asignar enum value", () => {
 		expect(leads.state.default).toBe(LEAD_STATE.SIN_ASIGNAR);
 	});
+
+	it("starts new leads in the new pool with zero no-contact impacts", () => {
+		expect(leads.poolStatus.default).toBe("new");
+		expect(leads.noContactImpactCount.default).toBe(0);
+	});
 });

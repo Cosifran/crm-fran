@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { UserRoundPlus } from "lucide-react";
+import type { ColumnDef } from "@tanstack/react-table";
 
+import { Badge } from "@crm-fran/ui/components/badge";
 import { Button } from "@crm-fran/ui/components/button";
 import { DataTable } from "@crm-fran/ui/components/data-table";
 import {
@@ -33,6 +35,12 @@ import {
   SelectValue,
 } from "@crm-fran/ui/components/select";
 import { Skeleton } from "@crm-fran/ui/components/skeleton";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@crm-fran/ui/components/tabs";
 
 import AssignLeadButton from "@/components/assign-lead-button";
 import { createLeadColumns } from "@/features/table/columns";
@@ -52,10 +60,28 @@ export function LeadAssignmentQueue({
   description: string;
   overlayClassName?: string;
 }) {
-  const leads = useQuery(
-    trpc.leads.listWithoutAssigned.queryOptions({ type }),
+  const newLeads = useQuery(
+    trpc.leads.listWithoutAssigned.queryOptions({ type, poolStatus: "new" }),
   );
-  const columns = createLeadColumns(
+  const recoveredLeads = useQuery(
+    {
+      ...trpc.leads.listWithoutAssigned.queryOptions({
+        type,
+        poolStatus: "recovered",
+      }),
+      enabled: newLeads.isSuccess,
+    },
+  );
+  const discardedLeads = useQuery(
+    {
+      ...trpc.leads.listWithoutAssigned.queryOptions({
+        type,
+        poolStatus: "discarded",
+      }),
+      enabled: recoveredLeads.isSuccess,
+    },
+  );
+  const availableColumns = createLeadColumns(
     (lead) => (
       <div className="flex items-center gap-2">
         <LeadTypeSelect
@@ -68,6 +94,24 @@ export function LeadAssignmentQueue({
     ),
     { variant: "available" },
   );
+  const recoveredColumns = createLeadColumns(
+    (lead) => (
+      <div className="flex items-center gap-2">
+        <LeadTypeSelect
+          leadId={lead.id}
+          type={lead.type}
+          overlayClassName={overlayClassName}
+        />
+        <AssignLeadDialog leadId={lead.id} />
+      </div>
+    ),
+    { variant: "available", showRecoveryProgress: true },
+  );
+  const discardedColumns = createLeadColumns(() => null, {
+    variant: "available",
+    showRecoveryProgress: true,
+    readOnly: true,
+  });
 
   return (
     <section className="mx-auto flex w-full max-w-6xl min-w-0 flex-col gap-6 py-4 md:py-6">
@@ -78,42 +122,118 @@ export function LeadAssignmentQueue({
         <p className="text-muted-foreground">{description}</p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Leads disponibles</CardTitle>
-          <CardDescription>
-            {leads.data?.length === 1
-              ? "1 lead disponible"
-              : `${leads.data?.length ?? 0} leads disponibles`}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="px-0">
-          {leads.isLoading ? (
-            <div className="flex flex-col gap-3 px-4 lg:px-6">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-64 w-full" />
-            </div>
-          ) : leads.isError ? (
-            <p className="px-4 text-destructive lg:px-6">
-              Error al cargar los leads disponibles.
-            </p>
-          ) : leads.data?.length ? (
-            <div className="min-w-0 overflow-x-auto">
-              <DataTable
-                key={`available-${type}-${columns.length}`}
-                data={leads.data}
-                columns={columns}
-                getRowId={(row) => row.id}
-              />
-            </div>
-          ) : (
-            <div className="px-4 lg:px-6">
-              <Empty heading="No hay leads disponibles" />
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <Tabs defaultValue="new">
+        <TabsList variant="line" className="mx-4 lg:mx-6">
+          <TabsTrigger value="new">
+            Nuevos <Badge variant="secondary">{newLeads.data?.length ?? 0}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="recovered">
+            Por contactar
+            <Badge variant="secondary">{recoveredLeads.data?.length ?? 0}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="discarded">
+            Descartados
+            <Badge variant="secondary">{discardedLeads.data?.length ?? 0}</Badge>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="new">
+          <LeadPoolCard
+            title="Leads nuevos"
+            description="Leads que todavía no han sido trabajados"
+            emptyHeading="No hay leads nuevos"
+            type={type}
+            poolStatus="new"
+            query={newLeads}
+            columns={availableColumns}
+          />
+        </TabsContent>
+        <TabsContent value="recovered">
+          <LeadPoolCard
+            title="Leads por contactar"
+            description="Leads liberados después de vencer un intento de contacto"
+            emptyHeading="No hay leads por contactar"
+            type={type}
+            poolStatus="recovered"
+            query={recoveredLeads}
+            columns={recoveredColumns}
+          />
+        </TabsContent>
+        <TabsContent value="discarded">
+          <LeadPoolCard
+            title="Leads descartados"
+            description="Leads que agotaron sus tres intentos de contacto"
+            emptyHeading="No hay leads descartados"
+            type={type}
+            poolStatus="discarded"
+            query={discardedLeads}
+            columns={discardedColumns}
+          />
+        </TabsContent>
+      </Tabs>
     </section>
+  );
+}
+
+type PoolQuery = {
+  data?: Array<{ id: string }>;
+  isLoading: boolean;
+  isError: boolean;
+};
+
+function LeadPoolCard({
+  title,
+  description,
+  emptyHeading,
+  type,
+  poolStatus,
+  query,
+  columns,
+}: {
+  title: string;
+  description: string;
+  emptyHeading: string;
+  type: LeadType;
+  poolStatus: "new" | "recovered" | "discarded";
+  query: PoolQuery;
+  columns: ColumnDef<any>[];
+}) {
+  const count = query.data?.length ?? 0;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+        <CardDescription>
+          {description}. {count === 1 ? "1 lead" : `${count} leads`}.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="px-0">
+        {query.isLoading ? (
+          <div className="flex flex-col gap-3 px-4 lg:px-6">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-64 w-full" />
+          </div>
+        ) : query.isError ? (
+          <p className="px-4 text-destructive lg:px-6">
+            Error al cargar los leads.
+          </p>
+        ) : query.data?.length ? (
+          <div className="min-w-0 overflow-x-auto">
+            <DataTable
+              key={`${poolStatus}-${type}-${columns.length}`}
+              data={query.data}
+              columns={columns}
+              getRowId={(row) => row.id}
+            />
+          </div>
+        ) : (
+          <div className="px-4 lg:px-6">
+            <Empty heading={emptyHeading} />
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

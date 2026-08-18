@@ -31,6 +31,7 @@ export async function listAlerts(input: ListAlertsInput) {
 
 	conditions.push(isNull(alerts.dismissedAt));
 	conditions.push(isNull(alerts.resolvedAt));
+	conditions.push(isNull(alerts.expiredAt));
 
 		return db.query.alerts.findMany({
 			with: {

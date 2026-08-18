@@ -194,37 +194,18 @@ describe("AssignLeadDrawer — orquesta submitFormId por rol", () => {
     );
   });
 
-  it("admin: el form activo del footer refleja el activeTab inicial", async () => {
+  it("admin: muestra el formulario operativo de acciones del caller", async () => {
     setupRole("role-admin");
     const user = userEvent.setup();
 
     render(<AssignLeadDrawer lead={baseLead} />);
     await openDrawer(user);
 
-    expect(screen.getByTestId("admin-caller-form")).toBeInTheDocument();
+    expect(screen.getByTestId("assign-lead-form")).toBeInTheDocument();
+    expect(screen.queryByTestId("admin-caller-form")).not.toBeInTheDocument();
 
     const submitButton = screen.getByRole("button", { name: /guardar/i });
-    expect(submitButton).toHaveAttribute("form", "admin-caller-form");
-  });
-
-  it("admin: al cambiar de tab el submitFormId del footer se actualiza", async () => {
-    setupRole("role-admin");
-    const user = userEvent.setup();
-
-    render(<AssignLeadDrawer lead={baseLead} />);
-    await openDrawer(user);
-
-    expect(
-      screen.getByRole("button", { name: /guardar/i }),
-    ).toHaveAttribute("form", "admin-caller-form");
-
-    await user.click(screen.getByRole("tab", { name: /sesión del closer/i }));
-
-    expect(
-      screen.getByRole("button", { name: /guardar/i }),
-    ).toHaveAttribute("form", "admin-closer-form");
-    expect(screen.getByTestId("admin-closer-form")).toBeInTheDocument();
-    expect(screen.queryByTestId("admin-caller-form")).not.toBeInTheDocument();
+    expect(submitButton).toHaveAttribute("form", "assign-lead-form");
   });
 });
 

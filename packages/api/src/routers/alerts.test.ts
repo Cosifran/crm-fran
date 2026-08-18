@@ -1,7 +1,13 @@
 import { describe, expect, it, beforeAll, afterEach } from "vitest";
 import { TRPCError } from "@trpc/server";
-import { db, inArray } from "@crm-fran/db";
-import { alerts, leads, roles, user } from "@crm-fran/db/schema/index";
+import { db, eq, inArray } from "@crm-fran/db";
+import {
+  alerts,
+  leads,
+  LEAD_POOL_STATUS,
+  roles,
+  user,
+} from "@crm-fran/db/schema/index";
 import { LEAD_STATE } from "@crm-fran/db/schema/state";
 import { ALERT_KIND, ALERT_SEVERITY } from "@crm-fran/db/schema/alerts";
 import { appRouter } from "./index";
@@ -337,6 +343,54 @@ describe("alerts router", () => {
     expect(updatedOwn?.occurrences).toBe(1);
     expect(unchangedOther?.occurrences).toBe(0);
   });
+
+  it("recovers a lead on each expired no-contact alert and discards it after the third impact", async () => {
+    const callerId = crypto.randomUUID();
+    const leadId = crypto.randomUUID();
+    await insertUser({
+      id: callerId,
+      name: "Caller",
+      email: `caller-${callerId}@test.com`,
+      roleId: "role-caller",
+    });
+    await insertLead({ id: leadId, callerId });
+
+    const caller = createCaller(callerId, "role-caller", ["leads:*", "alerts:read"]);
+
+    for (const expectedImpact of [1, 2, 3]) {
+      if (expectedImpact > 1) {
+        await db
+          .update(leads)
+          .set({ callerId })
+          .where(eq(leads.id, leadId));
+      }
+
+      const alertId = await insertAlert({
+        leadId,
+        targetUserId: callerId,
+        kind: ALERT_KIND.NO_CONTACT,
+        nextShowAt: new Date(Date.now() - 1_000),
+      });
+
+      await caller.alerts.countAlerts();
+
+      const recoveredLead = await db.query.leads.findFirst({
+        where: (table, operators) => operators.eq(table.id, leadId),
+      });
+      const expiredAlert = await db.query.alerts.findFirst({
+        where: (table, operators) => operators.eq(table.id, alertId),
+      });
+
+      expect(recoveredLead?.callerId).toBeNull();
+      expect(recoveredLead?.noContactImpactCount).toBe(expectedImpact);
+      expect(recoveredLead?.poolStatus).toBe(
+        expectedImpact === 3
+          ? LEAD_POOL_STATUS.DISCARDED
+          : LEAD_POOL_STATUS.RECOVERED,
+      );
+      expect(expiredAlert?.expiredAt).toBeInstanceOf(Date);
+    }
+  }, 15_000);
 
   it("advanceRecurringAlerts throws UNAUTHORIZED when not authenticated", async () => {
     const unauthCtx = {

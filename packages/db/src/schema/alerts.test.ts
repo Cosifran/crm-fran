@@ -19,4 +19,8 @@ describe("alerts schema", () => {
 	it("exports relations", () => {
 		expect(alertsRelations).toBeDefined();
 	});
+
+	it("tracks automated expiration separately from resolution and dismissal", () => {
+		expect(alerts.expiredAt).toBeDefined();
+	});
 });

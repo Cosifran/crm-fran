@@ -1,6 +1,7 @@
 import { relations, sql } from "drizzle-orm";
 import {
 	check,
+  integer,
   pgTable,
   text,
   json,
@@ -19,7 +20,15 @@ export const LEAD_TYPE = {
 	VSL: "vsl",
 } as const;
 
+export const LEAD_POOL_STATUS = {
+  NEW: "new",
+  RECOVERED: "recovered",
+  DISCARDED: "discarded",
+} as const;
+
 export type LeadType = (typeof LEAD_TYPE)[keyof typeof LEAD_TYPE];
+export type LeadPoolStatus =
+  (typeof LEAD_POOL_STATUS)[keyof typeof LEAD_POOL_STATUS];
 
 export type LeadQARole = (typeof LEAD_QA_ROLE)[keyof typeof LEAD_QA_ROLE];
 
@@ -52,6 +61,11 @@ export const leads = pgTable("leads", {
       .notNull(),
     callerId: text("caller_id").references(() => user.id, { onDelete: "set null" }),
     closerId: text("closer_id").references(() => user.id, { onDelete: "set null" }),
+    poolStatus: text("pool_status")
+      .$type<LeadPoolStatus>()
+      .default(LEAD_POOL_STATUS.NEW)
+      .notNull(),
+    noContactImpactCount: integer("no_contact_impact_count").default(0).notNull(),
     response: text("response").default("sin asignar").notNull(),
     feedback: text("feedback").default("sin asignar").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -61,6 +75,14 @@ export const leads = pgTable("leads", {
       .notNull(),
 }, (table) => [
 	check("leads_type_check", sql`${table.type} IN ('maestra', 'vsl')`),
+	check(
+    "leads_pool_status_check",
+    sql`${table.poolStatus} IN ('new', 'recovered', 'discarded')`,
+  ),
+	check(
+    "leads_no_contact_impact_count_check",
+    sql`${table.noContactImpactCount} BETWEEN 0 AND 3`,
+  ),
 ])
 
 export const leadsRelations = relations(leads, ({ one }) => ({

@@ -8,11 +8,16 @@ import {
 } from "@crm-fran/ui/components/select";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { Lead } from "../leads/assign-lead-drawer";
+import { getLeadPoolProgress } from "../leads/lead-pool";
 import { getCallerResponseStatus } from "../leads/response-status";
 
 export function createLeadColumns(
   renderAction: (lead: Lead) => React.ReactNode,
-  options: { variant?: "assigned" | "available" } = {},
+  options: {
+    variant?: "assigned" | "available";
+    showRecoveryProgress?: boolean;
+    readOnly?: boolean;
+  } = {},
 ): ColumnDef<any>[] {
   const columns: ColumnDef<any>[] = [
     {
@@ -75,6 +80,19 @@ export function createLeadColumns(
       cell: ({ row }) => renderAction(row.original),
     },
   ];
+
+  if (options.showRecoveryProgress) {
+    columns.splice(8, 0, {
+      accessorKey: "noContactImpactCount",
+      header: "Proceso",
+      cell: ({ row }) => getLeadPoolProgress(row.original.noContactImpactCount),
+    });
+  }
+
+  if (options.readOnly) {
+    const actionsIndex = columns.findIndex((column) => column.id === "actions");
+    if (actionsIndex >= 0) columns.splice(actionsIndex, 1);
+  }
 
   if (options.variant !== "available") return columns;
 

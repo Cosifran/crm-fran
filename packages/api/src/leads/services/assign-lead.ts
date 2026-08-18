@@ -5,6 +5,7 @@ import {
 	leads,
 	user,
 	LEAD_STATE,
+	LEAD_POOL_STATUS,
 	ALERT_KIND,
 	LEAD_QA_ROLE,
 		type LeadQASessionItem,
@@ -102,6 +103,13 @@ export async function assignLead({
 			throw new TRPCError({
 				code: "NOT_FOUND",
 				message: "Lead not found",
+			});
+		}
+
+		if (lead.poolStatus === LEAD_POOL_STATUS.DISCARDED) {
+			throw new TRPCError({
+				code: "CONFLICT",
+				message: "El lead está descartado y no puede volver a asignarse",
 			});
 		}
 

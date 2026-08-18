@@ -125,7 +125,8 @@ export const alerts = pgTable(
 		dismissedBy: text("dismissed_by").references(() => user.id, {
 			onDelete: "set null",
 		}),
-		resolvedAt: timestamp("resolved_at"),
+			resolvedAt: timestamp("resolved_at"),
+			expiredAt: timestamp("expired_at"),
 		intervalMinutes: integer("interval_minutes").notNull(),
 		nextShowAt: timestamp("next_show_at").notNull(),
 		occurrences: integer("occurrences").default(0).notNull(),
@@ -134,7 +135,8 @@ export const alerts = pgTable(
 	(table) => [
 		index("alerts_targetUserId_idx").on(table.targetUserId),
 		index("alerts_nextShowAt_idx").on(table.nextShowAt),
-		index("alerts_resolvedAt_idx").on(table.resolvedAt),
+			index("alerts_resolvedAt_idx").on(table.resolvedAt),
+			index("alerts_expiredAt_idx").on(table.expiredAt),
 	],
 );
 

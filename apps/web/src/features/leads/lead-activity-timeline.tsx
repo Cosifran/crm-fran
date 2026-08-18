@@ -2,11 +2,13 @@
 
 import {
   BellIcon,
+  BanIcon,
   CalendarClockIcon,
   CheckCircle2Icon,
   CircleUserRoundIcon,
   FileTextIcon,
   HistoryIcon,
+  RotateCcwIcon,
   UserRoundCheckIcon,
 } from "lucide-react";
 
@@ -33,6 +35,8 @@ const ICON_BY_KIND: Record<ActivityKind, typeof HistoryIcon> = {
   alert_created: BellIcon,
   alert_resolved: CheckCircle2Icon,
   alert_dismissed: BellIcon,
+  lead_recovered: RotateCcwIcon,
+  lead_discarded: BanIcon,
 };
 
 function formatActivityDate(value: Date | string | null) {

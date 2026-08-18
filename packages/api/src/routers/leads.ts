@@ -163,7 +163,12 @@ export const leadsRouter = router({
   }),
 
   listWithoutAssigned: permittedProcedure(["leads:read"])
-    .input(z.object({ type: z.enum(["maestra", "vsl"]) }))
+    .input(
+      z.object({
+        type: z.enum(["maestra", "vsl"]),
+        poolStatus: z.enum(["new", "recovered", "discarded"]).default("new"),
+      }),
+    )
     .query(async ({ input }) => {
       return await getWithoutAssigned(input);
     }),
