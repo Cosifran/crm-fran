@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   aggregateLeadConditions,
   aggregateCloserConditions,
+  aggregateHistoricalConditions,
   CLOSER_CONDITION_LABELS,
   classifyCloserCondition,
   classifyLeadCondition,
@@ -167,5 +168,74 @@ describe("personal lead statistics", () => {
     expect(Object.values(CLOSER_CONDITION_LABELS)).not.toContain("No venta");
     expect(Object.values(CLOSER_CONDITION_LABELS)).toContain("No interesado");
     expect(Object.values(CLOSER_CONDITION_LABELS)).toContain("No-show");
+  });
+
+  it("keeps a caller outcome in its real interval when the lead changes later", () => {
+    const result = aggregateHistoricalConditions(
+      [
+        {
+          leadId: "lead-1",
+          actorId: "caller-1",
+          actorRole: "caller",
+          kind: "caller_feedback",
+          description: "Agenda",
+          metadata: { questions: [question("callerOutcome", "Agenda")] },
+          occurredAt: new Date("2026-08-02T10:00:00.000Z"),
+        },
+        {
+          leadId: "lead-1",
+          actorId: "caller-1",
+          actorRole: "caller",
+          kind: "caller_feedback",
+          description: "No interesado",
+          metadata: { questions: [question("callerOutcome", "No interesado")] },
+          occurredAt: new Date("2026-08-15T10:00:00.000Z"),
+        },
+      ],
+      {
+        mode: "caller",
+        userId: "caller-1",
+        from: new Date("2026-08-01T00:00:00.000Z"),
+        to: new Date("2026-08-05T23:59:59.999Z"),
+      },
+    );
+
+    expect(result.total).toBe(1);
+    expect(result.counts.appointment).toBe(1);
+    expect(result.counts.not_interested).toBe(0);
+  });
+
+  it("attributes closer results to the closer who performed the action", () => {
+    const result = aggregateHistoricalConditions(
+      [
+        {
+          leadId: "lead-1",
+          actorId: "closer-1",
+          actorRole: "closer",
+          kind: "closer_feedback",
+          description: "Venta",
+          metadata: { questions: [closerQuestion("closerOutcome", "Venta")] },
+          occurredAt: new Date("2026-08-04T10:00:00.000Z"),
+        },
+        {
+          leadId: "lead-2",
+          actorId: "closer-2",
+          actorRole: "closer",
+          kind: "closer_feedback",
+          description: "Venta",
+          metadata: { questions: [closerQuestion("closerOutcome", "Venta")] },
+          occurredAt: new Date("2026-08-04T11:00:00.000Z"),
+        },
+      ],
+      {
+        mode: "closer",
+        userId: "closer-1",
+        from: new Date("2026-08-01T00:00:00.000Z"),
+        to: new Date("2026-08-05T23:59:59.999Z"),
+      },
+    );
+
+    expect(result.total).toBe(1);
+    expect(result.counts.sale).toBe(1);
   });
 });

@@ -1,4 +1,8 @@
-import type { LeadQASessionItem } from "@crm-fran/db/schema/index";
+import { and, asc, db, gte, lte } from "@crm-fran/db";
+import {
+  leadActivityEvents,
+  type LeadQASessionItem,
+} from "@crm-fran/db/schema/index";
 
 import { selectLeadWithUsers } from "../queries/index";
 
@@ -189,6 +193,158 @@ export function aggregateCloserConditions(
   };
 }
 
+type HistoricalStatisticsEvent = {
+  leadId: string;
+  actorId: string | null;
+  actorRole: string | null;
+  kind: string;
+  description: string | null;
+  metadata: Record<string, unknown>;
+  occurredAt: Date;
+};
+
+type HistoricalStatisticsFilters = {
+  mode: "caller" | "closer";
+  userId?: string;
+  from?: Date;
+  to?: Date;
+};
+
+const EVENT_PRIORITY: Record<string, number> = {
+  caller_assigned: 0,
+  closer_assigned: 0,
+  state_changed: 1,
+  appointment_scheduled: 2,
+  appointment_rescheduled: 2,
+  caller_feedback: 3,
+  closer_feedback: 3,
+};
+
+function readMetadataString(
+  metadata: Record<string, unknown>,
+  key: string,
+) {
+  const value = metadata[key];
+  return typeof value === "string" ? value : undefined;
+}
+
+function readEventQuestions(event: HistoricalStatisticsEvent) {
+  const questions = event.metadata.questions;
+  return Array.isArray(questions)
+    ? (questions as readonly LeadQASessionItem[])
+    : [];
+}
+
+function eventOwnerId(
+  event: HistoricalStatisticsEvent,
+  mode: HistoricalStatisticsFilters["mode"],
+) {
+  if (mode === "caller") {
+    if (
+      event.kind === "caller_assigned" ||
+      (event.actorRole === "caller" &&
+        (event.kind === "caller_feedback" || event.kind === "state_changed"))
+    ) {
+      return event.actorId;
+    }
+    return undefined;
+  }
+
+  if (event.kind === "closer_assigned") {
+    return readMetadataString(event.metadata, "userId");
+  }
+  if (
+    event.kind === "appointment_scheduled" ||
+    event.kind === "appointment_rescheduled"
+  ) {
+    return readMetadataString(event.metadata, "closerId");
+  }
+  if (event.kind === "closer_feedback" && event.actorRole === "closer") {
+    return event.actorId;
+  }
+  return undefined;
+}
+
+function classifyCallerEvent(event: HistoricalStatisticsEvent): LeadCondition {
+  if (event.kind === "caller_assigned") return "assigned";
+  const state = readMetadataString(event.metadata, "state") ?? "Asignado";
+  return classifyLeadCondition({ state, questions: readEventQuestions(event) });
+}
+
+function classifyCloserEvent(
+  event: HistoricalStatisticsEvent,
+): CloserCondition {
+  if (event.kind === "appointment_rescheduled") return "rescheduled";
+  if (
+    event.kind === "closer_assigned" ||
+    event.kind === "appointment_scheduled"
+  ) {
+    return "appointment";
+  }
+
+  const questions = readEventQuestions(event);
+  const contact = [...questions]
+    .reverse()
+    .find((item) => item.questionKey === "isContacted")?.answer;
+  if (contact === "No") return "no_show";
+  const outcome =
+    [...questions]
+      .reverse()
+      .find((item) => item.questionKey === "closerOutcome")?.answer ??
+    event.description ??
+    undefined;
+  return outcome ? (CLOSER_OUTCOME_CONDITIONS[outcome] ?? "appointment") : "appointment";
+}
+
+export function aggregateHistoricalConditions(
+  events: readonly HistoricalStatisticsEvent[],
+  filters: HistoricalStatisticsFilters,
+) {
+  const latestByLead = new Map<string, HistoricalStatisticsEvent>();
+
+  for (const event of events) {
+    if (filters.from && event.occurredAt < filters.from) continue;
+    if (filters.to && event.occurredAt > filters.to) continue;
+    const ownerId = eventOwnerId(event, filters.mode);
+    if (!ownerId || (filters.userId && ownerId !== filters.userId)) continue;
+
+    const previous = latestByLead.get(event.leadId);
+    const isLater = !previous || event.occurredAt > previous.occurredAt;
+    const hasHigherPriorityAtSameTime =
+      previous &&
+      event.occurredAt.getTime() === previous.occurredAt.getTime() &&
+      (EVENT_PRIORITY[event.kind] ?? -1) > (EVENT_PRIORITY[previous.kind] ?? -1);
+    if (isLater || hasHigherPriorityAtSameTime) {
+      latestByLead.set(event.leadId, event);
+    }
+  }
+
+  if (filters.mode === "closer") {
+    const counts = Object.fromEntries(
+      Object.keys(CLOSER_CONDITION_LABELS).map((condition) => [condition, 0]),
+    ) as Record<CloserCondition, number>;
+    for (const event of latestByLead.values()) {
+      counts[classifyCloserEvent(event)] += 1;
+    }
+    return { total: latestByLead.size, counts };
+  }
+
+  const counts = Object.fromEntries(
+    Object.keys(LEAD_CONDITION_LABELS).map((condition) => [condition, 0]),
+  ) as Record<LeadCondition, number>;
+  for (const event of latestByLead.values()) {
+    counts[classifyCallerEvent(event)] += 1;
+  }
+  return {
+    total: latestByLead.size,
+    discarded: [...DISCARDED_CONDITIONS].reduce(
+      (total, condition) => total + counts[condition],
+      0,
+    ),
+    counts,
+  };
+}
+
 function startOfDay(value: string): Date {
   const [year, month, day] = value.split("-").map(Number);
   return new Date(year ?? 0, (month ?? 1) - 1, day ?? 1);
@@ -207,8 +363,6 @@ export async function getPersonalStatistics(input: PersonalStatisticsInput) {
   const filteredRows = rows.filter((lead) => {
     if (input.callerId && lead.callerId !== input.callerId) return false;
     if (input.closerId && lead.closerId !== input.closerId) return false;
-    if (from && lead.updatedAt < from) return false;
-    if (to && lead.updatedAt > to) return false;
     return true;
   });
   const callers = new Map<string, string>();
@@ -224,8 +378,35 @@ export async function getPersonalStatistics(input: PersonalStatisticsInput) {
   }
 
   const mode = input.closerId ? "closer" : "caller";
-  const aggregate =
-    mode === "closer"
+  const hasHistoricalInterval = Boolean(from || to);
+  const historicalEvents = hasHistoricalInterval
+    ? await db
+        .select({
+          leadId: leadActivityEvents.leadId,
+          actorId: leadActivityEvents.actorId,
+          actorRole: leadActivityEvents.actorRole,
+          kind: leadActivityEvents.kind,
+          description: leadActivityEvents.description,
+          metadata: leadActivityEvents.metadata,
+          occurredAt: leadActivityEvents.occurredAt,
+        })
+        .from(leadActivityEvents)
+        .where(
+          and(
+            from ? gte(leadActivityEvents.occurredAt, from) : undefined,
+            to ? lte(leadActivityEvents.occurredAt, to) : undefined,
+          ),
+        )
+        .orderBy(asc(leadActivityEvents.occurredAt))
+    : [];
+  const aggregate = hasHistoricalInterval
+    ? aggregateHistoricalConditions(historicalEvents, {
+        mode,
+        userId: input.closerId ?? input.callerId,
+        from,
+        to,
+      })
+    : mode === "closer"
       ? aggregateCloserConditions(filteredRows)
       : aggregateLeadConditions(filteredRows);
 

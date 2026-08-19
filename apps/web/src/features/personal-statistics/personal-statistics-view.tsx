@@ -61,6 +61,7 @@ import {
   selectCloserFilter,
   toggleConditionFilter,
 } from "./personal-statistics-filters";
+import { PersonalGoalsPanel } from "./personal-goals-panel";
 import styles from "./personal-statistics.module.css";
 
 const initialPeople = { callerId: "all", closerId: "all" };
@@ -296,6 +297,16 @@ export function PersonalStatisticsView() {
           </FieldGroup>
         </CardContent>
       </Card>
+
+      <PersonalGoalsPanel
+        selectedUserId={
+          people.callerId !== "all"
+            ? people.callerId
+            : people.closerId !== "all"
+              ? people.closerId
+              : undefined
+        }
+      />
 
       {invalidInterval ? (
         <Empty heading="Corrige el intervalo de fechas" />

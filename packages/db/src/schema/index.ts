@@ -6,4 +6,5 @@ export * from "./calendar";
 export * from "./messages";
 export * from "./rankings";
 export * from "./quality-controls";
+export * from "./personal-goals";
 export * from "./state";
