@@ -15,6 +15,7 @@ import {
   getLeadActivity,
 } from "../leads/services/index";
 import { permittedProcedure } from "@crm-fran/api/trpc/trpc";
+import { getMonthlyCallFeedbackUsage } from "../call-feedback-runtime";
 
 const idInput = z.object({ id: z.string() });
 export const createLeadInput = z.object({
@@ -144,6 +145,9 @@ export const assignLeadInput = z.union([
 );
 
 export const leadsRouter = router({
+	monthlyCallFeedbackUsage: permittedProcedure(["*"]).query(() =>
+		getMonthlyCallFeedbackUsage(),
+	),
 	activity: permittedProcedure(["leads:read"])
 		.input(idInput)
 		.query(async ({ input }) => {

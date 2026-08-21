@@ -33,6 +33,9 @@ catalogs:
     next-themes:
       specifier: ^0.4.6
       version: 0.4.6
+    openai:
+      specifier: ^5.23.2
+      version: 5.23.2
     react:
       specifier: ^19.2.6
       version: 19.2.7
@@ -214,6 +217,9 @@ importers:
       next:
         specifier: 'catalog:'
         version: 16.2.9(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      openai:
+        specifier: 'catalog:'
+        version: 5.23.2(ws@8.21.1)(zod@4.4.3)
       zod:
         specifier: 'catalog:'
         version: 4.4.3
@@ -3295,6 +3301,18 @@ packages:
   open@11.0.0:
     resolution: {integrity: sha512-smsWv2LzFjP03xmvFoJ331ss6h+jixfA4UUV/Bsiyuu4YJPfN+FIQGOIiv4w9/+MoHkfkJ22UIaQWRVFRfH6Vw==}
     engines: {node: '>=20'}
+
+  openai@5.23.2:
+    resolution: {integrity: sha512-MQBzmTulj+MM5O8SKEk/gL8a7s5mktS9zUtAkU257WjvobGc9nKcBuVwjyEEcb9SI8a8Y2G/mzn3vm9n1Jlleg==}
+    hasBin: true
+    peerDependencies:
+      ws: ^8.18.0
+      zod: ^3.23.8
+    peerDependenciesMeta:
+      ws:
+        optional: true
+      zod:
+        optional: true
 
   ora@8.2.0:
     resolution: {integrity: sha512-weP+BZ8MVNnlCm8c0Qdc1WSWq4Qn7I+9CJGm7Qali6g44e/PUzbjNqJX5NJ9ljlNMosfJvg1fKEGILklK9cwnw==}
@@ -6533,6 +6551,11 @@ snapshots:
       is-inside-container: 1.0.0
       powershell-utils: 0.1.0
       wsl-utils: 0.3.1
+
+  openai@5.23.2(ws@8.21.1)(zod@4.4.3):
+    optionalDependencies:
+      ws: 8.21.1
+      zod: 4.4.3
 
   ora@8.2.0:
     dependencies:

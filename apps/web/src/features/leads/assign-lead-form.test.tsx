@@ -101,7 +101,16 @@ describe("AssignLeadForm", () => {
       await chooseOption(user, "outcome-trigger", label);
 
       expect(screen.getByLabelText("¿Es el decisor?")).toBeInTheDocument();
+      expect(
+        screen.getByLabelText(
+          "¿Es consciente de que es una formación y sabe el precio?",
+        ),
+      ).toBeInTheDocument();
+      expect(screen.getByLabelText("Resumen de la llamada")).toBeInTheDocument();
       expect(screen.getByLabelText("Información extra")).toBeInTheDocument();
+      expect(
+        screen.queryByLabelText("Producto recomendado"),
+      ).not.toBeInTheDocument();
       expect(screen.queryByLabelText("Closer asignado")).not.toBeInTheDocument();
       expect(screen.queryByLabelText("Importancia de la alerta")).not.toBeInTheDocument();
 
@@ -119,6 +128,48 @@ describe("AssignLeadForm", () => {
       });
     },
   );
+
+  it("persists the AI summary, full transcript and training awareness separately", async () => {
+    const user = userEvent.setup();
+    render(<AssignLeadForm leadId="lead-1" />);
+
+    await chooseOption(user, "isContacted-trigger", "Si");
+    await chooseOption(user, "outcome-trigger", "No interesado");
+    await user.type(
+      screen.getByLabelText(
+        "¿Es consciente de que es una formación y sabe el precio?",
+      ),
+      "Sabe que es una formación y conoce el precio",
+    );
+    await user.type(screen.getByLabelText("Resumen de la llamada"), "Resumen IA");
+    await user.type(
+      screen.getByLabelText("Información extra"),
+      "Transcripción completa",
+    );
+    await user.click(appendSubmitButton());
+
+    await waitFor(() => {
+      expect(mocks.mutate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          questions: expect.arrayContaining([
+            expect.objectContaining({
+              questionKey: "trainingAndPriceAwareness",
+              answer: "Sabe que es una formación y conoce el precio",
+            }),
+            expect.objectContaining({
+              questionKey: "summary",
+              answer: "Resumen IA",
+            }),
+            expect.objectContaining({
+              questionKey: "extraInfo",
+              answer: "Transcripción completa",
+            }),
+          ]),
+        }),
+        expect.any(Object),
+      );
+    });
+  });
 
   it("shows previous questions plus alert configuration for future calls", async () => {
     const user = userEvent.setup();

@@ -17,6 +17,8 @@ import {
   SelectValue,
 } from "@crm-fran/ui/components/select";
 import { Skeleton } from "@crm-fran/ui/components/skeleton";
+import { Textarea } from "@crm-fran/ui/components/textarea";
+import { CallRecordingPanel } from "./call-recording-panel";
 
 type CallerOutcome =
   | "future_call"
@@ -32,8 +34,9 @@ type FormValue = {
   isDecisionMaker: string;
   decisionMakerName: string;
   financialSource: string;
-  productFit: string;
+  trainingAndPriceAwareness: string;
   urgencyReason: string;
+  summary: string;
   extraInfo: string;
   closerId: string;
   scheduledDate: string;
@@ -89,8 +92,9 @@ const defaultValues: FormValue = {
   isDecisionMaker: "",
   decisionMakerName: "",
   financialSource: "",
-  productFit: "",
+  trainingAndPriceAwareness: "",
   urgencyReason: "",
+  summary: "",
   extraInfo: "",
   closerId: "",
   scheduledDate: "",
@@ -125,8 +129,10 @@ function getInitialValues(
     isDecisionMaker: byKey.get("isDecisionMaker") ?? "",
     decisionMakerName: byKey.get("decisionMakerName") ?? "",
     financialSource: byKey.get("financialSource") ?? "",
-    productFit: byKey.get("productFit") ?? "",
+    trainingAndPriceAwareness:
+      byKey.get("trainingAndPriceAwareness") ?? byKey.get("productFit") ?? "",
     urgencyReason: byKey.get("urgencyReason") ?? "",
+    summary: byKey.get("summary") ?? "",
     extraInfo: byKey.get("extraInfo") ?? "",
     closerId: byKey.get("closerId") ?? "",
     scheduledDate: byKey.get("scheduledDate") ?? "",
@@ -190,8 +196,13 @@ function buildPayload(value: FormValue, leadId: string, sourceAlertId?: string) 
     ["isDecisionMaker", "¿Es el decisor?", value.isDecisionMaker],
     ["decisionMakerName", "¿Quién es la persona correcta?", value.decisionMakerName],
     ["financialSource", "¿De dónde sale su capacidad económica?", value.financialSource],
-    ["productFit", "Producto recomendado", value.productFit],
+    [
+      "trainingAndPriceAwareness",
+      "¿Es consciente de que es una formación y sabe el precio?",
+      value.trainingAndPriceAwareness,
+    ],
     ["urgencyReason", "¿De dónde sale la urgencia?", value.urgencyReason],
+    ["summary", "Resumen de la llamada", value.summary],
     ["extraInfo", "Información extra", value.extraInfo],
   ]
     .filter(([, , answer]) => answer.trim() !== "")
@@ -315,8 +326,9 @@ export default function AssignLeadForm({
     form.setFieldValue("isDecisionMaker", "");
     form.setFieldValue("decisionMakerName", "");
     form.setFieldValue("financialSource", "");
-    form.setFieldValue("productFit", "");
+    form.setFieldValue("trainingAndPriceAwareness", "");
     form.setFieldValue("urgencyReason", "");
+    form.setFieldValue("summary", "");
     form.setFieldValue("extraInfo", "");
   };
 
@@ -338,6 +350,50 @@ export default function AssignLeadForm({
     form.setFieldValue("outcome", nextOutcome);
   };
 
+  const applyAiDraft = (draft: {
+    isContacted: "" | "Si" | "No";
+    outcome: CallerOutcome | "";
+    isDecisionMaker: "" | "Si" | "No";
+    decisionMakerName: string;
+    financialSource: string;
+    trainingAndPriceAwareness: string;
+    urgencyReason: string;
+    summary: string;
+    extraInfo: string;
+    scheduledDate: string;
+    scheduledTime: string;
+    alertSeverity: AlertSeverity | "";
+  }) => {
+    const nextOutcome = outcomeOptions.some(
+      (option) => option.value === draft.outcome,
+    )
+      ? draft.outcome
+      : "";
+    const nextContacted = draft.isContacted;
+
+    setIsContacted(nextContacted);
+    setOutcome(nextContacted === "Si" ? nextOutcome : "");
+    form.setFieldValue("isContacted", nextContacted);
+    form.setFieldValue("outcome", nextContacted === "Si" ? nextOutcome : "");
+    form.setFieldValue("isDecisionMaker", draft.isDecisionMaker);
+    form.setFieldValue("decisionMakerName", draft.decisionMakerName);
+    form.setFieldValue("financialSource", draft.financialSource);
+    form.setFieldValue(
+      "trainingAndPriceAwareness",
+      draft.trainingAndPriceAwareness,
+    );
+    form.setFieldValue("urgencyReason", draft.urgencyReason);
+    form.setFieldValue("summary", draft.summary);
+    form.setFieldValue("extraInfo", draft.extraInfo);
+    form.setFieldValue("scheduledDate", draft.scheduledDate);
+    form.setFieldValue("scheduledTime", draft.scheduledTime);
+    form.setFieldValue("alertSeverity", draft.alertSeverity);
+    form.setFieldValue(
+      "closerId",
+      nextOutcome === "appointment" ? currentCloserId ?? "" : "",
+    );
+  };
+
   return (
     <form
       className="mx-auto w-full max-w-lg"
@@ -349,6 +405,8 @@ export default function AssignLeadForm({
       }}
     >
       <FieldGroup>
+        <CallRecordingPanel leadId={leadId} onDraft={applyAiDraft} />
+
         <form.Field name="isContacted">
           {(field) => (
             <Field invalid={field.state.meta.errors.length > 0}>
@@ -473,12 +531,14 @@ export default function AssignLeadForm({
             )}
           </form.Field>
 
-          <form.Field name="productFit">
+          <form.Field name="trainingAndPriceAwareness">
             {(field) => (
               <Field>
-                <FieldLabel htmlFor="productFit">Producto recomendado</FieldLabel>
+                <FieldLabel htmlFor="trainingAndPriceAwareness">
+                  ¿Es consciente de que es una formación y sabe el precio?
+                </FieldLabel>
                 <Input
-                  id="productFit"
+                  id="trainingAndPriceAwareness"
                   value={field.state.value}
                   onChange={(event) => field.handleChange(event.target.value)}
                 />
@@ -501,12 +561,27 @@ export default function AssignLeadForm({
             )}
           </form.Field>
 
+          <form.Field name="summary">
+            {(field) => (
+              <Field>
+                <FieldLabel htmlFor="summary">Resumen de la llamada</FieldLabel>
+                <Textarea
+                  id="summary"
+                  rows={4}
+                  value={field.state.value}
+                  onChange={(event) => field.handleChange(event.target.value)}
+                />
+              </Field>
+            )}
+          </form.Field>
+
           <form.Field name="extraInfo">
             {(field) => (
               <Field>
                 <FieldLabel htmlFor="extraInfo">Información extra</FieldLabel>
-                <Input
+                <Textarea
                   id="extraInfo"
+                  rows={12}
                   value={field.state.value}
                   onChange={(event) => field.handleChange(event.target.value)}
                 />

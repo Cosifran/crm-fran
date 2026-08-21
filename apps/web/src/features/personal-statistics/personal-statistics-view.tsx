@@ -62,6 +62,7 @@ import {
   toggleConditionFilter,
 } from "./personal-statistics-filters";
 import { PersonalGoalsPanel } from "./personal-goals-panel";
+import { CallFeedbackUsageCard } from "./call-feedback-usage-card";
 import styles from "./personal-statistics.module.css";
 
 const initialPeople = { callerId: "all", closerId: "all" };
@@ -297,6 +298,8 @@ export function PersonalStatisticsView() {
           </FieldGroup>
         </CardContent>
       </Card>
+
+      <CallFeedbackUsageCard />
 
       <PersonalGoalsPanel
         selectedUserId={
