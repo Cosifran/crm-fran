@@ -6,7 +6,7 @@ const HOUR_MS = 60 * 60 * 1000;
 const createdAt = new Date("2099-01-01T00:00:00.000Z");
 
 describe("effective alert relevance", () => {
-  it("keeps the alert condition severity in condition mode", () => {
+  it("automatically raises condition severity as the deadline approaches", () => {
     expect(
       getEffectiveAlertSeverity(
         { kind: "follow_up", severity: "warning", createdAt },
@@ -24,7 +24,54 @@ describe("effective alert relevance", () => {
         },
         createdAt.getTime() + 11 * HOUR_MS,
       ),
-    ).toBe("info");
+    ).toBe("urgent");
+  });
+
+  it("never lowers a configured condition severity", () => {
+    expect(
+      getEffectiveAlertSeverity(
+        { kind: "appointment", severity: "info", createdAt },
+        {
+          mode: "condition",
+          urgentThresholdHours: 2,
+          warningThresholdHours: 6,
+          conditionSeverities: {
+            no_contact: "urgent",
+            follow_up: "info",
+            future_call: "info",
+            appointment: "urgent",
+            rescheduled: "info",
+          },
+        },
+        createdAt.getTime(),
+      ),
+    ).toBe("urgent");
+  });
+
+  it("uses the scheduled display time when the alert provides one", () => {
+    expect(
+      getEffectiveAlertSeverity(
+        {
+          kind: "future_call",
+          severity: "info",
+          createdAt,
+          nextShowAt: new Date(createdAt.getTime() + 24 * HOUR_MS),
+        },
+        {
+          mode: "condition",
+          urgentThresholdHours: 2,
+          warningThresholdHours: 6,
+          conditionSeverities: {
+            no_contact: "urgent",
+            follow_up: "info",
+            future_call: "info",
+            appointment: "info",
+            rescheduled: "info",
+          },
+        },
+        createdAt.getTime() + 19 * HOUR_MS,
+      ),
+    ).toBe("warning");
   });
 
   it("changes relevance as the configured deadline approaches", () => {

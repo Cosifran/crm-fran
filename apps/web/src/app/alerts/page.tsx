@@ -30,18 +30,27 @@ import {
   filterAlertsBySeverity,
 } from "@/features/alerts/alert-importance";
 import { AlertPreferencesDialog } from "@/features/alerts/alert-preferences-dialog";
+import { AlertOperationalCounters } from "@/features/alerts/alert-operational-counters";
+import {
+  filterLeadRiskQueue,
+  getOperationalAlertCounters,
+  mergeAlertPeople,
+} from "@/features/alerts/alert-operational-view";
+import { LeadRiskQueue } from "@/features/alerts/lead-risk-queue";
 import {
   DEFAULT_ALERT_RELEVANCE_PREFERENCES,
   getEffectiveAlertSeverity,
 } from "@/features/alerts/alert-relevance";
 import {
   type AlertTypeFilter,
+  ALERT_TYPE_LABELS,
   filterAlertsByType,
 } from "@/features/alerts/alert-type";
 import {
   useAlerts,
   useAlertPreferences,
   useDismissAlert,
+  useLeadRiskQueue,
 } from "@/features/alerts/use-alerts";
 
 import styles from "./alerts.module.css";
@@ -56,9 +65,10 @@ export default function AlertsPage() {
   );
 }
 
-function AlertsInbox() {
+export function AlertsInbox() {
   const { data, isLoading, isError } = useAlerts();
   const preferencesQuery = useAlertPreferences();
+  const riskQueueQuery = useLeadRiskQueue();
   const dismiss = useDismissAlert();
   const [filterNow, setFilterNow] = useState(() => Date.now());
   const [severityFilter, setSeverityFilter] =
@@ -76,8 +86,15 @@ function AlertsInbox() {
       getEffectiveAlertSeverity(alert, relevancePreferences, filterNow) ??
       alert.severity,
   }));
-  const callers = getAlertCallers(data ?? []);
-  const closers = getAlertClosers(data ?? []);
+  const riskQueue = riskQueueQuery.data ?? [];
+  const callers = mergeAlertPeople(
+    getAlertCallers(data ?? []),
+    riskQueue.map(({ lead }) => lead.caller),
+  );
+  const closers = mergeAlertPeople(
+    getAlertClosers(data ?? []),
+    riskQueue.map(({ lead }) => lead.closer),
+  );
   const selectedCaller = callers.find((caller) => caller.id === callerFilter);
   const selectedCloser = closers.find((closer) => closer.id === closerFilter);
   const severityFilteredAlerts = filterAlertsBySeverity(
@@ -95,6 +112,16 @@ function AlertsInbox() {
   const filteredAlerts = filterAlertsByCloser(
     typeFilteredAlerts,
     closerFilter,
+  );
+  const filteredRiskQueue = filterLeadRiskQueue(riskQueue, {
+    severity: severityFilter,
+    caller: callerFilter,
+    type: typeFilter,
+    closer: closerFilter,
+  });
+  const counters = getOperationalAlertCounters(
+    filteredAlerts,
+    filteredRiskQueue,
   );
 
   useEffect(() => {
@@ -115,12 +142,9 @@ function AlertsInbox() {
     return <p>Error al cargar alertas</p>;
   }
 
-  if (!data || data.length === 0) {
-    return <Empty heading="No hay alertas pendientes" />;
-  }
-
   return (
     <div className="flex min-w-0 flex-col gap-4">
+      <AlertOperationalCounters counters={counters} />
       <div className="mx-auto flex w-full max-w-5xl min-w-0 flex-col gap-3 px-2 pt-4 sm:flex-row sm:flex-wrap sm:items-center sm:px-3 sm:pt-5">
         <Select
           value={severityFilter}
@@ -192,6 +216,7 @@ function AlertsInbox() {
           onValueChange={(value) => {
             if (
               value === "all" ||
+              value === "no_contact" ||
               value === "follow_up" ||
               value === "appointment" ||
               value === "future_call" ||
@@ -209,18 +234,13 @@ function AlertsInbox() {
             <SelectValue>
               {typeFilter === "all"
                 ? "Todos los tipos"
-                : typeFilter === "follow_up"
-                  ? "Seguimiento"
-                  : typeFilter === "appointment"
-                    ? "Agenda"
-                    : typeFilter === "future_call"
-                      ? "Llamar futuro"
-                      : "Reagenda"}
+                : ALERT_TYPE_LABELS[typeFilter]}
             </SelectValue>
           </SelectTrigger>
           <SelectContent className={styles.overlayTheme}>
             <SelectGroup>
               <SelectItem value="all">Todos los tipos</SelectItem>
+              <SelectItem value="no_contact">Sin contacto</SelectItem>
               <SelectItem value="follow_up">Seguimiento</SelectItem>
               <SelectItem value="appointment">Agenda</SelectItem>
               <SelectItem value="future_call">Llamar futuro</SelectItem>
@@ -259,7 +279,15 @@ function AlertsInbox() {
         <AlertPreferencesDialog preferences={relevancePreferences} />
       </div>
 
-      {filteredAlerts.length === 0 ? (
+      <LeadRiskQueue
+        data={filteredRiskQueue}
+        isLoading={riskQueueQuery.isLoading}
+        isError={riskQueueQuery.isError}
+      />
+
+      {!data || data.length === 0 ? (
+        <Empty heading="No hay alertas pendientes" />
+      ) : filteredAlerts.length === 0 ? (
         <Empty heading="No hay alertas para este filtro" />
       ) : (
         <div className="mx-auto grid w-full max-w-5xl gap-4">

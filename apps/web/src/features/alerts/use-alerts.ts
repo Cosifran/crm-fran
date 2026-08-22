@@ -85,6 +85,13 @@ export function useAlertsCount() {
 	});
 }
 
+export function useLeadRiskQueue() {
+  return useQuery({
+    ...trpc.alerts.listLeadRiskQueue.queryOptions(),
+    refetchInterval: 60_000,
+  });
+}
+
 export function useAlertPreferences() {
   return useQuery({
     ...trpc.alerts.getPreferences.queryOptions(),

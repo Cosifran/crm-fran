@@ -6,6 +6,7 @@ import {
 	countAlerts,
 	dismissAlert,
 	listAlerts,
+	listLeadRiskQueue,
 	resolveAlert,
 	processRecurringAlerts,
 	getAlertPreferences,
@@ -99,6 +100,13 @@ export const alertsRouter = router({
 				offset: input?.offset,
 			});
 		}),
+
+	listLeadRiskQueue: permittedProcedure(["alerts:read"]).query(async ({ ctx }) => {
+		return await listLeadRiskQueue({
+			actorId: ctx.session.user.id,
+			permissions: ctx.permissions,
+		});
+	}),
 
 	dismissAlert: permittedProcedure(["alerts:write"])
 		.input(alertIdInput)

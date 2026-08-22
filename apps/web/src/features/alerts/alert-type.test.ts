@@ -25,6 +25,12 @@ const alerts = [
     lead: { questions: [] },
   },
   {
+    id: "no-contact",
+    kind: "no_contact",
+    message: "Sin contacto",
+    lead: { questions: [] },
+  },
+  {
     id: "future-call",
     kind: "no_contact",
     message: "Llamar a futuro",
@@ -69,7 +75,8 @@ const alerts = [
 
 describe("alert type filter", () => {
   it.each([
-    ["all", ["follow-up", "future-call", "appointment", "rescheduled"]],
+    ["all", ["follow-up", "no-contact", "future-call", "appointment", "rescheduled"]],
+    ["no_contact", ["no-contact"]],
     ["follow_up", ["follow-up"]],
     ["future_call", ["future-call"]],
     ["appointment", ["appointment"]],
@@ -81,17 +88,17 @@ describe("alert type filter", () => {
   });
 
   it("returns the complete schedule history only for the rescheduled card", () => {
-    expect(getAppointmentHistory(alerts[3])).toEqual([
+    expect(getAppointmentHistory(alerts[4])).toEqual([
       { date: "2099-01-01", time: "10:00" },
       { date: "2099-01-02", time: "11:00" },
       { date: "2099-01-03", time: "12:00" },
     ]);
-    expect(getAppointmentHistory(alerts[2])).toEqual([]);
+    expect(getAppointmentHistory(alerts[3])).toEqual([]);
   });
 
   it("classifies by the current alert kind, never by historical schedules", () => {
     const currentAppointmentWithHistory = {
-      ...alerts[2],
+      ...alerts[3],
       lead: {
         questions: [
           callerQuestion(

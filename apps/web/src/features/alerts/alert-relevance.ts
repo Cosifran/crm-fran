@@ -1,4 +1,4 @@
-import { getAlertCountdownRemaining } from "./alert-countdown";
+import { getAlertRemaining } from "./alert-countdown";
 import { normalizeAlertSeverity } from "./alert-importance";
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -36,22 +36,42 @@ type AlertForRelevance = {
   kind: string;
   severity: string;
   createdAt: Date | string;
+  nextShowAt?: Date | string;
 };
+
+const SEVERITY_RANK: Record<AlertRelevanceSeverity, number> = {
+  info: 1,
+  warning: 2,
+  urgent: 3,
+};
+
+function getTimeSeverity(
+  alert: AlertForRelevance,
+  preferences: AlertRelevancePreferences,
+  now: number,
+): AlertRelevanceSeverity {
+  const remaining = getAlertRemaining(alert, now);
+  if (remaining <= preferences.urgentThresholdHours * HOUR_MS) return "urgent";
+  if (remaining <= preferences.warningThresholdHours * HOUR_MS) return "warning";
+  return "info";
+}
 
 export function getEffectiveAlertSeverity(
   alert: AlertForRelevance,
   preferences: AlertRelevancePreferences,
   now = Date.now(),
 ) {
+  const timeSeverity = getTimeSeverity(alert, preferences, now);
   if (preferences.mode === "condition") {
-    if (alert.kind in preferences.conditionSeverities) {
-      return preferences.conditionSeverities[alert.kind as ConfigurableAlertKind];
-    }
-    return normalizeAlertSeverity(alert.severity);
+    const conditionSeverity =
+      alert.kind in preferences.conditionSeverities
+        ? preferences.conditionSeverities[alert.kind as ConfigurableAlertKind]
+        : normalizeAlertSeverity(alert.severity);
+    if (!conditionSeverity) return timeSeverity;
+    return SEVERITY_RANK[timeSeverity] > SEVERITY_RANK[conditionSeverity]
+      ? timeSeverity
+      : conditionSeverity;
   }
 
-  const remaining = getAlertCountdownRemaining(alert.createdAt, alert.kind, now);
-  if (remaining <= preferences.urgentThresholdHours * HOUR_MS) return "urgent";
-  if (remaining <= preferences.warningThresholdHours * HOUR_MS) return "warning";
-  return "info";
+  return timeSeverity;
 }

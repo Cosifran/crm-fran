@@ -15,6 +15,26 @@ const QUALITY_WEIGHTS = {
   sale: 0.45,
 } as const;
 
+const SPEED_BUCKETS = [
+  { key: "under_15", label: "Menos de 15 min" },
+  { key: "from_15_to_60", label: "15–60 min" },
+  { key: "from_1_to_3_hours", label: "1–3 h" },
+  { key: "from_3_to_24_hours", label: "3–24 h" },
+  { key: "over_24_hours", label: "Más de 24 h" },
+  { key: "not_contacted", label: "Sin contacto" },
+] as const;
+
+const ATTEMPT_BUCKETS = [
+  { key: "zero", label: "0 intentos" },
+  { key: "one", label: "1 intento" },
+  { key: "two", label: "2 intentos" },
+  { key: "three", label: "3 intentos" },
+  { key: "four_plus", label: "4+ intentos" },
+] as const;
+
+type SpeedBucketKey = (typeof SPEED_BUCKETS)[number]["key"];
+type AttemptBucketKey = (typeof ATTEMPT_BUCKETS)[number]["key"];
+
 type CallerQualityEvent = FunnelLead["events"][number];
 
 export type CallerQualityLead = {
@@ -41,6 +61,9 @@ type EvaluatedLead = Omit<CallerQualityLead, "events"> & {
   show: boolean;
   sale: boolean;
   firstContactMinutes: number | null;
+  attemptCount: number;
+  attemptIntervalMinutes: number;
+  attemptIntervalCount: number;
   quality: number;
   expectedQuality: number;
 };
@@ -104,8 +127,18 @@ function evaluateLead(lead: CallerQualityLead) {
       getConversionEventOutcome(event) !== "Lead no contactado",
   );
   const firstContactMinutes = firstContact
-    ? Math.max(0, Math.round((firstContact.occurredAt.getTime() - lead.assignedAt.getTime()) / 60_000))
+    ? Math.max(0, (firstContact.occurredAt.getTime() - lead.assignedAt.getTime()) / 60_000)
     : null;
+  const callerFeedbackEvents = events.filter((event) => event.kind === "caller_feedback");
+  const firstValidContactIndex = callerFeedbackEvents.findIndex(
+    (event) => getConversionEventOutcome(event) !== "Lead no contactado",
+  );
+  const attemptEvents = firstValidContactIndex >= 0
+    ? callerFeedbackEvents.slice(0, firstValidContactIndex + 1)
+    : callerFeedbackEvents;
+  const attemptIntervals = attemptEvents.slice(1).map((event, index) =>
+    Math.max(0, (event.occurredAt.getTime() - (attemptEvents[index]?.occurredAt.getTime() ?? event.occurredAt.getTime())) / 60_000),
+  );
   const quality =
     Number(classification.appointment) * QUALITY_WEIGHTS.appointment +
     Number(classification.show) * QUALITY_WEIGHTS.show +
@@ -117,6 +150,9 @@ function evaluateLead(lead: CallerQualityLead) {
     profile: readProfile(events),
     ...classification,
     firstContactMinutes,
+    attemptCount: attemptEvents.length,
+    attemptIntervalMinutes: attemptIntervals.reduce((sum, value) => sum + value, 0),
+    attemptIntervalCount: attemptIntervals.length,
     quality,
     expectedQuality: 0,
   } satisfies EvaluatedLead & { events: undefined };
@@ -151,6 +187,174 @@ function summarizeMetrics(leads: readonly MetricLead[]) {
             firstContactValues.reduce((sum, value) => sum + value, 0) /
               firstContactValues.length,
           ),
+  };
+}
+
+function speedBucketKey(firstContactMinutes: number | null): SpeedBucketKey {
+  if (firstContactMinutes === null) return "not_contacted";
+  if (firstContactMinutes < 15) return "under_15";
+  if (firstContactMinutes < 60) return "from_15_to_60";
+  if (firstContactMinutes < 180) return "from_1_to_3_hours";
+  if (firstContactMinutes < 1_440) return "from_3_to_24_hours";
+  return "over_24_hours";
+}
+
+function buildSpeedBuckets(leads: readonly EvaluatedLead[]) {
+  return SPEED_BUCKETS.map(({ key, label }) => ({
+    key,
+    label,
+    ...summarizeMetrics(
+      leads.filter(({ firstContactMinutes }) => speedBucketKey(firstContactMinutes) === key),
+    ),
+  }));
+}
+
+function buildSpeedGroups(
+  leads: readonly EvaluatedLead[],
+  select: (lead: EvaluatedLead) => { value: string; label: string },
+) {
+  const groups = new Map<string, { label: string; leads: EvaluatedLead[] }>();
+  for (const lead of leads) {
+    const { value, label } = select(lead);
+    const group = groups.get(value) ?? { label, leads: [] };
+    group.leads.push(lead);
+    groups.set(value, group);
+  }
+  return [...groups]
+    .map(([value, group]) => ({
+      value,
+      label: group.label,
+      total: group.leads.length,
+      buckets: buildSpeedBuckets(group.leads),
+    }))
+    .sort((first, second) => second.total - first.total || first.label.localeCompare(second.label));
+}
+
+function buildSpeedAnalysis(leads: readonly EvaluatedLead[]) {
+  const callers = buildSpeedGroups(leads, (lead) => ({
+    value: lead.callerId,
+    label: lead.callerName ?? "Sin nombre",
+  })).map((caller) => {
+    const callerLeads = leads.filter(({ callerId }) => callerId === caller.value);
+    return {
+      ...caller,
+      profiles: buildSpeedGroups(callerLeads, (lead) => {
+        const value = segmentValue(lead.profile, "Sin perfil");
+        return { value, label: value };
+      }),
+      sources: buildSpeedGroups(callerLeads, (lead) => {
+        const value = segmentValue(lead.source, "Sin fuente");
+        return { value, label: value };
+      }),
+      campaigns: buildSpeedGroups(callerLeads, (lead) => {
+        const value = segmentValue(lead.campaign, "Sin campaña");
+        return { value, label: value };
+      }),
+    };
+  });
+  return {
+    overall: buildSpeedBuckets(leads),
+    callers,
+    profiles: buildSpeedGroups(leads, (lead) => {
+      const value = segmentValue(lead.profile, "Sin perfil");
+      return { value, label: value };
+    }),
+    sources: buildSpeedGroups(leads, (lead) => {
+      const value = segmentValue(lead.source, "Sin fuente");
+      return { value, label: value };
+    }),
+    campaigns: buildSpeedGroups(leads, (lead) => {
+      const value = segmentValue(lead.campaign, "Sin campaña");
+      return { value, label: value };
+    }),
+  };
+}
+
+function attemptBucketKey(attemptCount: number): AttemptBucketKey {
+  if (attemptCount === 0) return "zero";
+  if (attemptCount === 1) return "one";
+  if (attemptCount === 2) return "two";
+  if (attemptCount === 3) return "three";
+  return "four_plus";
+}
+
+function buildAttemptSummary(leads: readonly EvaluatedLead[]) {
+  const intervalCount = leads.reduce((sum, lead) => sum + lead.attemptIntervalCount, 0);
+  const notContactedBelowThree = leads.filter(
+    ({ contacted, attemptCount }) => !contacted && attemptCount < 3,
+  ).length;
+  return {
+    total: leads.length,
+    averageAttempts: leads.length === 0
+      ? 0
+      : round(leads.reduce((sum, lead) => sum + lead.attemptCount, 0) / leads.length),
+    averageAttemptIntervalMinutes: intervalCount === 0
+      ? null
+      : Math.round(
+          leads.reduce((sum, lead) => sum + lead.attemptIntervalMinutes, 0) / intervalCount,
+        ),
+    notContactedBelowThree,
+    notContactedBelowThreeRate: percentage(notContactedBelowThree, leads.length),
+    buckets: ATTEMPT_BUCKETS.map(({ key, label }) => {
+      const bucketLeads = leads.filter(({ attemptCount }) => attemptBucketKey(attemptCount) === key);
+      return { key, label, ...summarizeMetrics(bucketLeads) };
+    }),
+  };
+}
+
+function buildAttemptGroups(
+  leads: readonly EvaluatedLead[],
+  select: (lead: EvaluatedLead) => { value: string; label: string },
+) {
+  const groups = new Map<string, { label: string; leads: EvaluatedLead[] }>();
+  for (const lead of leads) {
+    const { value, label } = select(lead);
+    const group = groups.get(value) ?? { label, leads: [] };
+    group.leads.push(lead);
+    groups.set(value, group);
+  }
+  return [...groups]
+    .map(([value, group]) => ({ value, label: group.label, ...buildAttemptSummary(group.leads) }))
+    .sort((first, second) => second.total - first.total || first.label.localeCompare(second.label));
+}
+
+function buildAttemptAnalysis(leads: readonly EvaluatedLead[]) {
+  const callers = buildAttemptGroups(leads, (lead) => ({
+    value: lead.callerId,
+    label: lead.callerName ?? "Sin nombre",
+  })).map((caller) => {
+    const callerLeads = leads.filter(({ callerId }) => callerId === caller.value);
+    return {
+      ...caller,
+      profiles: buildAttemptGroups(callerLeads, (lead) => {
+        const value = segmentValue(lead.profile, "Sin perfil");
+        return { value, label: value };
+      }),
+      sources: buildAttemptGroups(callerLeads, (lead) => {
+        const value = segmentValue(lead.source, "Sin fuente");
+        return { value, label: value };
+      }),
+      campaigns: buildAttemptGroups(callerLeads, (lead) => {
+        const value = segmentValue(lead.campaign, "Sin campaña");
+        return { value, label: value };
+      }),
+    };
+  });
+  return {
+    overall: buildAttemptSummary(leads),
+    callers,
+    profiles: buildAttemptGroups(leads, (lead) => {
+      const value = segmentValue(lead.profile, "Sin perfil");
+      return { value, label: value };
+    }),
+    sources: buildAttemptGroups(leads, (lead) => {
+      const value = segmentValue(lead.source, "Sin fuente");
+      return { value, label: value };
+    }),
+    campaigns: buildAttemptGroups(leads, (lead) => {
+      const value = segmentValue(lead.campaign, "Sin campaña");
+      return { value, label: value };
+    }),
   };
 }
 
@@ -258,7 +462,13 @@ export function buildCallerQualityRanking(
         sources: buildBreakdown(callerLeads, (lead) => segmentValue(lead.source, "Sin fuente")),
         campaigns: buildBreakdown(callerLeads, (lead) => segmentValue(lead.campaign, "Sin campaña")),
       },
-      leads: callerLeads.map(({ expectedQuality: _expectedQuality, quality: _quality, ...lead }) => lead),
+      leads: callerLeads.map(({
+        expectedQuality: _expectedQuality,
+        quality: _quality,
+        attemptIntervalMinutes: _attemptIntervalMinutes,
+        attemptIntervalCount: _attemptIntervalCount,
+        ...lead
+      }) => lead),
     };
   });
   const eligible = rows
@@ -274,5 +484,55 @@ export function buildCallerQualityRanking(
       .sort((first, second) => second.assigned - first.assigned),
     weekly: buildTrends(leadsWithExpected, "week"),
     monthly: buildTrends(leadsWithExpected, "month"),
+    speedAnalysis: buildSpeedAnalysis(leadsWithExpected),
+    attemptAnalysis: buildAttemptAnalysis(leadsWithExpected),
+  };
+}
+
+export function selectCallerQualityRanking(
+  ranking: ReturnType<typeof buildCallerQualityRanking>,
+  callerId?: string,
+) {
+  if (!callerId) return ranking;
+  const selectedSpeed = ranking.speedAnalysis.callers.find(({ value }) => value === callerId);
+  const selectedAttempts = ranking.attemptAnalysis.callers.find(({ value }) => value === callerId);
+  return {
+    ...ranking,
+    ranked: ranking.ranked.filter((caller) => caller.callerId === callerId),
+    insufficientSample: ranking.insufficientSample.filter(
+      (caller) => caller.callerId === callerId,
+    ),
+    weekly: ranking.weekly.filter((row) => row.callerId === callerId),
+    monthly: ranking.monthly.filter((row) => row.callerId === callerId),
+    speedAnalysis: selectedSpeed
+      ? {
+          overall: selectedSpeed.buckets,
+          callers: [selectedSpeed],
+          profiles: selectedSpeed.profiles,
+          sources: selectedSpeed.sources,
+          campaigns: selectedSpeed.campaigns,
+        }
+      : {
+          overall: buildSpeedBuckets([]),
+          callers: [],
+          profiles: [],
+          sources: [],
+          campaigns: [],
+        },
+    attemptAnalysis: selectedAttempts
+      ? {
+          overall: selectedAttempts,
+          callers: [selectedAttempts],
+          profiles: selectedAttempts.profiles,
+          sources: selectedAttempts.sources,
+          campaigns: selectedAttempts.campaigns,
+        }
+      : {
+          overall: buildAttemptSummary([]),
+          callers: [],
+          profiles: [],
+          sources: [],
+          campaigns: [],
+        },
   };
 }

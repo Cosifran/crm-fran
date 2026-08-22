@@ -9,7 +9,7 @@ import { cn } from "@crm-fran/ui/lib/utils";
 
 import {
   formatAlertCountdown,
-  getAlertCountdownRemaining,
+  getAlertRemaining,
 } from "./alert-countdown";
 import { normalizeAlertSeverity } from "./alert-importance";
 import {
@@ -56,11 +56,7 @@ export function AlertCard({
   const kind = alert.kind as keyof typeof KIND_LABEL;
   const alertType = getAlertType(alert);
   const appointmentHistory = getAppointmentHistory(alert);
-  const remainingMs = getAlertCountdownRemaining(
-    alert.createdAt,
-    alert.kind,
-    now,
-  );
+  const remainingMs = getAlertRemaining(alert, now);
   const countdown = formatAlertCountdown(remainingMs);
   const isExpired = remainingMs < 0;
 

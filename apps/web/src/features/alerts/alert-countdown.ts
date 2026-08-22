@@ -19,6 +19,20 @@ export function getAlertCountdownRemaining(
   return getAlertCountdownDeadline(createdAt, kind) - now;
 }
 
+export function getAlertRemaining(
+  alert: {
+    kind: string;
+    createdAt: Date | string;
+    nextShowAt?: Date | string;
+  },
+  now = Date.now(),
+): number {
+  if (alert.kind === "future_call" && alert.nextShowAt) {
+    return new Date(alert.nextShowAt).getTime() - now;
+  }
+  return getAlertCountdownRemaining(alert.createdAt, alert.kind, now);
+}
+
 export function formatAlertCountdown(milliseconds: number): string {
   const sign = milliseconds < 0 ? "-" : "";
   const totalSeconds = Math.floor(Math.abs(milliseconds) / 1000);

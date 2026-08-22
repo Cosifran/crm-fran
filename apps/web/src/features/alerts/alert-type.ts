@@ -1,11 +1,13 @@
 export type AlertTypeFilter =
   | "all"
+  | "no_contact"
   | "follow_up"
   | "appointment"
   | "future_call"
   | "rescheduled";
 
 export const ALERT_TYPE_LABELS: Record<Exclude<AlertTypeFilter, "all">, string> = {
+  no_contact: "Sin contacto",
   follow_up: "Seguimiento",
   appointment: "Agenda",
   future_call: "Llamar futuro",
@@ -41,17 +43,18 @@ function getLatestAnswer(
 export function getAlertType(
   alert: AlertWithType,
 ): Exclude<AlertTypeFilter, "all"> | undefined {
+  if (alert.message === "Llamar a futuro") {
+    return "future_call";
+  }
+
   if (
+    alert.kind === "no_contact" ||
     alert.kind === "follow_up" ||
     alert.kind === "appointment" ||
     alert.kind === "future_call" ||
     alert.kind === "rescheduled"
   ) {
     return alert.kind;
-  }
-
-  if (alert.message === "Llamar a futuro") {
-    return "future_call";
   }
 
   return undefined;

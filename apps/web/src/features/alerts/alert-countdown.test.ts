@@ -5,6 +5,7 @@ import {
   getAlertCountdownDeadline,
   getAlertCountdownDuration,
   getAlertCountdownRemaining,
+  getAlertRemaining,
 } from "./alert-countdown";
 
 describe("alert countdown", () => {
@@ -28,6 +29,21 @@ describe("alert countdown", () => {
     expect(getAlertCountdownRemaining(createdAt, "no_contact", now)).toBe(
       22 * 60 * 60 * 1000 + 29 * 60 * 1000 + 55 * 1000,
     );
+  });
+
+  it("counts future calls down to their scheduled display time", () => {
+    const now = Date.parse("2026-08-10T12:00:00.000Z");
+
+    expect(
+      getAlertRemaining(
+        {
+          kind: "future_call",
+          createdAt: "2026-08-10T10:00:00.000Z",
+          nextShowAt: "2026-08-11T12:00:00.000Z",
+        },
+        now,
+      ),
+    ).toBe(24 * 60 * 60 * 1000);
   });
 
   it("formats positive, zero, and negative durations", () => {

@@ -9,7 +9,10 @@ import {
 import type { FeedbackProfile, MotivationAngle } from "../../call-feedback";
 import { FEEDBACK_PROFILES, MOTIVATION_ANGLES } from "../../call-feedback";
 import { classifyConversionLead } from "../../dashboard/conversion-funnel";
-import { buildCallerQualityRanking } from "./caller-quality-ranking";
+import {
+  buildCallerQualityRanking,
+  selectCallerQualityRanking,
+} from "./caller-quality-ranking";
 
 export type FeedbackReaction = "appointment" | "future_call" | "not_interested" | "not_fit" | "unknown";
 
@@ -407,7 +410,6 @@ export async function getFeedbackStatistics(input: FeedbackStatisticsInput) {
         eq(leadActivityEvents.kind, LEAD_ACTIVITY_KIND.CALLER_ASSIGNED),
         input.from ? gte(leadActivityEvents.occurredAt, startOfDay(input.from)) : undefined,
         input.to ? lte(leadActivityEvents.occurredAt, endOfDay(input.to)) : undefined,
-        input.callerId ? eq(leadActivityEvents.actorId, input.callerId) : undefined,
         input.source ? eq(leads.source, input.source) : undefined,
         input.campaign ? eq(leads.campaign, input.campaign) : undefined,
       ))
@@ -462,20 +464,23 @@ export async function getFeedbackStatistics(input: FeedbackStatisticsInput) {
       events: eventsByLead.get(lead.id) ?? [],
     })),
   );
-  const callerQuality = buildCallerQualityRanking(
-    usableRankingAssignments.map((assignment) => {
-      const events = eventsByLead.get(assignment.id) ?? [];
-      const nextAssignment = events.find(
-        (event) =>
-          event.kind === LEAD_ACTIVITY_KIND.CALLER_ASSIGNED &&
-          event.occurredAt > assignment.assignedAt,
-      );
-      return {
-        ...assignment,
-        assignmentEndedAt: nextAssignment?.occurredAt ?? null,
-        events,
-      };
-    }),
+  const callerQuality = selectCallerQualityRanking(
+    buildCallerQualityRanking(
+      usableRankingAssignments.map((assignment) => {
+        const events = eventsByLead.get(assignment.id) ?? [];
+        const nextAssignment = events.find(
+          (event) =>
+            event.kind === LEAD_ACTIVITY_KIND.CALLER_ASSIGNED &&
+            event.occurredAt > assignment.assignedAt,
+        );
+        return {
+          ...assignment,
+          assignmentEndedAt: nextAssignment?.occurredAt ?? null,
+          events,
+        };
+      }),
+    ),
+    input.callerId,
   );
   const availableSources = [...new Set(funnelLeadRows.flatMap((lead) => lead.source ? [lead.source] : []))].sort();
   const availableCampaigns = [...new Set(funnelLeadRows.flatMap((lead) => lead.campaign ? [lead.campaign] : []))].sort();

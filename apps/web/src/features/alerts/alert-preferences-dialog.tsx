@@ -124,12 +124,13 @@ export function AlertPreferencesDialog({
                 </SelectContent>
               </Select>
               <FieldDescription>
-                Por condición conserva la relevancia definida por el suceso. Por
-                tiempo la modifica automáticamente al acercarse el vencimiento.
+                Por condición parte de la relevancia definida por el suceso. En
+                ambos modos la prioridad aumenta automáticamente al acercarse el
+                vencimiento y nunca disminuye.
               </FieldDescription>
             </Field>
 
-            {mode === "time" && (
+            {(
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field invalid={thresholdsInvalid}>
                   <FieldLabel htmlFor="urgentThresholdHours">
