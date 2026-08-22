@@ -12,6 +12,7 @@ import { getPersonalStatistics } from "./personal-statistics";
 import { createLead } from "./create-lead";
 import { setLeadType } from "./set-lead-type";
 import { getLeadActivity } from "./lead-activity";
+import { getFeedbackStatistics } from "./feedback-statistics";
 
 export {
 	getAll,
@@ -28,4 +29,5 @@ export {
 	createLead,
 	setLeadType,
 	getLeadActivity,
+	getFeedbackStatistics,
 };

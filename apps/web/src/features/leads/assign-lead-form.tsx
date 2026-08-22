@@ -3,6 +3,13 @@
 import { useEffect, useState } from "react";
 import { useForm } from "@tanstack/react-form";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  FEEDBACK_PROFILES,
+  MOTIVATION_ANGLES,
+  type CallFeedbackDraft,
+  type FeedbackProfile,
+  type MotivationAngle,
+} from "@crm-fran/api/call-feedback";
 
 import { trpc } from "@/utils/trpc";
 import { useTrpcMutationWithToast } from "@/lib/use-trpc-mutation-with-toast";
@@ -18,6 +25,7 @@ import {
 } from "@crm-fran/ui/components/select";
 import { Skeleton } from "@crm-fran/ui/components/skeleton";
 import { Textarea } from "@crm-fran/ui/components/textarea";
+import { Checkbox } from "@crm-fran/ui/components/checkbox";
 import { CallRecordingPanel } from "./call-recording-panel";
 
 type CallerOutcome =
@@ -31,6 +39,9 @@ type AlertSeverity = "urgent" | "warning" | "info";
 type FormValue = {
   isContacted: "" | "Si" | "No";
   outcome: CallerOutcome | "";
+  primaryProfile: FeedbackProfile | "";
+  subProfile: FeedbackProfile | "";
+  motivationAngles: MotivationAngle[];
   isDecisionMaker: string;
   decisionMakerName: string;
   financialSource: string;
@@ -89,6 +100,9 @@ const OUTCOME_BY_LABEL: Record<string, CallerOutcome> = {
 const defaultValues: FormValue = {
   isContacted: "",
   outcome: "",
+  primaryProfile: "",
+  subProfile: "",
+  motivationAngles: [],
   isDecisionMaker: "",
   decisionMakerName: "",
   financialSource: "",
@@ -117,6 +131,23 @@ function getInitialValues(
   const outcome = outcomeAnswer ? OUTCOME_BY_LABEL[outcomeAnswer] ?? "" : "";
   const severity = byKey.get("alertSeverity");
   const legacyContacted = byKey.get("isContacted");
+  const primaryProfileAnswer = byKey.get("primaryProfile");
+  const subProfileAnswer = byKey.get("subProfile");
+  const isFeedbackProfile = (value: string | undefined): value is FeedbackProfile =>
+    Boolean(value && FEEDBACK_PROFILES.some((profile) => profile.value === value));
+  let motivationAngles: MotivationAngle[] = [];
+  try {
+    const parsed: unknown = JSON.parse(byKey.get("motivationAngles") ?? "[]");
+    if (Array.isArray(parsed)) {
+      motivationAngles = parsed.filter(
+        (value): value is MotivationAngle =>
+          typeof value === "string" &&
+          MOTIVATION_ANGLES.some((angle) => angle.value === value),
+      );
+    }
+  } catch {
+    motivationAngles = [];
+  }
 
   return {
     isContacted:
@@ -126,6 +157,9 @@ function getInitialValues(
           ? "No"
           : "",
     outcome,
+    primaryProfile: isFeedbackProfile(primaryProfileAnswer) ? primaryProfileAnswer : "",
+    subProfile: isFeedbackProfile(subProfileAnswer) ? subProfileAnswer : "",
+    motivationAngles,
     isDecisionMaker: byKey.get("isDecisionMaker") ?? "",
     decisionMakerName: byKey.get("decisionMakerName") ?? "",
     financialSource: byKey.get("financialSource") ?? "",
@@ -192,6 +226,9 @@ function buildPayload(value: FormValue, leadId: string, sourceAlertId?: string) 
   }
 
   const questions = [
+    ["primaryProfile", "Perfil principal", value.primaryProfile],
+    ["subProfile", "Subperfil", value.subProfile],
+    ["motivationAngles", "Ángulos de motivación", JSON.stringify(value.motivationAngles)],
     ["isContacted", "¿Fue contactado?", "Si"],
     ["isDecisionMaker", "¿Es el decisor?", value.isDecisionMaker],
     ["decisionMakerName", "¿Quién es la persona correcta?", value.decisionMakerName],
@@ -205,7 +242,9 @@ function buildPayload(value: FormValue, leadId: string, sourceAlertId?: string) 
     ["summary", "Resumen de la llamada", value.summary],
     ["extraInfo", "Información extra", value.extraInfo],
   ]
-    .filter(([, , answer]) => answer.trim() !== "")
+    .filter(([questionKey, , answer]) =>
+      questionKey === "motivationAngles" ? answer !== "[]" : answer.trim() !== "",
+    )
     .map(([questionKey, question, answer]) => ({
       questionKey,
       question,
@@ -323,6 +362,9 @@ export default function AssignLeadForm({
   };
 
   const clearPreviousQuestions = () => {
+    form.setFieldValue("primaryProfile", "");
+    form.setFieldValue("subProfile", "");
+    form.setFieldValue("motivationAngles", []);
     form.setFieldValue("isDecisionMaker", "");
     form.setFieldValue("decisionMakerName", "");
     form.setFieldValue("financialSource", "");
@@ -350,20 +392,7 @@ export default function AssignLeadForm({
     form.setFieldValue("outcome", nextOutcome);
   };
 
-  const applyAiDraft = (draft: {
-    isContacted: "" | "Si" | "No";
-    outcome: CallerOutcome | "";
-    isDecisionMaker: "" | "Si" | "No";
-    decisionMakerName: string;
-    financialSource: string;
-    trainingAndPriceAwareness: string;
-    urgencyReason: string;
-    summary: string;
-    extraInfo: string;
-    scheduledDate: string;
-    scheduledTime: string;
-    alertSeverity: AlertSeverity | "";
-  }) => {
+  const applyAiDraft = (draft: CallFeedbackDraft) => {
     const nextOutcome = outcomeOptions.some(
       (option) => option.value === draft.outcome,
     )
@@ -375,6 +404,12 @@ export default function AssignLeadForm({
     setOutcome(nextContacted === "Si" ? nextOutcome : "");
     form.setFieldValue("isContacted", nextContacted);
     form.setFieldValue("outcome", nextContacted === "Si" ? nextOutcome : "");
+    form.setFieldValue("primaryProfile", draft.primaryProfile);
+    form.setFieldValue(
+      "subProfile",
+      draft.primaryProfile === "latino_extranjero" ? draft.subProfile : "",
+    );
+    form.setFieldValue("motivationAngles", draft.motivationAngles);
     form.setFieldValue("isDecisionMaker", draft.isDecisionMaker);
     form.setFieldValue("decisionMakerName", draft.decisionMakerName);
     form.setFieldValue("financialSource", draft.financialSource);
@@ -469,6 +504,98 @@ export default function AssignLeadForm({
                   .map((error) => (typeof error === "string" ? error : ""))
                   .join(" ")}
               </FieldError>
+            </Field>
+          )}
+        </form.Field>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <form.Field name="primaryProfile">
+            {(field) => (
+              <Field>
+                <FieldLabel htmlFor="primaryProfile">Perfil principal</FieldLabel>
+                <Select
+                  value={field.state.value}
+                  onValueChange={(value) => {
+                    const nextValue = (value ?? "") as FeedbackProfile | "";
+                    field.handleChange(nextValue);
+                    if (nextValue !== "latino_extranjero") {
+                      form.setFieldValue("subProfile", "");
+                    }
+                  }}
+                >
+                  <SelectTrigger id="primaryProfile" data-testid="primary-profile-trigger">
+                    <SelectValue placeholder="Seleccione un perfil" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {FEEDBACK_PROFILES.map((profile) => (
+                        <SelectItem key={profile.value} value={profile.value}>
+                          {profile.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
+          </form.Field>
+
+          <form.Subscribe selector={(state) => state.values.primaryProfile}>
+            {(primaryProfile) =>
+              primaryProfile === "latino_extranjero" ? (
+                <form.Field name="subProfile">
+                  {(field) => (
+                    <Field>
+                      <FieldLabel htmlFor="subProfile">Subperfil</FieldLabel>
+                      <Select
+                        value={field.state.value}
+                        onValueChange={(value) => field.handleChange((value ?? "") as FeedbackProfile | "")}
+                      >
+                        <SelectTrigger id="subProfile" data-testid="sub-profile-trigger">
+                          <SelectValue placeholder="Seleccione un subperfil" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            {FEEDBACK_PROFILES.filter((profile) => profile.value !== "latino_extranjero").map((profile) => (
+                              <SelectItem key={profile.value} value={profile.value}>
+                                {profile.label}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                  )}
+                </form.Field>
+              ) : null
+            }
+          </form.Subscribe>
+        </div>
+
+        <form.Field name="motivationAngles">
+          {(field) => (
+            <Field>
+              <FieldLabel>Ángulos de motivación</FieldLabel>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {MOTIVATION_ANGLES.map((angle) => {
+                  const checked = field.state.value.includes(angle.value);
+                  return (
+                    <label key={angle.value} className="flex items-start gap-2 text-sm">
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(nextChecked) =>
+                          field.handleChange(
+                            nextChecked
+                              ? [...field.state.value, angle.value]
+                              : field.state.value.filter((value) => value !== angle.value),
+                          )
+                        }
+                      />
+                      <span>{angle.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
             </Field>
           )}
         </form.Field>

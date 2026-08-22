@@ -11,6 +11,41 @@ export const MONTHLY_REFERENCE_MINUTES = 5_000;
 const nullableFormText = z.string().max(2_000);
 const transcriptText = z.string().max(100_000);
 
+export const FEEDBACK_PROFILES = [
+  { value: "latino_extranjero", label: "Latino/extranjero" },
+  { value: "mayor_edad_avanzada", label: "Mayor/edad avanzada" },
+  { value: "closer_setter_comercial", label: "Closer/setter/comercial" },
+  { value: "parado_desempleado", label: "Parado/desempleado" },
+  { value: "familia_con_hijos", label: "Madre/padre o familia con hijos" },
+  { value: "busca_ingreso_extra", label: "Busca una segunda fuente/ingreso extra" },
+  { value: "autonomo_emprendedor", label: "Autónomo/emprendedor" },
+  { value: "solo_busca_empleo", label: "Solo busca trabajo/empleo" },
+  { value: "sin_recursos_no_invierte", label: "Sin recursos/no invierte" },
+] as const;
+
+export const MOTIVATION_ANGLES = [
+  { value: "income_extra_to_primary", label: "Convertir el extra en fuente principal/dejar su empleo" },
+  { value: "concrete_income_goal", label: "Meta de dinero concreta (1,5k–5k)/escalar" },
+  { value: "time_freedom", label: "Libertad de tiempo/flexibilidad horaria" },
+  { value: "remote_location_freedom", label: "Trabajar online/desde casa/ubicación libre" },
+  { value: "combine_current_work", label: "Compaginar con su trabajo actual" },
+  { value: "financial_stability", label: "Estabilidad/tranquilidad financiera" },
+  { value: "burned_out_current_job", label: "Quemado/harto del trabajo actual" },
+  { value: "family_quality_time", label: "Más tiempo/calidad de vida con la familia" },
+] as const;
+
+export type FeedbackProfile = (typeof FEEDBACK_PROFILES)[number]["value"];
+export type MotivationAngle = (typeof MOTIVATION_ANGLES)[number]["value"];
+
+const profileValues = FEEDBACK_PROFILES.map((profile) => profile.value) as [
+  FeedbackProfile,
+  ...FeedbackProfile[],
+];
+const motivationAngleValues = MOTIVATION_ANGLES.map((angle) => angle.value) as [
+  MotivationAngle,
+  ...MotivationAngle[],
+];
+
 export const callFeedbackDraftSchema = z
   .object({
     isContacted: z.enum(["", "Si", "No"]),
@@ -21,6 +56,9 @@ export const callFeedbackDraftSchema = z
       "not_interested",
       "appointment",
     ]),
+    primaryProfile: z.union([z.literal(""), z.enum(profileValues)]),
+    subProfile: z.union([z.literal(""), z.enum(profileValues)]),
+    motivationAngles: z.array(z.enum(motivationAngleValues)).max(MOTIVATION_ANGLES.length),
     isDecisionMaker: z.enum(["", "Si", "No"]),
     decisionMakerName: nullableFormText,
     financialSource: nullableFormText,
@@ -77,6 +115,12 @@ const structuredDraftSchema = {
       type: "string",
       enum: ["", "future_call", "not_fit", "not_interested", "appointment"],
     },
+    primaryProfile: { type: "string", enum: ["", ...profileValues] },
+    subProfile: { type: "string", enum: ["", ...profileValues] },
+    motivationAngles: {
+      type: "array",
+      items: { type: "string", enum: motivationAngleValues },
+    },
     isDecisionMaker: { type: "string", enum: ["", "Si", "No"] },
     decisionMakerName: { type: "string" },
     financialSource: { type: "string" },
@@ -93,6 +137,9 @@ const structuredDraftSchema = {
   required: [
     "isContacted",
     "outcome",
+    "primaryProfile",
+    "subProfile",
+    "motivationAngles",
     "isDecisionMaker",
     "decisionMakerName",
     "financialSource",

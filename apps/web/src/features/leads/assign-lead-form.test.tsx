@@ -135,6 +135,8 @@ describe("AssignLeadForm", () => {
 
     await chooseOption(user, "isContacted-trigger", "Si");
     await chooseOption(user, "outcome-trigger", "No interesado");
+    await chooseOption(user, "primary-profile-trigger", "Latino/extranjero");
+    await chooseOption(user, "sub-profile-trigger", "Parado/desempleado");
     await user.type(
       screen.getByLabelText(
         "¿Es consciente de que es una formación y sabe el precio?",
@@ -152,6 +154,14 @@ describe("AssignLeadForm", () => {
       expect(mocks.mutate).toHaveBeenCalledWith(
         expect.objectContaining({
           questions: expect.arrayContaining([
+            expect.objectContaining({
+              questionKey: "primaryProfile",
+              answer: "latino_extranjero",
+            }),
+            expect.objectContaining({
+              questionKey: "subProfile",
+              answer: "parado_desempleado",
+            }),
             expect.objectContaining({
               questionKey: "trainingAndPriceAwareness",
               answer: "Sabe que es una formación y conoce el precio",

@@ -5,6 +5,8 @@ const ROUTE_MAP: Record<string, string> = {
     "/alerts": "Alertas",
     "/users": "Usuarios",
     "/leads": "Leads",
+    "/personal-statistics": "Estadísticas personales",
+    "/feedback-statistics": "Estadísticas de feedback",
     "/analytical": "Analitica",
     "/campaigns": "Campañas",
     "/calendar": "Calendario",

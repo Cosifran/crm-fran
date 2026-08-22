@@ -96,6 +96,11 @@ const data = {
       url: "/personal-statistics",
       icon: <ChartNoAxesCombinedIcon />,
     },
+    {
+      title: "Estadísticas de feedback",
+      url: "/feedback-statistics",
+      icon: <FileChartColumnIcon />,
+    },
     /*  {
        title: "Analitica",
        url: "/analytical",

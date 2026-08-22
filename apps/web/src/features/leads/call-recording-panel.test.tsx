@@ -83,6 +83,9 @@ describe("CallRecordingPanel", () => {
     const draft = {
       isContacted: "Si",
       outcome: "not_interested",
+      primaryProfile: "parado_desempleado",
+      subProfile: "",
+      motivationAngles: ["financial_stability"],
       isDecisionMaker: "",
       decisionMakerName: "",
       financialSource: "",

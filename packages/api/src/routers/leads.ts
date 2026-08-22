@@ -13,6 +13,7 @@ import {
   createLead,
   setLeadType,
   getLeadActivity,
+  getFeedbackStatistics,
 } from "../leads/services/index";
 import { permittedProcedure } from "@crm-fran/api/trpc/trpc";
 import { getMonthlyCallFeedbackUsage } from "../call-feedback-runtime";
@@ -82,6 +83,17 @@ export const personalStatisticsInput = z
   })
   .refine((value) => !(value.callerId && value.closerId), {
     message: "Caller and closer filters cannot be combined",
+  })
+  .refine((value) => !(value.from && value.to && value.from > value.to), {
+    message: "From date must be before or equal to to date",
+    path: ["to"],
+  });
+
+export const feedbackStatisticsInput = z
+  .object({
+    callerId: z.string().min(1).optional(),
+    from: z.string().date().optional(),
+    to: z.string().date().optional(),
   })
   .refine((value) => !(value.from && value.to && value.from > value.to), {
     message: "From date must be before or equal to to date",
@@ -158,6 +170,12 @@ export const leadsRouter = router({
 		.input(personalStatisticsInput)
 		.query(async ({ input }) => {
 			return await getPersonalStatistics(input);
+		}),
+
+	feedbackStatistics: permittedProcedure(["leads:read"])
+		.input(feedbackStatisticsInput)
+		.query(async ({ input }) => {
+			return await getFeedbackStatistics(input);
 		}),
 
   listAll: permittedProcedure(["leads:read"])

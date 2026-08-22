@@ -43,6 +43,10 @@ const dependencies: CallFeedbackDependencies = {
       instructions:
         "Extract a conservative CRM feedback draft from the Spanish call transcript. " +
         "Never invent facts. Use empty strings when information is absent or uncertain. " +
+        "Classify profiles only from explicit statements. Never infer nationality, age, family status, employment, profession, or finances. " +
+        "Choose one primaryProfile using this precedence: latino_extranjero, mayor_edad_avanzada, closer_setter_comercial, parado_desempleado, familia_con_hijos, then the remaining applicable profile. " +
+        "When latino_extranjero is explicit, use it as primaryProfile and preserve the next applicable profile in subProfile; otherwise leave subProfile empty. " +
+        "Select every explicitly stated motivation angle. Do not evaluate or score the caller's sales technique. " +
         "Write a concise factual summary in summary. " +
         "In trainingAndPriceAwareness, state only whether the lead understands that the product is training and whether they know its price. " +
         "Extract the stated source of financial capacity and the reason for urgency when available. " +

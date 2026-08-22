@@ -11,6 +11,9 @@ import type { CallFeedbackDependencies } from "../call-feedback";
 const validDraft = {
   isContacted: "Si",
   outcome: "not_interested",
+  primaryProfile: "latino_extranjero",
+  subProfile: "parado_desempleado",
+  motivationAngles: ["income_extra_to_primary"],
   isDecisionMaker: "",
   decisionMakerName: "",
   financialSource: "",
@@ -79,6 +82,9 @@ describe("call feedback", () => {
       callFeedbackDraftSchema.parse({
         isContacted: "Si",
         outcome: "future_call",
+        primaryProfile: "mayor_edad_avanzada",
+        subProfile: "",
+        motivationAngles: ["financial_stability"],
         isDecisionMaker: "Si",
         decisionMakerName: "",
         financialSource: "Ahorros",
