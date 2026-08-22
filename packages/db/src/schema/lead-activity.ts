@@ -27,6 +27,10 @@ export const LEAD_ACTIVITY_KIND = {
   ALERT_DISMISSED: "alert_dismissed",
   LEAD_RECOVERED: "lead_recovered",
   LEAD_DISCARDED: "lead_discarded",
+  RECOMMENDATION_SHOWN: "recommendation_shown",
+  RECOMMENDATION_OPENED: "recommendation_opened",
+  RECOMMENDATION_COMPLETED: "recommendation_completed",
+  RECOMMENDATION_SKIPPED: "recommendation_skipped",
 } as const;
 
 export type LeadActivityKind =
@@ -64,7 +68,7 @@ export const leadActivityEvents = pgTable(
     ),
     check(
       "lead_activity_events_kind_check",
-      sql`${table.kind} IN ('lead_created', 'lead_type_changed', 'caller_assigned', 'closer_assigned', 'state_changed', 'caller_feedback', 'closer_feedback', 'appointment_scheduled', 'appointment_rescheduled', 'alert_created', 'alert_resolved', 'alert_dismissed', 'lead_recovered', 'lead_discarded')`,
+      sql`${table.kind} IN ('lead_created', 'lead_type_changed', 'caller_assigned', 'closer_assigned', 'state_changed', 'caller_feedback', 'closer_feedback', 'appointment_scheduled', 'appointment_rescheduled', 'alert_created', 'alert_resolved', 'alert_dismissed', 'lead_recovered', 'lead_discarded', 'recommendation_shown', 'recommendation_opened', 'recommendation_completed', 'recommendation_skipped')`,
     ),
   ],
 );

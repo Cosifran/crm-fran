@@ -7,6 +7,9 @@ import {
 	dismissAlert,
 	listAlerts,
 	listLeadRiskQueue,
+	listNextBestActions,
+	listRecommendationMetrics,
+	recordRecommendationEvent,
 	resolveAlert,
 	processRecurringAlerts,
 	getAlertPreferences,
@@ -41,6 +44,18 @@ const listAlertsInput = z
 
 const alertIdInput = z.object({
 	id: z.string().min(1),
+});
+
+const recommendationEventInput = z.object({
+	leadId: z.string().min(1),
+	recommendationKey: z.string().min(1),
+	kind: z.enum(["recommendation_shown", "recommendation_opened", "recommendation_completed", "recommendation_skipped"]),
+	reason: z.string().trim().min(1).max(500).optional(),
+	reactionTimeMs: z.number().int().nonnegative().optional(),
+}).superRefine((value, ctx) => {
+	if (value.kind === "recommendation_skipped" && !value.reason) {
+		ctx.addIssue({ code: "custom", path: ["reason"], message: "Skip reason is required" });
+	}
 });
 
 export const alertPreferencesInput = z
@@ -107,6 +122,23 @@ export const alertsRouter = router({
 			permissions: ctx.permissions,
 		});
 	}),
+
+	listNextBestActions: permittedProcedure(["alerts:read"]).query(async ({ ctx }) => {
+		return await listNextBestActions({
+			actorId: ctx.session.user.id,
+			permissions: ctx.permissions,
+		});
+	}),
+
+	getNextBestActionMetrics: permittedProcedure(["alerts:read"]).query(async ({ ctx }) => {
+		return await listRecommendationMetrics({ actorId: ctx.session.user.id, permissions: ctx.permissions });
+	}),
+
+	recordNextBestActionEvent: permittedProcedure(["alerts:write"])
+		.input(recommendationEventInput)
+		.mutation(async ({ ctx, input }) => {
+			return await recordRecommendationEvent({ ...input, actorId: ctx.session.user.id, permissions: ctx.permissions });
+		}),
 
 	dismissAlert: permittedProcedure(["alerts:write"])
 		.input(alertIdInput)

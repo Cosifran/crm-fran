@@ -6,6 +6,8 @@ import {
   CalendarClockIcon,
   CheckCircle2Icon,
   CircleUserRoundIcon,
+  CircleOffIcon,
+  EyeIcon,
   FileTextIcon,
   HistoryIcon,
   RotateCcwIcon,
@@ -37,6 +39,10 @@ const ICON_BY_KIND: Record<ActivityKind, typeof HistoryIcon> = {
   alert_dismissed: BellIcon,
   lead_recovered: RotateCcwIcon,
   lead_discarded: BanIcon,
+  recommendation_shown: EyeIcon,
+  recommendation_opened: EyeIcon,
+  recommendation_completed: CheckCircle2Icon,
+  recommendation_skipped: CircleOffIcon,
 };
 
 function formatActivityDate(value: Date | string | null) {

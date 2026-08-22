@@ -92,6 +92,36 @@ export function useLeadRiskQueue() {
   });
 }
 
+export function useNextBestActions() {
+	return useQuery({
+		...trpc.alerts.listNextBestActions.queryOptions(),
+		refetchInterval: 60_000,
+	});
+}
+
+export function useNextBestActionMetrics() {
+	return useQuery({
+		...trpc.alerts.getNextBestActionMetrics.queryOptions(),
+		refetchInterval: 60_000,
+	});
+}
+
+export function useRecordNextBestActionEvent() {
+	const queryClient = useQueryClient();
+	return useTrpcMutationWithToast(
+		{
+			...trpc.alerts.recordNextBestActionEvent.mutationOptions(),
+			onSuccess: async () => {
+				await Promise.all([
+					queryClient.invalidateQueries({ queryKey: trpc.alerts.listNextBestActions.queryKey() }),
+					queryClient.invalidateQueries({ queryKey: trpc.alerts.getNextBestActionMetrics.queryKey() }),
+				]);
+			},
+		},
+		{ success: "Actividad de recomendación registrada", error: "No se pudo registrar la actividad" },
+	);
+}
+
 export function useAlertPreferences() {
   return useQuery({
     ...trpc.alerts.getPreferences.queryOptions(),

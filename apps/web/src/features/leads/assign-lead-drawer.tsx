@@ -41,6 +41,8 @@ interface AssignLeadDrawerProps {
     lead: Lead;
     triggerLabel?: string;
     mode?: "default" | "agenda-feedback";
+		onOpen?: () => void | Promise<void>;
+		onCompleted?: () => void | Promise<void>;
 }
 
 // ── Role detection ───────────────────────────────────────────────────────────
@@ -66,10 +68,15 @@ export default function AssignLeadDrawer({
     lead,
     triggerLabel,
     mode = "default",
+		onOpen,
+		onCompleted,
 }: AssignLeadDrawerProps) {
     const [open, setOpen] = useState(false);
     const [closerSubmitLabel, setCloserSubmitLabel] = useState("Guardar");
     const [callerSubmitLabel, setCallerSubmitLabel] = useState("Guardar");
+		const [businessCompleted, setBusinessCompleted] = useState(false);
+		const [completionState, setCompletionState] = useState<"idle" | "pending" | "error">("idle");
+		const [completionError, setCompletionError] = useState<string | null>(null);
 
     const { data: session } = authClient.useSession();
     const { permissions } = usePermissionState();
@@ -81,6 +88,24 @@ export default function AssignLeadDrawer({
         (session?.user as { roleId?: string } | undefined)?.roleId,
     );
     const isAgendaFeedback = mode === "agenda-feedback";
+		const completeRecommendation = async () => {
+			setCompletionState("pending");
+			setCompletionError(null);
+			try {
+				await onCompleted?.();
+				setBusinessCompleted(false);
+				setCompletionState("idle");
+				setCompletionError(null);
+				setOpen(false);
+			} catch {
+				setCompletionState("error");
+				setCompletionError("La gestión se guardó, pero no se pudo registrar la recomendación. Reinténtalo sin guardar de nuevo.");
+			}
+		};
+		const handleBusinessSuccess = () => {
+			setBusinessCompleted(true);
+			void completeRecommendation();
+		};
     const showsCloserFeedback =
       role === "role-closer" || (isAgendaFeedback && role === "role-admin");
     const showsCallerActions =
@@ -121,7 +146,13 @@ export default function AssignLeadDrawer({
       <>
         <Button
           variant="outline"
-          onClick={() => setOpen(true)}
+		  onClick={() => {
+				if (businessCompleted) return;
+				setCompletionState("idle");
+				setCompletionError(null);
+				setOpen(true);
+				void Promise.resolve(onOpen?.()).catch(() => undefined);
+			}}
           aria-label={triggerLabel ?? "Abrir drawer"}
         >
           <UserRoundPlus />
@@ -130,18 +161,18 @@ export default function AssignLeadDrawer({
 
         <LeadDrawer
           open={open}
-          onOpenChange={setOpen}
+		  onOpenChange={(nextOpen) => { if (!businessCompleted) setOpen(nextOpen); }}
           title={title}
           description={description}
           type="edit"
-          submitFormId={submitFormId}
+		  submitFormId={businessCompleted ? undefined : submitFormId}
           submitLabel={
             showsCloserFeedback
               ? closerSubmitLabel
               : callerSubmitLabel
           }
         >
-          {showsCloserFeedback && (
+		  {!businessCompleted && showsCloserFeedback && (
             <CloserQAForm
               leadId={lead.id}
               currentCloserId={lead.closerId}
@@ -149,21 +180,27 @@ export default function AssignLeadDrawer({
                 (q) => q.authorRole === "closer",
               )}
               onCancel={() => setOpen(false)}
-              onSuccess={() => setOpen(false)}
+				  onSuccess={handleBusinessSuccess}
               onSubmitLabelChange={setCloserSubmitLabel}
             />
           )}
 
-          {showsCallerActions && (
+		  {!businessCompleted && showsCallerActions && (
             <AssignLeadForm
               leadId={lead.id}
               onCancel={() => setOpen(false)}
-              onSuccess={() => setOpen(false)}
+				  onSuccess={handleBusinessSuccess}
               leadQuestions={lead.questions}
               currentCloserId={lead.closerId}
               onSubmitLabelChange={setCallerSubmitLabel}
             />
-          )}
+	          )}
+			  {businessCompleted && (
+				  <div className="flex flex-col gap-3 border p-4" role="status">
+					  <p className={completionState === "error" ? "text-sm text-destructive" : "text-sm text-muted-foreground"}>{completionError ?? "La gestión se guardó. Espera a que termine el registro."}</p>
+					  {completionState === "error" && <Button type="button" onClick={() => { void completeRecommendation(); }}>Reintentar registro</Button>}
+				  </div>
+			  )}
         </LeadDrawer>
       </>
     );
