@@ -29,4 +29,19 @@ describe("createLeadInput", () => {
     if (!result.success) throw new Error("Expected valid imported lead");
     expect(result.data.type).toBe("maestra");
   });
+
+  it("accepts campaign and source from the incoming lead data", () => {
+    const result = createLeadInput.safeParse({
+      ...lead,
+      source: "Meta Ads",
+      campaign: "VSL Agosto",
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) throw new Error("Expected valid imported lead");
+    expect(result.data).toMatchObject({
+      source: "Meta Ads",
+      campaign: "VSL Agosto",
+    });
+  });
 });

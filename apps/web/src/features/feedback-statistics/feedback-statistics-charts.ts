@@ -13,6 +13,7 @@ type ProfileRow = {
 };
 
 type AngleRow = { angle: string; total: number };
+type AttributionRow = { value: string; total: number };
 
 const reactionLabels: Record<keyof Reactions, string> = {
   appointment: "Agenda",
@@ -31,11 +32,15 @@ export type FeedbackChartItem = {
 export function buildFeedbackChartData({
   profiles,
   angles,
+  sources,
+  campaigns,
   profileLabels,
   angleLabels,
 }: {
   profiles: readonly ProfileRow[];
   angles: readonly AngleRow[];
+  sources: readonly AttributionRow[];
+  campaigns: readonly AttributionRow[];
   profileLabels: Readonly<Record<string, string>>;
   angleLabels: Readonly<Record<string, string>>;
 }) {
@@ -61,6 +66,16 @@ export function buildFeedbackChartData({
     angles: angles.map(({ angle, total }) => ({
       key: angle,
       name: angleLabels[angle] ?? angle,
+      value: total,
+    })),
+    sources: sources.map(({ value, total }) => ({
+      key: value,
+      name: value,
+      value: total,
+    })),
+    campaigns: campaigns.map(({ value, total }) => ({
+      key: value,
+      name: value,
       value: total,
     })),
   };

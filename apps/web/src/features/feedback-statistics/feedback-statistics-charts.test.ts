@@ -30,6 +30,8 @@ describe("feedback statistics charts", () => {
         },
       ],
       angles: [{ angle: "financial_stability", total: 2 }],
+      sources: [{ value: "Meta Ads", total: 3 }],
+      campaigns: [{ value: "VSL Agosto", total: 2 }],
       profileLabels: { latino_extranjero: "Latino/extranjero", parado_desempleado: "Parado/desempleado" },
       angleLabels: { financial_stability: "Estabilidad financiera" },
     });
@@ -45,6 +47,12 @@ describe("feedback statistics charts", () => {
     ]);
     expect(result.angles).toEqual([
       { key: "financial_stability", name: "Estabilidad financiera", value: 2 },
+    ]);
+    expect(result.sources).toEqual([
+      { key: "Meta Ads", name: "Meta Ads", value: 3 },
+    ]);
+    expect(result.campaigns).toEqual([
+      { key: "VSL Agosto", name: "VSL Agosto", value: 2 },
     ]);
   });
 });

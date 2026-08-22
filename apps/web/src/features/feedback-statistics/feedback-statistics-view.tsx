@@ -3,9 +3,12 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Cell, Pie, PieChart } from "recharts";
+
 import { FEEDBACK_PROFILES, MOTIVATION_ANGLES } from "@crm-fran/api/call-feedback";
+import { Button } from "@crm-fran/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@crm-fran/ui/components/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@crm-fran/ui/components/chart";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@crm-fran/ui/components/dialog";
 import { Field, FieldError, FieldLabel } from "@crm-fran/ui/components/field";
 import { Input } from "@crm-fran/ui/components/input";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@crm-fran/ui/components/select";
@@ -13,66 +16,211 @@ import { Skeleton } from "@crm-fran/ui/components/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@crm-fran/ui/components/table";
 
 import { trpc } from "@/utils/trpc";
-import { selectFeedbackCaller } from "./feedback-statistics-filters";
 import { buildFeedbackChartData, type FeedbackChartItem } from "./feedback-statistics-charts";
+import { filterFeedbackDetails, type FeedbackDrilldownFilter } from "./feedback-statistics-drilldown";
+import { selectFeedbackCaller } from "./feedback-statistics-filters";
 
-const profileLabels = Object.fromEntries(FEEDBACK_PROFILES.map(({ value, label }) => [value, label]));
-const angleLabels = Object.fromEntries(MOTIVATION_ANGLES.map(({ value, label }) => [value, label]));
+const profileLabels = Object.fromEntries(
+  FEEDBACK_PROFILES.map(({ value, label }) => [value, label]),
+);
+const angleLabels = Object.fromEntries(
+  MOTIVATION_ANGLES.map(({ value, label }) => [value, label]),
+);
 const chartConfig = { value: { label: "Feedbacks" } } satisfies ChartConfig;
 const chartColors = [
-  "var(--chart-1)",
-  "var(--chart-2)",
-  "var(--chart-3)",
-  "var(--chart-4)",
-  "var(--chart-5)",
-  "var(--chart-6)",
-  "var(--chart-7)",
-  "var(--chart-8)",
-  "var(--chart-9)",
+  "var(--chart-1)", "var(--chart-2)", "var(--chart-3)",
+  "var(--chart-4)", "var(--chart-5)", "var(--chart-6)",
+  "var(--chart-7)", "var(--chart-8)", "var(--chart-9)",
 ];
+
+type FeedbackDetail = {
+  leadId: string;
+  leadName: string;
+  callerName: string | null;
+  source: string | null;
+  campaign: string | null;
+  outcome: string | null;
+  profile: string | null;
+  angles: readonly string[];
+  summary: string;
+  occurredAt: Date | string;
+};
+
+type FunnelLead = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  source: string | null;
+  campaign: string | null;
+};
+
+type Drilldown = { title: string; items: Array<FeedbackDetail | FunnelLead> } | null;
 
 export function FeedbackStatisticsView() {
   const [caller, setCaller] = useState({ id: "all", name: "Todos los callers" });
+  const [source, setSource] = useState("all");
+  const [campaign, setCampaign] = useState("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [drilldown, setDrilldown] = useState<Drilldown>(null);
   const invalidInterval = Boolean(from && to && from > to);
   const statistics = useQuery({
-    ...trpc.leads.feedbackStatistics.queryOptions({ callerId: caller.id === "all" ? undefined : caller.id, from: from || undefined, to: to || undefined }),
+    ...trpc.leads.feedbackStatistics.queryOptions({
+      callerId: caller.id === "all" ? undefined : caller.id,
+      source: source === "all" ? undefined : source,
+      campaign: campaign === "all" ? undefined : campaign,
+      from: from || undefined,
+      to: to || undefined,
+    }),
     enabled: !invalidInterval,
   });
   const chartData = buildFeedbackChartData({
     profiles: statistics.data?.profiles ?? [],
     angles: statistics.data?.angles ?? [],
+    sources: statistics.data?.sources ?? [],
+    campaigns: statistics.data?.campaigns ?? [],
     profileLabels,
     angleLabels,
   });
 
+  const openFeedbackDrilldown = (title: string, filter: FeedbackDrilldownFilter) => {
+    setDrilldown({
+      title,
+      items: filterFeedbackDetails(statistics.data?.feedbacks ?? [], filter),
+    });
+  };
+
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 pt-4 sm:pt-6">
-      <div><h1 className="text-2xl font-semibold">Estadísticas de feedback</h1><p className="text-muted-foreground">Perfiles, motivaciones y reacción de los leads en los feedbacks guardados.</p></div>
-      <Card><CardHeader><CardTitle>Filtros</CardTitle></CardHeader><CardContent className="grid gap-4 md:grid-cols-3">
-        <Field><FieldLabel htmlFor="feedback-caller">Caller</FieldLabel><Select value={caller.id} onValueChange={(value) => setCaller(selectFeedbackCaller(statistics.data?.callers ?? [], value ?? "all"))}><SelectTrigger id="feedback-caller"><SelectValue>{caller.name}</SelectValue></SelectTrigger><SelectContent><SelectGroup><SelectItem value="all">Todos los callers</SelectItem>{statistics.data?.callers.map((callerOption) => <SelectItem key={callerOption.id} value={callerOption.id}>{callerOption.name}</SelectItem>)}</SelectGroup></SelectContent></Select></Field>
-        <Field><FieldLabel htmlFor="feedback-from">Desde</FieldLabel><Input id="feedback-from" type="date" value={from} onChange={(event) => setFrom(event.target.value)} /></Field>
-        <Field invalid={invalidInterval}><FieldLabel htmlFor="feedback-to">Hasta</FieldLabel><Input id="feedback-to" type="date" value={to} onChange={(event) => setTo(event.target.value)} aria-invalid={invalidInterval} /><FieldError>{invalidInterval ? "La fecha final no puede ser anterior a la inicial" : ""}</FieldError></Field>
-      </CardContent></Card>
+      <div>
+        <h1 className="text-2xl font-semibold">Estadísticas de feedback</h1>
+        <p className="text-muted-foreground">
+          Calidad, conversión y trazabilidad de perfiles, campañas y orígenes.
+        </p>
+      </div>
 
-      {statistics.isLoading ? <div className="grid gap-4 md:grid-cols-3"><Skeleton className="h-28" /><Skeleton className="h-28" /><Skeleton className="h-28" /></div> : statistics.isError ? <Card><CardContent className="py-8 text-sm text-destructive">No se pudieron cargar las estadísticas.</CardContent></Card> : <>
-        <div className="grid gap-4 md:grid-cols-3"><Metric title="Feedbacks" value={statistics.data?.totalFeedbacks ?? 0} /><Metric title="Con perfil" value={statistics.data?.classifiedFeedbacks ?? 0} /><Metric title="Conversión a agenda" value={`${statistics.data?.appointmentRate ?? 0}%`} /></div>
-        <div className="grid gap-4 lg:grid-cols-3">
-          <DonutChart title="Distribución de perfiles" data={chartData.profiles} />
-          <DonutChart title="Reacción de los perfiles" data={chartData.reactions} />
-          <DonutChart title="Ángulos de motivación" data={chartData.angles} />
+      <Filters
+        caller={caller}
+        source={source}
+        campaign={campaign}
+        from={from}
+        to={to}
+        invalidInterval={invalidInterval}
+        callers={statistics.data?.callers ?? []}
+        sources={statistics.data?.availableSources ?? []}
+        campaigns={statistics.data?.availableCampaigns ?? []}
+        onCallerChange={(value) => setCaller(selectFeedbackCaller(statistics.data?.callers ?? [], value))}
+        onSourceChange={setSource}
+        onCampaignChange={setCampaign}
+        onFromChange={setFrom}
+        onToChange={setTo}
+      />
+
+      {statistics.isLoading ? (
+        <div className="grid gap-4 md:grid-cols-3">
+          <Skeleton className="h-28" /><Skeleton className="h-28" /><Skeleton className="h-28" />
         </div>
-        <Card><CardHeader><CardTitle>Reacción por perfil</CardTitle></CardHeader><CardContent><Table><TableHeader><TableRow><TableHead>Perfil</TableHead><TableHead>Subperfiles</TableHead><TableHead>Total</TableHead><TableHead>Agenda</TableHead><TableHead>Futuro</TableHead><TableHead>No interesado</TableHead><TableHead>No encaja</TableHead></TableRow></TableHeader><TableBody>
-          {statistics.data?.profiles.map((profile) => <TableRow key={profile.profile}><TableCell className="font-medium">{profileLabels[profile.profile] ?? profile.profile}</TableCell><TableCell>{profile.subProfiles.map((sub) => `${profileLabels[sub.profile] ?? sub.profile} (${sub.total})`).join(", ") || "—"}</TableCell><TableCell>{profile.total}</TableCell><TableCell>{profile.reactions.appointment}</TableCell><TableCell>{profile.reactions.future_call}</TableCell><TableCell>{profile.reactions.not_interested}</TableCell><TableCell>{profile.reactions.not_fit}</TableCell></TableRow>)}
-          {statistics.data?.profiles.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No hay feedbacks clasificados en este intervalo.</TableCell></TableRow>}
-        </TableBody></Table></CardContent></Card>
-        <Card><CardHeader><CardTitle>Ángulos de motivación</CardTitle></CardHeader><CardContent><Table><TableHeader><TableRow><TableHead>Ángulo</TableHead><TableHead>Total</TableHead><TableHead>Agenda</TableHead><TableHead>Futuro</TableHead><TableHead>No interesado</TableHead><TableHead>No encaja</TableHead></TableRow></TableHeader><TableBody>
-          {statistics.data?.angles.map((angle) => <TableRow key={angle.angle}><TableCell className="font-medium">{angleLabels[angle.angle] ?? angle.angle}</TableCell><TableCell>{angle.total}</TableCell><TableCell>{angle.reactions.appointment}</TableCell><TableCell>{angle.reactions.future_call}</TableCell><TableCell>{angle.reactions.not_interested}</TableCell><TableCell>{angle.reactions.not_fit}</TableCell></TableRow>)}
-          {statistics.data?.angles.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No hay ángulos registrados en este intervalo.</TableCell></TableRow>}
-        </TableBody></Table></CardContent></Card>
-      </>}
+      ) : statistics.isError ? (
+        <Card><CardContent className="py-8 text-sm text-destructive">No se pudieron cargar las estadísticas.</CardContent></Card>
+      ) : (
+        <>
+          <div className="grid gap-4 md:grid-cols-3">
+            <Metric title="Feedbacks" value={statistics.data?.totalFeedbacks ?? 0} />
+            <Metric title="Con perfil" value={statistics.data?.classifiedFeedbacks ?? 0} />
+            <Metric title="Conversión a agenda" value={`${statistics.data?.appointmentRate ?? 0}%`} />
+          </div>
+
+          <DataQualityPanel
+            quality={statistics.data?.dataQuality}
+            onSelect={(field, label) =>
+              openFeedbackDrilldown(`Feedbacks sin ${label.toLowerCase()}`, { kind: "missing", value: field })
+            }
+          />
+
+          <FunnelSection
+            title="Embudo por origen"
+            groups={statistics.data?.funnels.sources ?? []}
+            onSelect={(title, leads) => setDrilldown({ title, items: leads })}
+          />
+          <FunnelSection
+            title="Embudo por campaña"
+            groups={statistics.data?.funnels.campaigns ?? []}
+            onSelect={(title, leads) => setDrilldown({ title, items: leads })}
+          />
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <DonutChart title="Distribución por origen" data={chartData.sources} onSelect={(item) => openFeedbackDrilldown(`Origen: ${item.name}`, { kind: "source", value: item.key })} />
+            <DonutChart title="Distribución por campaña" data={chartData.campaigns} onSelect={(item) => openFeedbackDrilldown(`Campaña: ${item.name}`, { kind: "campaign", value: item.key })} />
+          </div>
+          <div className="grid gap-4 lg:grid-cols-3">
+            <DonutChart title="Distribución de perfiles" data={chartData.profiles} onSelect={(item) => openFeedbackDrilldown(`Perfil: ${item.name}`, { kind: "profile", value: item.key })} />
+            <DonutChart title="Reacción de los perfiles" data={chartData.reactions} onSelect={(item) => openFeedbackDrilldown(`Reacción: ${item.name}`, { kind: "reaction", value: item.key })} />
+            <DonutChart title="Ángulos de motivación" data={chartData.angles} onSelect={(item) => openFeedbackDrilldown(`Ángulo: ${item.name}`, { kind: "angle", value: item.key })} />
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-2">
+            <AttributionTable title="Calidad por origen" rows={statistics.data?.sources ?? []} onSelect={(value) => openFeedbackDrilldown(`Origen: ${value}`, { kind: "source", value })} />
+            <AttributionTable title="Calidad por campaña" rows={statistics.data?.campaigns ?? []} onSelect={(value) => openFeedbackDrilldown(`Campaña: ${value}`, { kind: "campaign", value })} />
+          </div>
+
+          <ProfileTable profiles={statistics.data?.profiles ?? []} />
+          <AngleTable angles={statistics.data?.angles ?? []} />
+        </>
+      )}
+
+      <DrilldownDialog drilldown={drilldown} onOpenChange={(open) => { if (!open) setDrilldown(null); }} />
     </div>
+  );
+}
+
+type FiltersProps = {
+  caller: { id: string; name: string };
+  source: string;
+  campaign: string;
+  from: string;
+  to: string;
+  invalidInterval: boolean;
+  callers: readonly { id: string; name: string }[];
+  sources: readonly string[];
+  campaigns: readonly string[];
+  onCallerChange: (value: string) => void;
+  onSourceChange: (value: string) => void;
+  onCampaignChange: (value: string) => void;
+  onFromChange: (value: string) => void;
+  onToChange: (value: string) => void;
+};
+
+function Filters(props: FiltersProps) {
+  return (
+    <Card>
+      <CardHeader><CardTitle>Filtros</CardTitle></CardHeader>
+      <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <Field>
+          <FieldLabel htmlFor="feedback-caller">Caller</FieldLabel>
+          <Select value={props.caller.id} onValueChange={(value) => props.onCallerChange(value ?? "all")}>
+            <SelectTrigger id="feedback-caller"><SelectValue>{props.caller.name}</SelectValue></SelectTrigger>
+            <SelectContent><SelectGroup><SelectItem value="all">Todos los callers</SelectItem>{props.callers.map((caller) => <SelectItem key={caller.id} value={caller.id}>{caller.name}</SelectItem>)}</SelectGroup></SelectContent>
+          </Select>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="feedback-source">Origen</FieldLabel>
+          <Select value={props.source} onValueChange={(value) => props.onSourceChange(value ?? "all")}>
+            <SelectTrigger id="feedback-source"><SelectValue>{props.source === "all" ? "Todos los orígenes" : props.source}</SelectValue></SelectTrigger>
+            <SelectContent><SelectGroup><SelectItem value="all">Todos los orígenes</SelectItem>{props.sources.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectGroup></SelectContent>
+          </Select>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="feedback-campaign">Campaña</FieldLabel>
+          <Select value={props.campaign} onValueChange={(value) => props.onCampaignChange(value ?? "all")}>
+            <SelectTrigger id="feedback-campaign"><SelectValue>{props.campaign === "all" ? "Todas las campañas" : props.campaign}</SelectValue></SelectTrigger>
+            <SelectContent><SelectGroup><SelectItem value="all">Todas las campañas</SelectItem>{props.campaigns.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectGroup></SelectContent>
+          </Select>
+        </Field>
+        <Field><FieldLabel htmlFor="feedback-from">Desde</FieldLabel><Input id="feedback-from" type="date" value={props.from} onChange={(event) => props.onFromChange(event.target.value)} /></Field>
+        <Field invalid={props.invalidInterval}><FieldLabel htmlFor="feedback-to">Hasta</FieldLabel><Input id="feedback-to" type="date" value={props.to} onChange={(event) => props.onToChange(event.target.value)} aria-invalid={props.invalidInterval} /><FieldError>{props.invalidInterval ? "La fecha final no puede ser anterior a la inicial" : ""}</FieldError></Field>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -80,36 +228,108 @@ function Metric({ title, value }: { title: string; value: string | number }) {
   return <Card><CardHeader><CardTitle className="text-sm text-muted-foreground">{title}</CardTitle></CardHeader><CardContent className="text-3xl font-semibold">{value}</CardContent></Card>;
 }
 
-function DonutChart({ title, data }: { title: string; data: readonly FeedbackChartItem[] }) {
-  const total = data.reduce((sum, item) => sum + item.value, 0);
+type Quality = { count: number; percentage: number };
+type QualityField = "profile" | "source" | "campaign" | "outcome";
 
+function DataQualityPanel({ quality, onSelect }: {
+  quality?: { missingProfile: Quality; missingSource: Quality; missingCampaign: Quality; missingOutcome: Quality };
+  onSelect: (field: QualityField, label: string) => void;
+}) {
+  const items: Array<{ field: QualityField; label: string; value: Quality }> = [
+    { field: "profile", label: "Perfil", value: quality?.missingProfile ?? { count: 0, percentage: 0 } },
+    { field: "source", label: "Origen", value: quality?.missingSource ?? { count: 0, percentage: 0 } },
+    { field: "campaign", label: "Campaña", value: quality?.missingCampaign ?? { count: 0, percentage: 0 } },
+    { field: "outcome", label: "Resultado", value: quality?.missingOutcome ?? { count: 0, percentage: 0 } },
+  ];
   return (
     <Card>
-      <CardHeader><CardTitle>{title}</CardTitle></CardHeader>
-      <CardContent>
-        {total === 0 ? (
-          <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">Sin datos para mostrar</div>
-        ) : (
-          <>
-            <ChartContainer config={chartConfig} className="mx-auto aspect-square h-64">
-              <PieChart>
-                <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
-                <Pie data={data} dataKey="value" nameKey="name" innerRadius={58} outerRadius={92} paddingAngle={2} strokeWidth={2}>
-                  {data.map((item, index) => <Cell key={item.key} fill={chartColors[index % chartColors.length]} />)}
-                </Pie>
-              </PieChart>
-            </ChartContainer>
-            <div className="flex flex-col gap-2">
-              {data.map((item, index) => (
-                <div key={item.key} className="flex items-start justify-between gap-3 text-sm">
-                  <span className="flex min-w-0 items-start gap-2"><span className="mt-1.5 size-2 shrink-0 rounded-full" style={{ backgroundColor: chartColors[index % chartColors.length] }} /><span>{item.name}</span></span>
-                  <span className="shrink-0 font-medium">{item.value} · {Math.round((item.value / total) * 100)}%</span>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
+      <CardHeader><CardTitle>Calidad del dato</CardTitle></CardHeader>
+      <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {items.map((item) => (
+          <Button key={item.field} variant="outline" className="h-auto justify-between p-4 text-left" onClick={() => onSelect(item.field, item.label)}>
+            <span><span className="block font-medium">Sin {item.label.toLowerCase()}</span><span className="text-xs text-muted-foreground">Ver feedbacks afectados</span></span>
+            <span className="text-right"><span className="block text-xl font-semibold">{item.value.count}</span><span className="text-xs text-muted-foreground">{item.value.percentage}%</span></span>
+          </Button>
+        ))}
       </CardContent>
     </Card>
   );
+}
+
+type FunnelStage = { count: number; previousConversion: number; leads: FunnelLead[] };
+type FunnelGroup = {
+  value: string;
+  totalConversion: number;
+  stages: { received: FunnelStage; contacted: FunnelStage; appointment: FunnelStage; show: FunnelStage; sale: FunnelStage };
+};
+
+function FunnelSection({ title, groups, onSelect }: { title: string; groups: readonly FunnelGroup[]; onSelect: (title: string, leads: FunnelLead[]) => void }) {
+  const columns: Array<{ key: keyof FunnelGroup["stages"]; label: string }> = [
+    { key: "received", label: "Recibidos" }, { key: "contacted", label: "Contactados" },
+    { key: "appointment", label: "Agenda" }, { key: "show", label: "Asistencia" }, { key: "sale", label: "Venta" },
+  ];
+  return (
+    <Card>
+      <CardHeader><CardTitle>{title}</CardTitle></CardHeader>
+      <CardContent className="overflow-x-auto">
+        <Table>
+          <TableHeader><TableRow><TableHead>Valor</TableHead>{columns.map((column) => <TableHead key={column.key}>{column.label}</TableHead>)}<TableHead>Conversión total</TableHead></TableRow></TableHeader>
+          <TableBody>
+            {groups.map((group) => (
+              <TableRow key={group.value}>
+                <TableCell className="font-medium">{group.value}</TableCell>
+                {columns.map((column) => {
+                  const stage = group.stages[column.key];
+                  return <TableCell key={column.key}><Button variant="ghost" size="sm" onClick={() => onSelect(`${title}: ${group.value} · ${column.label}`, stage.leads)}>{stage.count} <span className="text-muted-foreground">({stage.previousConversion}%)</span></Button></TableCell>;
+                })}
+                <TableCell className="font-semibold">{group.totalConversion}%</TableCell>
+              </TableRow>
+            ))}
+            {groups.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Sin datos suficientes para construir el embudo.</TableCell></TableRow>}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+type AttributionRow = { value: string; total: number; appointmentRate: number; reactions: { appointment: number; not_interested: number } };
+
+function AttributionTable({ title, rows, onSelect }: { title: string; rows: readonly AttributionRow[]; onSelect: (value: string) => void }) {
+  return (
+    <Card><CardHeader><CardTitle>{title}</CardTitle></CardHeader><CardContent><Table>
+      <TableHeader><TableRow><TableHead>Valor</TableHead><TableHead>Total</TableHead><TableHead>Agenda</TableHead><TableHead>Conversión</TableHead><TableHead>No interesado</TableHead></TableRow></TableHeader>
+      <TableBody>{rows.map((row) => <TableRow key={row.value} className="cursor-pointer" onClick={() => onSelect(row.value)}><TableCell className="font-medium">{row.value}</TableCell><TableCell>{row.total}</TableCell><TableCell>{row.reactions.appointment}</TableCell><TableCell>{row.appointmentRate}%</TableCell><TableCell>{row.reactions.not_interested}</TableCell></TableRow>)}{rows.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">Sin datos de atribución.</TableCell></TableRow>}</TableBody>
+    </Table></CardContent></Card>
+  );
+}
+
+function DonutChart({ title, data, onSelect }: { title: string; data: readonly FeedbackChartItem[]; onSelect?: (item: FeedbackChartItem) => void }) {
+  const total = data.reduce((sum, item) => sum + item.value, 0);
+  return (
+    <Card><CardHeader><CardTitle>{title}</CardTitle></CardHeader><CardContent>
+      {total === 0 ? <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">Sin datos para mostrar</div> : <>
+        <ChartContainer config={chartConfig} className="mx-auto aspect-square h-64"><PieChart><ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} /><Pie data={data} dataKey="value" nameKey="name" innerRadius={58} outerRadius={92} paddingAngle={2} strokeWidth={2} onClick={(_, index) => { const item = data[index]; if (item) onSelect?.(item); }}>{data.map((item, index) => <Cell key={item.key} className={onSelect ? "cursor-pointer" : undefined} fill={chartColors[index % chartColors.length]} />)}</Pie></PieChart></ChartContainer>
+        <div className="flex flex-col gap-2">{data.map((item, index) => <button type="button" key={item.key} className="flex items-start justify-between gap-3 text-left text-sm" onClick={() => onSelect?.(item)}><span className="flex min-w-0 items-start gap-2"><span className="mt-1.5 size-2 shrink-0 rounded-full" style={{ backgroundColor: chartColors[index % chartColors.length] }} /><span>{item.name}</span></span><span className="shrink-0 font-medium">{item.value} · {Math.round((item.value / total) * 100)}%</span></button>)}</div>
+      </>}
+    </CardContent></Card>
+  );
+}
+
+function ProfileTable({ profiles }: { profiles: ReadonlyArray<{ profile: string; total: number; subProfiles: Array<{ profile: string; total: number }>; reactions: { appointment: number; future_call: number; not_interested: number; not_fit: number } }> }) {
+  return <Card><CardHeader><CardTitle>Reacción por perfil</CardTitle></CardHeader><CardContent><Table><TableHeader><TableRow><TableHead>Perfil</TableHead><TableHead>Subperfiles</TableHead><TableHead>Total</TableHead><TableHead>Agenda</TableHead><TableHead>Futuro</TableHead><TableHead>No interesado</TableHead><TableHead>No encaja</TableHead></TableRow></TableHeader><TableBody>{profiles.map((profile) => <TableRow key={profile.profile}><TableCell className="font-medium">{profileLabels[profile.profile] ?? profile.profile}</TableCell><TableCell>{profile.subProfiles.map((sub) => `${profileLabels[sub.profile] ?? sub.profile} (${sub.total})`).join(", ") || "—"}</TableCell><TableCell>{profile.total}</TableCell><TableCell>{profile.reactions.appointment}</TableCell><TableCell>{profile.reactions.future_call}</TableCell><TableCell>{profile.reactions.not_interested}</TableCell><TableCell>{profile.reactions.not_fit}</TableCell></TableRow>)}{profiles.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No hay feedbacks clasificados en este intervalo.</TableCell></TableRow>}</TableBody></Table></CardContent></Card>;
+}
+
+function AngleTable({ angles }: { angles: ReadonlyArray<{ angle: string; total: number; reactions: { appointment: number; future_call: number; not_interested: number; not_fit: number } }> }) {
+  return <Card><CardHeader><CardTitle>Ángulos de motivación</CardTitle></CardHeader><CardContent><Table><TableHeader><TableRow><TableHead>Ángulo</TableHead><TableHead>Total</TableHead><TableHead>Agenda</TableHead><TableHead>Futuro</TableHead><TableHead>No interesado</TableHead><TableHead>No encaja</TableHead></TableRow></TableHeader><TableBody>{angles.map((angle) => <TableRow key={angle.angle}><TableCell className="font-medium">{angleLabels[angle.angle] ?? angle.angle}</TableCell><TableCell>{angle.total}</TableCell><TableCell>{angle.reactions.appointment}</TableCell><TableCell>{angle.reactions.future_call}</TableCell><TableCell>{angle.reactions.not_interested}</TableCell><TableCell>{angle.reactions.not_fit}</TableCell></TableRow>)}{angles.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No hay ángulos registrados en este intervalo.</TableCell></TableRow>}</TableBody></Table></CardContent></Card>;
+}
+
+function DrilldownDialog({ drilldown, onOpenChange }: { drilldown: Drilldown; onOpenChange: (open: boolean) => void }) {
+  return <Dialog open={Boolean(drilldown)} onOpenChange={onOpenChange}><DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-5xl"><DialogHeader><DialogTitle>{drilldown?.title ?? "Detalle"}</DialogTitle><DialogDescription>{drilldown?.items.length ?? 0} leads encontrados. Cada fila explica qué registros forman el dato seleccionado.</DialogDescription></DialogHeader><Table><TableHeader><TableRow><TableHead>Lead</TableHead><TableHead>Origen</TableHead><TableHead>Campaña</TableHead><TableHead>Resultado</TableHead><TableHead>Perfil</TableHead><TableHead>Resumen</TableHead></TableRow></TableHeader><TableBody>{drilldown?.items.map((item) => {
+    if ("leadId" in item) {
+      return <TableRow key={`${item.leadId}:${String(item.occurredAt)}`}><TableCell className="font-medium">{item.leadName}</TableCell><TableCell>{item.source ?? "—"}</TableCell><TableCell>{item.campaign ?? "—"}</TableCell><TableCell>{item.outcome ?? "—"}</TableCell><TableCell>{item.profile ? (profileLabels[item.profile] ?? item.profile) : "—"}</TableCell><TableCell className="max-w-sm whitespace-normal">{item.summary || "—"}</TableCell></TableRow>;
+    }
+
+    return <TableRow key={item.id}><TableCell className="font-medium">{item.name}</TableCell><TableCell>{item.source ?? "—"}</TableCell><TableCell>{item.campaign ?? "—"}</TableCell><TableCell>—</TableCell><TableCell>—</TableCell><TableCell>—</TableCell></TableRow>;
+  })}{drilldown?.items.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No hay registros para este segmento.</TableCell></TableRow>}</TableBody></Table></DialogContent></Dialog>;
 }

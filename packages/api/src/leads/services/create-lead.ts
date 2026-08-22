@@ -12,6 +12,8 @@ export type CreateLeadInput = {
   name: string;
   email: string;
   phone: string;
+  source?: string;
+  campaign?: string;
   type: LeadType;
 };
 
@@ -34,7 +36,11 @@ export async function createLead(input: CreateLeadInput) {
       kind: LEAD_ACTIVITY_KIND.LEAD_CREATED,
       title: "Lead creado",
       description: `Lead ${lead.name} incorporado al CRM`,
-      metadata: { type: lead.type },
+	      metadata: {
+	        type: lead.type,
+	        source: lead.source,
+	        campaign: lead.campaign,
+	      },
       dedupeKey: `lead_created:${lead.id}`,
       occurredAt: lead.createdAt,
     });

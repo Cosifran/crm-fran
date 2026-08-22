@@ -23,6 +23,8 @@ export const createLeadInput = z.object({
   name: z.string(),
   email: z.email(),
   phone: z.string(),
+  source: z.string().trim().min(1).max(200).optional(),
+  campaign: z.string().trim().min(1).max(200).optional(),
   type: z.enum(["maestra", "vsl"]).default("maestra"),
 });
 const updateLeadInput = createLeadInput.partial().extend({ id: z.string() });
@@ -92,6 +94,8 @@ export const personalStatisticsInput = z
 export const feedbackStatisticsInput = z
   .object({
     callerId: z.string().min(1).optional(),
+    source: z.string().min(1).optional(),
+    campaign: z.string().min(1).optional(),
     from: z.string().date().optional(),
     to: z.string().date().optional(),
   })

@@ -78,6 +78,40 @@ function eventOutcome(event: FunnelEvent) {
   return outcome?.answer;
 }
 
+export function classifyConversionLead(lead: FunnelLead) {
+  const events = lead.events
+    .filter((event) => event.occurredAt >= lead.assignedAt)
+    .sort((first, second) => first.occurredAt.getTime() - second.occurredAt.getTime());
+  const callerFeedback = events.filter((event) => event.kind === "caller_feedback");
+  const closerFeedback = events.filter((event) => event.kind === "closer_feedback");
+  const callerOutcomes = callerFeedback.map(eventOutcome);
+  const closerOutcomes = closerFeedback.map(eventOutcome);
+  const latestCloserOutcome = closerOutcomes.at(-1);
+  const contacted = callerFeedback.some(
+    (event) => eventOutcome(event) !== "Lead no contactado",
+  );
+  const appointment =
+    contacted &&
+    events.some(
+      (event) =>
+        event.kind === "appointment_scheduled" ||
+        event.kind === "appointment_rescheduled",
+    );
+  const show =
+    appointment && closerOutcomes.some((outcome) => ATTENDED_OUTCOMES.has(outcome ?? ""));
+  const sale = show && closerOutcomes.includes("Venta");
+
+  return {
+    contacted,
+    appointment,
+    show,
+    sale,
+    callerOutcomes,
+    closerOutcomes,
+    latestCloserOutcome,
+  };
+}
+
 export function selectConversionCohort(
   leads: readonly FunnelLead[],
   filters: ConversionCohortFilters,
@@ -118,28 +152,15 @@ export function buildConversionFunnel(input: readonly FunnelLead[]) {
   const exits = { noShow: 0, notInterested: 0, followUp: 0 };
 
   for (const lead of leadsById.values()) {
-    const events = lead.events
-      .filter((event) => event.occurredAt >= lead.assignedAt)
-      .sort((first, second) => first.occurredAt.getTime() - second.occurredAt.getTime());
-    const callerFeedback = events.filter((event) => event.kind === "caller_feedback");
-    const closerFeedback = events.filter((event) => event.kind === "closer_feedback");
-    const callerOutcomes = callerFeedback.map(eventOutcome);
-    const closerOutcomes = closerFeedback.map(eventOutcome);
-    const latestCloserOutcome = closerOutcomes.at(-1);
-
-    const contacted = callerFeedback.some(
-      (event) => eventOutcome(event) !== "Lead no contactado",
-    );
-    const appointment =
-      contacted &&
-      events.some(
-        (event) =>
-          event.kind === "appointment_scheduled" ||
-          event.kind === "appointment_rescheduled",
-      );
-    const show =
-      appointment && closerOutcomes.some((outcome) => ATTENDED_OUTCOMES.has(outcome ?? ""));
-    const sale = show && closerOutcomes.includes("Venta");
+    const {
+      contacted,
+      appointment,
+      show,
+      sale,
+      callerOutcomes,
+      closerOutcomes,
+      latestCloserOutcome,
+    } = classifyConversionLead(lead);
 
     stageLeads.assigned.push(lead);
     if (contacted) stageLeads.contacted.push(lead);

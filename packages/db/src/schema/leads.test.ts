@@ -55,4 +55,11 @@ describe("leads schema", () => {
 		expect(leads.poolStatus.default).toBe("new");
 		expect(leads.noContactImpactCount.default).toBe(0);
 	});
+
+	it("stores optional source and campaign attribution", () => {
+		expect(leads.source).toBeDefined();
+		expect(leads.campaign).toBeDefined();
+		expect(leads.source.notNull).toBe(false);
+		expect(leads.campaign.notNull).toBe(false);
+	});
 });

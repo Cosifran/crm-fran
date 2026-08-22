@@ -1,19 +1,31 @@
-import { and, asc, db, eq, gte, lte } from "@crm-fran/db";
-import { leadActivityEvents, user } from "@crm-fran/db/schema/index";
+import { and, asc, db, eq, gte, inArray, lte } from "@crm-fran/db";
+import { leadActivityEvents, leads, user } from "@crm-fran/db/schema/index";
 
 import type { FeedbackProfile, MotivationAngle } from "../../call-feedback";
 import { FEEDBACK_PROFILES, MOTIVATION_ANGLES } from "../../call-feedback";
+import { classifyConversionLead } from "../../dashboard/conversion-funnel";
 
 export type FeedbackReaction = "appointment" | "future_call" | "not_interested" | "not_fit" | "unknown";
 
 type FeedbackRow = {
   actorId: string | null;
   actorName: string | null;
+  leadId: string;
+  leadName: string;
+  source: string | null;
+  campaign: string | null;
   description: string | null;
+  occurredAt: Date;
   metadata: Record<string, unknown>;
 };
 
-type FeedbackStatisticsInput = { callerId?: string; from?: string; to?: string };
+type FeedbackStatisticsInput = {
+  callerId?: string;
+  source?: string;
+  campaign?: string;
+  from?: string;
+  to?: string;
+};
 
 const REACTION_BY_OUTCOME: Record<string, FeedbackReaction> = {
   Agenda: "appointment",
@@ -53,6 +65,162 @@ function readAngles(answer: string | undefined): MotivationAngle[] {
   }
 }
 
+function aggregateAttribution(
+  rows: readonly FeedbackRow[],
+  selectValue: (row: FeedbackRow) => string | null,
+) {
+  const groups = new Map<
+    string,
+    { value: string; total: number; reactions: Record<FeedbackReaction, number> }
+  >();
+
+  for (const row of rows) {
+    const value = selectValue(row)?.trim();
+    if (!value) continue;
+    const reaction = REACTION_BY_OUTCOME[row.description ?? ""] ?? "unknown";
+    const group = groups.get(value) ?? {
+      value,
+      total: 0,
+      reactions: emptyReactions(),
+    };
+    group.total += 1;
+    group.reactions[reaction] += 1;
+    groups.set(value, group);
+  }
+
+  return [...groups.values()]
+    .map((group) => ({
+      ...group,
+      appointmentRate:
+        group.total === 0
+          ? 0
+          : Math.round((group.reactions.appointment / group.total) * 1_000) / 10,
+    }))
+    .sort((a, b) => b.total - a.total);
+}
+
+function qualityMetric(count: number, total: number) {
+  return {
+    count,
+    percentage: total === 0 ? 0 : Math.round((count / total) * 1_000) / 10,
+  };
+}
+
+type AttributionFunnelLead = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  type: "maestra" | "vsl";
+  callerId: string | null;
+  closerId: string | null;
+  createdAt: Date;
+  source: string | null;
+  campaign: string | null;
+  events: Array<{
+    id: string;
+    kind: string;
+    description: string | null;
+    metadata: Record<string, unknown>;
+    occurredAt: Date;
+  }>;
+};
+
+const FUNNEL_STAGE_KEYS = [
+  "received",
+  "contacted",
+  "appointment",
+  "show",
+  "sale",
+] as const;
+type AttributionStage = (typeof FUNNEL_STAGE_KEYS)[number];
+
+function buildAttributionGroup(
+  value: string,
+  leadsForGroup: readonly AttributionFunnelLead[],
+) {
+  const stageLeads: Record<
+    AttributionStage,
+    Array<Omit<AttributionFunnelLead, "events">>
+  > = {
+    received: [],
+    contacted: [],
+    appointment: [],
+    show: [],
+    sale: [],
+  };
+
+  for (const lead of leadsForGroup) {
+    const { events: _events, ...summary } = lead;
+    const classification = classifyConversionLead({
+      ...lead,
+      callerId: lead.callerId ?? "",
+      callerName: null,
+      closerName: null,
+      assignedAt: lead.createdAt,
+    });
+    stageLeads.received.push(summary);
+    if (classification.contacted) stageLeads.contacted.push(summary);
+    if (classification.appointment) stageLeads.appointment.push(summary);
+    if (classification.show) stageLeads.show.push(summary);
+    if (classification.sale) stageLeads.sale.push(summary);
+  }
+
+  const stages = Object.fromEntries(
+    FUNNEL_STAGE_KEYS.map((stage, index) => {
+      const count = stageLeads[stage].length;
+      const previousStage = FUNNEL_STAGE_KEYS[index - 1];
+      const previousCount = previousStage
+        ? stageLeads[previousStage].length
+        : count;
+      return [
+        stage,
+        {
+          count,
+          previousConversion:
+            index === 0 || previousCount === 0
+              ? index === 0 ? 100 : 0
+              : Math.round((count / previousCount) * 1_000) / 10,
+          leads: stageLeads[stage],
+        },
+      ];
+    }),
+  ) as Record<
+    AttributionStage,
+    { count: number; previousConversion: number; leads: Array<Omit<AttributionFunnelLead, "events">> }
+  >;
+
+  return {
+    value,
+    stages,
+    totalConversion:
+      stages.received.count === 0
+        ? 0
+        : Math.round((stages.sale.count / stages.received.count) * 1_000) / 10,
+  };
+}
+
+export function buildAttributionFunnels(leadsInput: readonly AttributionFunnelLead[]) {
+  const groupBy = (selectValue: (lead: AttributionFunnelLead) => string | null) => {
+    const groups = new Map<string, AttributionFunnelLead[]>();
+    for (const lead of leadsInput) {
+      const value = selectValue(lead)?.trim();
+      if (!value) continue;
+      const group = groups.get(value) ?? [];
+      group.push(lead);
+      groups.set(value, group);
+    }
+    return [...groups]
+      .map(([value, groupedLeads]) => buildAttributionGroup(value, groupedLeads))
+      .sort((first, second) => second.stages.received.count - first.stages.received.count);
+  };
+
+  return {
+    sources: groupBy((lead) => lead.source),
+    campaigns: groupBy((lead) => lead.campaign),
+  };
+}
+
 export function buildFeedbackStatistics(rows: readonly FeedbackRow[]) {
   const profiles = new Map<FeedbackProfile, {
     profile: FeedbackProfile;
@@ -68,6 +236,11 @@ export function buildFeedbackStatistics(rows: readonly FeedbackRow[]) {
   const callers = new Map<string, { id: string; name: string; total: number }>();
   let classifiedFeedbacks = 0;
   let classifiedAppointments = 0;
+  let missingProfile = 0;
+  let missingSource = 0;
+  let missingCampaign = 0;
+  let missingOutcome = 0;
+  const feedbacks = [];
 
   for (const row of rows) {
     const reaction = REACTION_BY_OUTCOME[row.description ?? ""] ?? "unknown";
@@ -76,6 +249,10 @@ export function buildFeedbackStatistics(rows: readonly FeedbackRow[]) {
     const profile = profileAnswer && profileValues.has(profileAnswer)
       ? (profileAnswer as FeedbackProfile)
       : undefined;
+    if (!profile) missingProfile += 1;
+    if (!row.source?.trim()) missingSource += 1;
+    if (!row.campaign?.trim()) missingCampaign += 1;
+    if (reaction === "unknown") missingOutcome += 1;
 
     if (profile) {
       classifiedFeedbacks += 1;
@@ -110,6 +287,20 @@ export function buildFeedbackStatistics(rows: readonly FeedbackRow[]) {
       caller.total += 1;
       callers.set(row.actorId, caller);
     }
+
+    feedbacks.push({
+      leadId: row.leadId,
+      leadName: row.leadName,
+      callerId: row.actorId,
+      callerName: row.actorName,
+      source: row.source,
+      campaign: row.campaign,
+      outcome: row.description,
+      profile: profile ?? null,
+      angles: readAngles(answers.get("motivationAngles")),
+      summary: answers.get("summary") ?? "",
+      occurredAt: row.occurredAt,
+    });
   }
 
   return {
@@ -120,6 +311,15 @@ export function buildFeedbackStatistics(rows: readonly FeedbackRow[]) {
       .map(({ subProfiles, ...entry }) => ({ ...entry, subProfiles: [...subProfiles.values()].sort((a, b) => b.total - a.total) }))
       .sort((a, b) => b.total - a.total),
     angles: [...angles.values()].sort((a, b) => b.total - a.total),
+    sources: aggregateAttribution(rows, (row) => row.source),
+    campaigns: aggregateAttribution(rows, (row) => row.campaign),
+    dataQuality: {
+      missingProfile: qualityMetric(missingProfile, rows.length),
+      missingSource: qualityMetric(missingSource, rows.length),
+      missingCampaign: qualityMetric(missingCampaign, rows.length),
+      missingOutcome: qualityMetric(missingOutcome, rows.length),
+    },
+    feedbacks,
     callers: [...callers.values()].sort((a, b) => a.name.localeCompare(b.name)),
   };
 }
@@ -136,23 +336,96 @@ function endOfDay(value: string) {
 }
 
 export async function getFeedbackStatistics(input: FeedbackStatisticsInput) {
-  const rows = await db
-    .select({ actorId: leadActivityEvents.actorId, actorName: user.name, description: leadActivityEvents.description, metadata: leadActivityEvents.metadata })
+  const [rows, funnelLeadRows] = await Promise.all([
+    db
+    .select({
+      leadId: leadActivityEvents.leadId,
+      leadName: leads.name,
+      actorId: leadActivityEvents.actorId,
+      actorName: user.name,
+      source: leads.source,
+      campaign: leads.campaign,
+      description: leadActivityEvents.description,
+      metadata: leadActivityEvents.metadata,
+      occurredAt: leadActivityEvents.occurredAt,
+    })
     .from(leadActivityEvents)
     .leftJoin(user, eq(leadActivityEvents.actorId, user.id))
+    .innerJoin(leads, eq(leadActivityEvents.leadId, leads.id))
     .where(and(
       eq(leadActivityEvents.kind, "caller_feedback"),
       input.from ? gte(leadActivityEvents.occurredAt, startOfDay(input.from)) : undefined,
       input.to ? lte(leadActivityEvents.occurredAt, endOfDay(input.to)) : undefined,
     ))
-    .orderBy(asc(leadActivityEvents.occurredAt));
+    .orderBy(asc(leadActivityEvents.occurredAt)),
+    db
+      .select({
+        id: leads.id,
+        name: leads.name,
+        email: leads.email,
+        phone: leads.phone,
+        type: leads.type,
+        callerId: leads.callerId,
+        closerId: leads.closerId,
+        createdAt: leads.createdAt,
+        source: leads.source,
+        campaign: leads.campaign,
+      })
+      .from(leads)
+      .where(and(
+        input.from ? gte(leads.createdAt, startOfDay(input.from)) : undefined,
+        input.to ? lte(leads.createdAt, endOfDay(input.to)) : undefined,
+      )),
+  ]);
 
   const allStatistics = buildFeedbackStatistics(rows);
-  const filteredStatistics = buildFeedbackStatistics(
-    input.callerId
-      ? rows.filter((row) => row.actorId === input.callerId)
-      : rows,
+  const filteredStatistics = buildFeedbackStatistics(rows.filter((row) => {
+    if (input.callerId && row.actorId !== input.callerId) return false;
+    if (input.source && row.source !== input.source) return false;
+    if (input.campaign && row.campaign !== input.campaign) return false;
+    return true;
+  }));
+  const filteredFunnelLeadRows = funnelLeadRows.filter((lead) => {
+    if (input.callerId && lead.callerId !== input.callerId) return false;
+    if (input.source && lead.source !== input.source) return false;
+    if (input.campaign && lead.campaign !== input.campaign) return false;
+    return true;
+  });
+  const funnelLeadIds = filteredFunnelLeadRows.map(({ id }) => id);
+  const activityRows = funnelLeadIds.length === 0
+    ? []
+    : await db
+        .select({
+          id: leadActivityEvents.id,
+          leadId: leadActivityEvents.leadId,
+          kind: leadActivityEvents.kind,
+          description: leadActivityEvents.description,
+          metadata: leadActivityEvents.metadata,
+          occurredAt: leadActivityEvents.occurredAt,
+        })
+        .from(leadActivityEvents)
+        .where(inArray(leadActivityEvents.leadId, funnelLeadIds))
+        .orderBy(asc(leadActivityEvents.occurredAt));
+  const eventsByLead = new Map<string, AttributionFunnelLead["events"]>();
+  for (const event of activityRows) {
+    const events = eventsByLead.get(event.leadId) ?? [];
+    events.push(event);
+    eventsByLead.set(event.leadId, events);
+  }
+  const funnels = buildAttributionFunnels(
+    filteredFunnelLeadRows.map((lead) => ({
+      ...lead,
+      events: eventsByLead.get(lead.id) ?? [],
+    })),
   );
+  const availableSources = [...new Set(funnelLeadRows.flatMap((lead) => lead.source ? [lead.source] : []))].sort();
+  const availableCampaigns = [...new Set(funnelLeadRows.flatMap((lead) => lead.campaign ? [lead.campaign] : []))].sort();
 
-  return { ...filteredStatistics, callers: allStatistics.callers };
+  return {
+    ...filteredStatistics,
+    callers: allStatistics.callers,
+    availableSources,
+    availableCampaigns,
+    funnels,
+  };
 }
