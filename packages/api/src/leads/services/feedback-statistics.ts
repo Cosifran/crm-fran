@@ -1,9 +1,15 @@
-import { and, asc, db, eq, gte, inArray, lte } from "@crm-fran/db";
-import { leadActivityEvents, leads, user } from "@crm-fran/db/schema/index";
+import { alias, and, asc, db, eq, gte, inArray, lte } from "@crm-fran/db";
+import {
+  LEAD_ACTIVITY_KIND,
+  leadActivityEvents,
+  leads,
+  user,
+} from "@crm-fran/db/schema/index";
 
 import type { FeedbackProfile, MotivationAngle } from "../../call-feedback";
 import { FEEDBACK_PROFILES, MOTIVATION_ANGLES } from "../../call-feedback";
 import { classifyConversionLead } from "../../dashboard/conversion-funnel";
+import { buildCallerQualityRanking } from "./caller-quality-ranking";
 
 export type FeedbackReaction = "appointment" | "future_call" | "not_interested" | "not_fit" | "unknown";
 
@@ -336,7 +342,9 @@ function endOfDay(value: string) {
 }
 
 export async function getFeedbackStatistics(input: FeedbackStatisticsInput) {
-  const [rows, funnelLeadRows] = await Promise.all([
+  const rankingCaller = alias(user, "feedback_ranking_caller");
+  const rankingCloser = alias(user, "feedback_ranking_closer");
+  const [rows, funnelLeadRows, rankingAssignmentRows] = await Promise.all([
     db
     .select({
       leadId: leadActivityEvents.leadId,
@@ -376,6 +384,34 @@ export async function getFeedbackStatistics(input: FeedbackStatisticsInput) {
         input.from ? gte(leads.createdAt, startOfDay(input.from)) : undefined,
         input.to ? lte(leads.createdAt, endOfDay(input.to)) : undefined,
       )),
+    db
+      .select({
+        id: leads.id,
+        name: leads.name,
+        email: leads.email,
+        phone: leads.phone,
+        type: leads.type,
+        callerId: leadActivityEvents.actorId,
+        callerName: rankingCaller.name,
+        closerId: leads.closerId,
+        closerName: rankingCloser.name,
+        assignedAt: leadActivityEvents.occurredAt,
+        source: leads.source,
+        campaign: leads.campaign,
+      })
+      .from(leadActivityEvents)
+      .innerJoin(leads, eq(leads.id, leadActivityEvents.leadId))
+      .leftJoin(rankingCaller, eq(rankingCaller.id, leadActivityEvents.actorId))
+      .leftJoin(rankingCloser, eq(rankingCloser.id, leads.closerId))
+      .where(and(
+        eq(leadActivityEvents.kind, LEAD_ACTIVITY_KIND.CALLER_ASSIGNED),
+        input.from ? gte(leadActivityEvents.occurredAt, startOfDay(input.from)) : undefined,
+        input.to ? lte(leadActivityEvents.occurredAt, endOfDay(input.to)) : undefined,
+        input.callerId ? eq(leadActivityEvents.actorId, input.callerId) : undefined,
+        input.source ? eq(leads.source, input.source) : undefined,
+        input.campaign ? eq(leads.campaign, input.campaign) : undefined,
+      ))
+      .orderBy(asc(leadActivityEvents.occurredAt)),
   ]);
 
   const allStatistics = buildFeedbackStatistics(rows);
@@ -391,8 +427,16 @@ export async function getFeedbackStatistics(input: FeedbackStatisticsInput) {
     if (input.campaign && lead.campaign !== input.campaign) return false;
     return true;
   });
-  const funnelLeadIds = filteredFunnelLeadRows.map(({ id }) => id);
-  const activityRows = funnelLeadIds.length === 0
+  const usableRankingAssignments = rankingAssignmentRows.filter(
+    (row): row is typeof row & { callerId: string } => Boolean(row.callerId),
+  );
+  const activityLeadIds = [
+    ...new Set([
+      ...filteredFunnelLeadRows.map(({ id }) => id),
+      ...usableRankingAssignments.map(({ id }) => id),
+    ]),
+  ];
+  const activityRows = activityLeadIds.length === 0
     ? []
     : await db
         .select({
@@ -404,7 +448,7 @@ export async function getFeedbackStatistics(input: FeedbackStatisticsInput) {
           occurredAt: leadActivityEvents.occurredAt,
         })
         .from(leadActivityEvents)
-        .where(inArray(leadActivityEvents.leadId, funnelLeadIds))
+        .where(inArray(leadActivityEvents.leadId, activityLeadIds))
         .orderBy(asc(leadActivityEvents.occurredAt));
   const eventsByLead = new Map<string, AttributionFunnelLead["events"]>();
   for (const event of activityRows) {
@@ -418,6 +462,21 @@ export async function getFeedbackStatistics(input: FeedbackStatisticsInput) {
       events: eventsByLead.get(lead.id) ?? [],
     })),
   );
+  const callerQuality = buildCallerQualityRanking(
+    usableRankingAssignments.map((assignment) => {
+      const events = eventsByLead.get(assignment.id) ?? [];
+      const nextAssignment = events.find(
+        (event) =>
+          event.kind === LEAD_ACTIVITY_KIND.CALLER_ASSIGNED &&
+          event.occurredAt > assignment.assignedAt,
+      );
+      return {
+        ...assignment,
+        assignmentEndedAt: nextAssignment?.occurredAt ?? null,
+        events,
+      };
+    }),
+  );
   const availableSources = [...new Set(funnelLeadRows.flatMap((lead) => lead.source ? [lead.source] : []))].sort();
   const availableCampaigns = [...new Set(funnelLeadRows.flatMap((lead) => lead.campaign ? [lead.campaign] : []))].sort();
 
@@ -427,5 +486,6 @@ export async function getFeedbackStatistics(input: FeedbackStatisticsInput) {
     availableSources,
     availableCampaigns,
     funnels,
+    callerQuality,
   };
 }

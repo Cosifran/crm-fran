@@ -59,7 +59,7 @@ function roundPercentage(value: number) {
   return Math.round(value * 10) / 10;
 }
 
-function eventOutcome(event: FunnelEvent) {
+export function getConversionEventOutcome(event: FunnelEvent) {
   if (event.description) return event.description;
   const questions = event.metadata.questions;
   if (!Array.isArray(questions)) return undefined;
@@ -84,11 +84,11 @@ export function classifyConversionLead(lead: FunnelLead) {
     .sort((first, second) => first.occurredAt.getTime() - second.occurredAt.getTime());
   const callerFeedback = events.filter((event) => event.kind === "caller_feedback");
   const closerFeedback = events.filter((event) => event.kind === "closer_feedback");
-  const callerOutcomes = callerFeedback.map(eventOutcome);
-  const closerOutcomes = closerFeedback.map(eventOutcome);
+  const callerOutcomes = callerFeedback.map(getConversionEventOutcome);
+  const closerOutcomes = closerFeedback.map(getConversionEventOutcome);
   const latestCloserOutcome = closerOutcomes.at(-1);
   const contacted = callerFeedback.some(
-    (event) => eventOutcome(event) !== "Lead no contactado",
+    (event) => getConversionEventOutcome(event) !== "Lead no contactado",
   );
   const appointment =
     contacted &&

@@ -13,6 +13,7 @@ import {
   YAxis,
 } from "recharts";
 
+import { FEEDBACK_PROFILES } from "@crm-fran/api/call-feedback";
 import { Button } from "@crm-fran/ui/components/button";
 import {
   Card,
@@ -56,6 +57,7 @@ import { Skeleton } from "@crm-fran/ui/components/skeleton";
 import { cn } from "@crm-fran/ui/lib/utils";
 
 import { trpc } from "@/utils/trpc";
+import { CallerQualitySection } from "../feedback-statistics/caller-quality-section";
 import {
   selectCallerFilter,
   selectCloserFilter,
@@ -66,6 +68,9 @@ import { CallFeedbackUsageCard } from "./call-feedback-usage-card";
 import styles from "./personal-statistics.module.css";
 
 const initialPeople = { callerId: "all", closerId: "all" };
+const profileLabels = Object.fromEntries(
+  FEEDBACK_PROFILES.map(({ value, label }) => [value, label]),
+);
 const CALLER_CONDITION_KEYS = [
   "unassigned",
   "assigned",
@@ -136,6 +141,14 @@ export function PersonalStatisticsView() {
       to: to || undefined,
     }),
     enabled: !invalidInterval,
+  });
+  const callerQuality = useQuery({
+    ...trpc.leads.feedbackStatistics.queryOptions({
+      callerId: people.callerId === "all" ? undefined : people.callerId,
+      from: from || undefined,
+      to: to || undefined,
+    }),
+    enabled: !invalidInterval && mode === "caller",
   });
 
   return (
@@ -310,6 +323,19 @@ export function PersonalStatisticsView() {
               : undefined
         }
       />
+
+      {mode === "caller" && (
+        callerQuality.isLoading ? (
+          <Skeleton className="h-96" />
+        ) : callerQuality.isError ? (
+          <Empty heading="No se pudo cargar el ranking de callers" />
+        ) : callerQuality.data ? (
+          <CallerQualitySection
+            data={callerQuality.data.callerQuality}
+            profileLabels={profileLabels}
+          />
+        ) : null
+      )}
 
       {invalidInterval ? (
         <Empty heading="Corrige el intervalo de fechas" />
