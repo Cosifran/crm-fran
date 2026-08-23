@@ -19,12 +19,14 @@ export type RecommendationEventKind =
 type RecommendationMetadata = LeadActivityMetadata & {
   recommendationKey?: string;
   sourceAlertId?: string | null;
+  actionType?: string;
   reactionTimeMs?: number;
   reason?: string;
 };
 
 type RecommendationEvent = {
   kind: RecommendationEventKind;
+  actionType?: string;
   metadata: RecommendationMetadata;
   occurredAt: Date;
 };
@@ -74,6 +76,7 @@ export async function recordRecommendationEvent(input: {
   leadId: string;
   recommendationKey: string;
   kind: RecommendationEventKind;
+  actionType?: string;
   reason?: string;
   reactionTimeMs?: number;
 }) {
@@ -94,7 +97,7 @@ export async function recordRecommendationEvent(input: {
     throw new Error("La recomendación debe mostrarse o abrirse antes de completarse");
   }
   const parsedAlertKey = parseAlertRecommendationKey(input.recommendationKey);
-  const [sourceAlert] = parsedAlertKey ? await db.select({ id: alerts.id, targetUserId: alerts.targetUserId, nextShowAt: alerts.nextShowAt })
+  const [sourceAlert] = parsedAlertKey ? await db.select({ id: alerts.id, kind: alerts.kind, targetUserId: alerts.targetUserId, nextShowAt: alerts.nextShowAt })
     .from(alerts).where(and(eq(alerts.leadId, input.leadId), eq(alerts.id, parsedAlertKey.alertId), eq(alerts.nextShowAt, parsedAlertKey.nextShowAt), isNull(alerts.dismissedAt), isNull(alerts.resolvedAt), isNull(alerts.expiredAt))) : [];
   const isBoundAlert = Boolean(sourceAlert) && input.recommendationKey === buildAlertRecommendationKey({ alertId: sourceAlert.id, nextShowAt: sourceAlert.nextShowAt }) && (isPrivileged || sourceAlert.targetUserId === input.actorId);
   const riskItems = input.kind === "recommendation_completed" || isBoundAlert ? [] : await listLeadRiskQueue({ actorId: input.actorId, permissions: input.permissions });
@@ -104,6 +107,14 @@ export async function recordRecommendationEvent(input: {
   }
   if (input.kind === "recommendation_skipped" && !input.reason?.trim()) {
     throw new Error("Indica el motivo para omitir la recomendación");
+  }
+  const priorActionType = priorEvent ? (priorEvent.metadata as RecommendationMetadata).actionType ?? (input.recommendationKey.startsWith("risk:") ? "no_contact" : input.recommendationKey.startsWith("alert:") ? "alerta" : undefined) : undefined;
+  const boundActionType = sourceAlert?.kind ?? (isBoundRisk ? "no_contact" : priorActionType);
+  if (!boundActionType) {
+    throw new Error("No se pudo vincular el tipo de acción de la recomendación");
+  }
+  if (input.actionType && input.actionType !== boundActionType) {
+    throw new Error("El tipo de acción no coincide con la recomendación vigente");
   }
   const dedupeKey = `recommendation:${input.kind}:${input.actorId}:${input.recommendationKey}`;
   let reactionTimeMs = input.reactionTimeMs;
@@ -116,6 +127,7 @@ export async function recordRecommendationEvent(input: {
   const metadata: RecommendationMetadata = {
     recommendationKey: input.recommendationKey,
     sourceAlertId: sourceAlert?.id ?? null,
+    actionType: boundActionType,
     ...(input.reason ? { reason: input.reason.trim() } : {}),
     ...(reactionTimeMs === undefined ? {} : { reactionTimeMs }),
   };

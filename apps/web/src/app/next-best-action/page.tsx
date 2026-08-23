@@ -20,7 +20,7 @@ function NextBestActionContent() {
   const event = useRecordNextBestActionEvent();
   const [skippedAction, setSkippedAction] = useState<(typeof data)[number] | null>(null);
   const [skipReason, setSkipReason] = useState("");
-  type TrackableRecommendation = { lead: { id: string }; recommendationKey?: string };
+  type TrackableRecommendation = { lead: { id: string }; recommendationKey?: string; actionType?: string };
   const shownKeys = useRef(new Set<string>());
   const pendingShownKeys = useRef(new Set<string>());
   const shownAttempts = useRef(new Map<string, number>());
@@ -28,7 +28,7 @@ function NextBestActionContent() {
   const activeShownKeys = useRef(new Set<string>());
   const record = async (action: TrackableRecommendation, kind: "recommendation_shown" | "recommendation_opened" | "recommendation_completed" | "recommendation_skipped", reason?: string) => {
     if (!action.recommendationKey) return;
-    await event.mutateAsync({ leadId: action.lead.id, recommendationKey: action.recommendationKey, kind, ...(reason ? { reason } : {}) });
+    await event.mutateAsync({ leadId: action.lead.id, recommendationKey: action.recommendationKey, kind, ...(action.actionType ? { actionType: action.actionType } : {}), ...(reason ? { reason } : {}) });
   };
   const markShown = (action: TrackableRecommendation) => {
     const key = action.recommendationKey;
@@ -71,7 +71,7 @@ function NextBestActionContent() {
     {metrics && <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">{[["Mostradas", metrics.shown], ["Completadas", metrics.completed], ["Omitidas", metrics.skipped], ["Cumplimiento", `${metrics.complianceRate}%`], ["Reacción media", metrics.averageReactionMinutes === null ? "—" : `${metrics.averageReactionMinutes} min`]].map(([label, value]) => <div key={String(label)} className="border p-4"><p className="text-sm text-muted-foreground">{label}</p><p className="text-2xl font-semibold">{value}</p></div>)}</div>}
     <NextBestActionView actions={data} onOpen={(action) => record(action, "recommendation_opened")} onCompleted={(action) => record(action, "recommendation_completed")} />
     {data[0] && <Button variant="outline" type="button" onClick={() => setSkippedAction(data[0] ?? null)}>Omitir acción principal</Button>}
-    <Dialog open={Boolean(skippedAction)} onOpenChange={(open) => { if (!open) setSkippedAction(null); }}><DialogContent><DialogHeader><DialogTitle>Omitir recomendación</DialogTitle><DialogDescription>Indica por qué esta acción no aplica ahora.</DialogDescription></DialogHeader><Textarea aria-label="Motivo para omitir" value={skipReason} onChange={(change) => setSkipReason(change.target.value)} /><DialogFooter><Button variant="outline" type="button" onClick={() => setSkippedAction(null)}>Cancelar</Button><Button type="button" disabled={!skipReason.trim() || event.isPending} onClick={async () => { if (!skippedAction) return; await event.mutateAsync({ leadId: skippedAction.lead.id, recommendationKey: skippedAction.recommendationKey, kind: "recommendation_skipped", reason: skipReason }); setSkipReason(""); setSkippedAction(null); }}>Confirmar omisión</Button></DialogFooter></DialogContent></Dialog>
+    <Dialog open={Boolean(skippedAction)} onOpenChange={(open) => { if (!open) setSkippedAction(null); }}><DialogContent><DialogHeader><DialogTitle>Omitir recomendación</DialogTitle><DialogDescription>Indica por qué esta acción no aplica ahora.</DialogDescription></DialogHeader><Textarea aria-label="Motivo para omitir" value={skipReason} onChange={(change) => setSkipReason(change.target.value)} /><DialogFooter><Button variant="outline" type="button" onClick={() => setSkippedAction(null)}>Cancelar</Button><Button type="button" disabled={!skipReason.trim() || event.isPending} onClick={async () => { if (!skippedAction) return; await event.mutateAsync({ leadId: skippedAction.lead.id, recommendationKey: skippedAction.recommendationKey, kind: "recommendation_skipped", actionType: skippedAction.actionType, reason: skipReason }); setSkipReason(""); setSkippedAction(null); }}>Confirmar omisión</Button></DialogFooter></DialogContent></Dialog>
   </div>;
 }
 

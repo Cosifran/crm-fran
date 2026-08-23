@@ -49,6 +49,7 @@ const alertIdInput = z.object({
 const recommendationEventInput = z.object({
 	leadId: z.string().min(1),
 	recommendationKey: z.string().min(1),
+	actionType: z.string().min(1).max(100).optional(),
 	kind: z.enum(["recommendation_shown", "recommendation_opened", "recommendation_completed", "recommendation_skipped"]),
 	reason: z.string().trim().min(1).max(500).optional(),
 	reactionTimeMs: z.number().int().nonnegative().optional(),

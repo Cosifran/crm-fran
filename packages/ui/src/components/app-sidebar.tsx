@@ -14,7 +14,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@crm-fran/ui/components/sidebar"
-import { CircleAlertIcon, HouseIcon, ChartBarIcon, CalendarDaysIcon, ChartNoAxesCombinedIcon, CameraIcon, FileTextIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, CommandIcon, MessageSquareIcon, TrophyIcon, ListChecksIcon } from "lucide-react"
+import { BrainCircuitIcon, FlaskConicalIcon, CircleAlertIcon, HouseIcon, ChartBarIcon, CalendarDaysIcon, ChartNoAxesCombinedIcon, CameraIcon, FileTextIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, CommandIcon, MessageSquareIcon, TrophyIcon, ListChecksIcon } from "lucide-react"
 
 const data = {
   user: {
@@ -35,6 +35,16 @@ const data = {
       title: "Próxima mejor acción",
       url: "/next-best-action",
       icon: <ListChecksIcon />,
+    },
+    {
+      title: "Experimentos comerciales",
+      url: "/experimentos-comerciales",
+      icon: <FlaskConicalIcon />,
+    },
+    {
+      title: "Inteligencia comercial",
+      url: "/inteligencia-comercial",
+      icon: <BrainCircuitIcon />,
     },
     /*  {
        title: "Usuarios",
