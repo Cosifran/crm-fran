@@ -9,6 +9,7 @@ import { dashboardRouter } from "./dashboard";
 import { personalGoalsRouter } from "./personal-goals";
 import { commercialIntelligenceRouter } from "./commercial-intelligence";
 import { commercialExperimentsRouter } from "./commercial-experiments";
+import { profitabilityRouter } from "./profitability";
 import { permittedProcedure } from "@crm-fran/api/trpc/trpc";
 import { publicProcedure, router } from "../index";
 
@@ -42,5 +43,6 @@ export const appRouter = router({
   personalGoals: personalGoalsRouter,
   commercialIntelligence: commercialIntelligenceRouter,
   commercialExperiments: commercialExperimentsRouter,
+  profitability: profitabilityRouter,
 });
 export type AppRouter = typeof appRouter;

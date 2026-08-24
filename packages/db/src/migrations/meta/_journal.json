@@ -169,6 +169,13 @@
       "when": 1787490672753,
       "tag": "0023_aspiring_molten_man",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1787505541956,
+      "tag": "0024_new_ma_gnuci",
+      "breakpoints": true
     }
   ]
 }
