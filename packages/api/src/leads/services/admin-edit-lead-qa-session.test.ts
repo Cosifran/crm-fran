@@ -98,6 +98,8 @@ describe("adminEditLeadQASession", () => {
 		});
 
 		expect(updated.questions).toEqual(questions);
+		const stored = await db.query.leads.findFirst({ where: (table, { eq }) => eq(table.id, leadId) });
+		expect(stored?.questions).toEqual(questions.map((question) => ({ ...question, authorRole: "caller", authorId: adminId })));
 	});
 
 	it("rejects a caller without wildcard permission", async () => {

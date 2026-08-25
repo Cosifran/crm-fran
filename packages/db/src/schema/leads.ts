@@ -49,6 +49,9 @@ export const leads = pgTable("leads", {
 	    phone: text("phone").notNull(),
 	    source: text("source"),
 	    campaign: text("campaign"),
+	    ad: text("ad"),
+	    creative: text("creative"),
+	    acquisitionAngle: text("acquisition_angle"),
 	type: text("type")
 		.$type<LeadType>()
 		.default(LEAD_TYPE.MAESTRA)

@@ -1,20 +1,29 @@
 import { TRPCError } from "@trpc/server";
 
-import { and, db, eq, gte, inArray, lte, sql } from "@crm-fran/db";
+import { and, db, desc, eq, gte, ilike, inArray, lte, or, sql } from "@crm-fran/db";
 import {
   campaignSpendPeriods,
+  leadFinancialEvents,
   leadActivityEvents,
   leads,
   LEAD_ACTIVITY_KIND,
   user,
   type LeadActivityMetadata,
   type LeadQASession,
+  type LeadFinancialEventKind,
 } from "@crm-fran/db/schema/index";
 
 import {
   buildProfitabilityAnalysis,
   type ProfitabilityLead,
 } from "./analysis";
+import { buildFinancialTruthProjection } from "./financial-truth";
+import {
+  classifyReversalInsertConflict,
+  isSameRecordRequest,
+  isSameReversalRequest,
+  reversalProblem,
+} from "./financial-event-rules";
 
 type Activity = {
   leadId: string;
@@ -77,8 +86,34 @@ function outcomeFlags(events: readonly Activity[]) {
 }
 
 export const profitabilityService = {
-  async overview(input: { from: Date; to: Date }) {
-    const spendPeriods = await db
+  async searchAttributionLeads(input: { query: string; limit: number }) {
+    const query = input.query.trim();
+    const condition = query
+      ? or(
+          ilike(leads.name, `%${query}%`),
+          ilike(leads.email, `%${query}%`),
+        )
+      : undefined;
+    return db
+      .select({
+        id: leads.id,
+        name: leads.name,
+        email: leads.email,
+        source: leads.source,
+        campaign: leads.campaign,
+        ad: leads.ad,
+        creative: leads.creative,
+        acquisitionAngle: leads.acquisitionAngle,
+      })
+      .from(leads)
+      .where(condition)
+      .orderBy(desc(leads.createdAt))
+      .limit(input.limit);
+  },
+
+  async overview(input: { from: Date; to: Date; currency?: string }) {
+    const currency = input.currency ?? "EUR";
+    const allSpendPeriods = await db
       .select()
       .from(campaignSpendPeriods)
       .where(
@@ -87,12 +122,20 @@ export const profitabilityService = {
           lte(campaignSpendPeriods.periodEnd, input.to),
         ),
       );
+    const availableCurrencies = [...new Set(allSpendPeriods.map((period) => period.currency))].sort();
+    if (availableCurrencies.length === 0) availableCurrencies.push("EUR");
+    const spendPeriods = allSpendPeriods.filter(
+      (period) => period.currency === currency,
+    );
     const leadRows = await db
       .select({
         id: leads.id,
         profileQuestions: leads.questions,
         source: leads.source,
         campaign: leads.campaign,
+        ad: leads.ad,
+        creative: leads.creative,
+        acquisitionAngle: leads.acquisitionAngle,
         createdAt: leads.createdAt,
         callerId: leads.callerId,
         closerId: leads.closerId,
@@ -170,6 +213,9 @@ export const profitabilityService = {
         profile: profileFrom(lead.profileQuestions),
         source: lead.source,
         campaign: lead.campaign,
+        ad: lead.ad,
+        creative: lead.creative,
+        acquisitionAngle: lead.acquisitionAngle,
         createdAt: lead.createdAt,
         callerId,
         callerName: callerId ? names.get(callerId) ?? callerId : null,
@@ -200,10 +246,12 @@ export const profitabilityService = {
       ...buildProfitabilityAnalysis({
         from: input.from,
         to: input.to,
+        currency,
         spendPeriods,
         leads: analysisLeads,
       }),
       spendPeriods,
+      availableCurrencies,
       campaignOptions,
     };
   },
@@ -216,6 +264,7 @@ export const profitabilityService = {
     periodEnd: Date;
     spendCents: number;
     referenceSaleValueCents: number;
+    currency?: string;
     actorId: string;
   }) {
     return db.transaction(async (transaction) => {
@@ -247,6 +296,7 @@ export const profitabilityService = {
         periodEnd: input.periodEnd,
         spendCents: input.spendCents,
         referenceSaleValueCents: input.referenceSaleValueCents,
+        currency: input.currency ?? "EUR",
         updatedAt: new Date(),
       };
       if (input.id) {
@@ -281,5 +331,189 @@ export const profitabilityService = {
       .where(eq(campaignSpendPeriods.id, id))
       .returning({ id: campaignSpendPeriods.id });
     return { deleted: deleted.length > 0 };
+  },
+
+  async listFinancialLedger(leadId: string) {
+    const events = await db
+      .select()
+      .from(leadFinancialEvents)
+      .where(eq(leadFinancialEvents.leadId, leadId))
+      .orderBy(desc(leadFinancialEvents.occurredAt), desc(leadFinancialEvents.createdAt));
+    return {
+      events,
+      projectionByCurrency: buildFinancialTruthProjection(events),
+      source: "manual_financial_ledger" as const,
+      estimatedProfitabilityIsSeparate: true as const,
+    };
+  },
+
+  async recordFinancialEvent(input: {
+    leadId: string;
+    kind: Exclude<LeadFinancialEventKind, "reversal">;
+    amountCents: number;
+    currency: string;
+    occurredAt: Date;
+    actorId: string;
+    idempotencyKey: string;
+    note?: string;
+    externalReference?: string;
+  }) {
+    return db.transaction(async (transaction) => {
+      const [lead] = await transaction
+        .select({ id: leads.id })
+        .from(leads)
+        .where(eq(leads.id, input.leadId));
+      if (!lead) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Lead no encontrado." });
+      }
+      const [created] = await transaction
+        .insert(leadFinancialEvents)
+        .values({
+          id: crypto.randomUUID(),
+          leadId: input.leadId,
+          kind: input.kind,
+          amountCents: input.amountCents,
+          currency: input.currency,
+          occurredAt: input.occurredAt,
+          createdById: input.actorId,
+          idempotencyKey: input.idempotencyKey,
+          note: input.note,
+          externalReference: input.externalReference,
+        })
+        .onConflictDoNothing()
+        .returning();
+      if (created) return created;
+      const [existing] = await transaction
+        .select()
+        .from(leadFinancialEvents)
+        .where(
+          and(
+            eq(leadFinancialEvents.createdById, input.actorId),
+            eq(leadFinancialEvents.idempotencyKey, input.idempotencyKey),
+          ),
+        );
+      if (!existing || !isSameRecordRequest(existing, input)) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "La clave de idempotencia ya se utilizó para otra operación.",
+        });
+      }
+      return existing;
+    });
+  },
+
+  async reverseFinancialEvent(input: {
+    leadId: string;
+    eventId: string;
+    occurredAt: Date;
+    actorId: string;
+    idempotencyKey: string;
+    note?: string;
+  }) {
+    return db.transaction(async (transaction) => {
+      const [retry] = await transaction
+        .select()
+        .from(leadFinancialEvents)
+        .where(
+          and(
+            eq(leadFinancialEvents.createdById, input.actorId),
+            eq(leadFinancialEvents.idempotencyKey, input.idempotencyKey),
+          ),
+        );
+      if (retry) {
+        if (!isSameReversalRequest(retry, input)) {
+          throw new TRPCError({ code: "CONFLICT", message: "La clave de idempotencia ya se utilizó para otra operación." });
+        }
+        return retry;
+      }
+      await transaction.execute(
+        sql`select id from lead_financial_events where id = ${input.eventId} for update`,
+      );
+      const [original] = await transaction
+        .select()
+        .from(leadFinancialEvents)
+        .where(eq(leadFinancialEvents.id, input.eventId));
+      const problem = reversalProblem(original, input.leadId);
+      if (problem === "not_found") {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Movimiento financiero no encontrado para este lead." });
+      }
+      if (problem === "reversal_of_reversal") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "No se puede revertir una reversión." });
+      }
+      if (!original) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No se pudo validar el movimiento financiero." });
+      }
+      const [concurrentRetry] = await transaction
+        .select()
+        .from(leadFinancialEvents)
+        .where(
+          and(
+            eq(leadFinancialEvents.createdById, input.actorId),
+            eq(leadFinancialEvents.idempotencyKey, input.idempotencyKey),
+          ),
+        );
+      if (concurrentRetry) {
+        if (!isSameReversalRequest(concurrentRetry, input)) {
+          throw new TRPCError({ code: "CONFLICT", message: "La clave de idempotencia ya se utilizó para otra operación." });
+        }
+        return concurrentRetry;
+      }
+      const [existingReversal] = await transaction
+        .select({ id: leadFinancialEvents.id })
+        .from(leadFinancialEvents)
+        .where(eq(leadFinancialEvents.reversalOfId, original.id));
+      if (existingReversal) {
+        throw new TRPCError({ code: "CONFLICT", message: "El movimiento ya fue revertido." });
+      }
+      const [created] = await transaction
+        .insert(leadFinancialEvents)
+        .values({
+          id: crypto.randomUUID(),
+          leadId: original.leadId,
+          kind: "reversal",
+          amountCents: original.amountCents,
+          currency: original.currency,
+          occurredAt: input.occurredAt,
+          createdById: input.actorId,
+          idempotencyKey: input.idempotencyKey,
+          note: input.note,
+          reversalOfId: original.id,
+        })
+        .onConflictDoNothing()
+        .returning();
+      if (created) return created;
+
+      const [idempotencyEvent] = await transaction
+        .select()
+        .from(leadFinancialEvents)
+        .where(
+          and(
+            eq(leadFinancialEvents.createdById, input.actorId),
+            eq(leadFinancialEvents.idempotencyKey, input.idempotencyKey),
+          ),
+        );
+      const [sourceReversal] = await transaction
+        .select({ id: leadFinancialEvents.id })
+        .from(leadFinancialEvents)
+        .where(eq(leadFinancialEvents.reversalOfId, original.id));
+      const conflict = classifyReversalInsertConflict(
+        {
+          idempotencyEvent,
+          sourceReversalExists: Boolean(sourceReversal),
+        },
+        input,
+      );
+      if (conflict === "retry") return idempotencyEvent!;
+      if (conflict === "already_reversed") {
+        throw new TRPCError({ code: "CONFLICT", message: "El movimiento ya fue revertido." });
+      }
+      throw new TRPCError({
+        code: "CONFLICT",
+        message:
+          conflict === "idempotency_conflict"
+            ? "La clave de idempotencia ya se utilizó para otra operación."
+            : "No se pudo registrar la reversión por un conflicto concurrente.",
+      });
+    });
   },
 };

@@ -6,9 +6,11 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   FEEDBACK_PROFILES,
   MOTIVATION_ANGLES,
+  OBJECTION_TYPES,
   type CallFeedbackDraft,
   type FeedbackProfile,
   type MotivationAngle,
+  type ObjectionType,
 } from "@crm-fran/api/call-feedback";
 
 import { trpc } from "@/utils/trpc";
@@ -42,6 +44,7 @@ type FormValue = {
   primaryProfile: FeedbackProfile | "";
   subProfile: FeedbackProfile | "";
   motivationAngles: MotivationAngle[];
+  objectionTypes: ObjectionType[];
   isDecisionMaker: string;
   decisionMakerName: string;
   financialSource: string;
@@ -103,6 +106,7 @@ const defaultValues: FormValue = {
   primaryProfile: "",
   subProfile: "",
   motivationAngles: [],
+  objectionTypes: [],
   isDecisionMaker: "",
   decisionMakerName: "",
   financialSource: "",
@@ -136,6 +140,7 @@ function getInitialValues(
   const isFeedbackProfile = (value: string | undefined): value is FeedbackProfile =>
     Boolean(value && FEEDBACK_PROFILES.some((profile) => profile.value === value));
   let motivationAngles: MotivationAngle[] = [];
+  let objectionTypes: ObjectionType[] = [];
   try {
     const parsed: unknown = JSON.parse(byKey.get("motivationAngles") ?? "[]");
     if (Array.isArray(parsed)) {
@@ -148,6 +153,10 @@ function getInitialValues(
   } catch {
     motivationAngles = [];
   }
+  try {
+    const parsed: unknown = JSON.parse(byKey.get("objectionTypes") ?? "[]");
+    if (Array.isArray(parsed)) objectionTypes = parsed.filter((value): value is ObjectionType => typeof value === "string" && OBJECTION_TYPES.some((item) => item.value === value));
+  } catch { objectionTypes = []; }
 
   return {
     isContacted:
@@ -160,6 +169,7 @@ function getInitialValues(
     primaryProfile: isFeedbackProfile(primaryProfileAnswer) ? primaryProfileAnswer : "",
     subProfile: isFeedbackProfile(subProfileAnswer) ? subProfileAnswer : "",
     motivationAngles,
+    objectionTypes,
     isDecisionMaker: byKey.get("isDecisionMaker") ?? "",
     decisionMakerName: byKey.get("decisionMakerName") ?? "",
     financialSource: byKey.get("financialSource") ?? "",
@@ -229,6 +239,7 @@ function buildPayload(value: FormValue, leadId: string, sourceAlertId?: string) 
     ["primaryProfile", "Perfil principal", value.primaryProfile],
     ["subProfile", "Subperfil", value.subProfile],
     ["motivationAngles", "Ángulos de motivación", JSON.stringify(value.motivationAngles)],
+    ["objectionTypes", "Objeciones confirmadas", JSON.stringify(value.objectionTypes)],
     ["isContacted", "¿Fue contactado?", "Si"],
     ["isDecisionMaker", "¿Es el decisor?", value.isDecisionMaker],
     ["decisionMakerName", "¿Quién es la persona correcta?", value.decisionMakerName],
@@ -243,7 +254,7 @@ function buildPayload(value: FormValue, leadId: string, sourceAlertId?: string) 
     ["extraInfo", "Información extra", value.extraInfo],
   ]
     .filter(([questionKey, , answer]) =>
-      questionKey === "motivationAngles" ? answer !== "[]" : answer.trim() !== "",
+      questionKey === "motivationAngles" || questionKey === "objectionTypes" ? answer !== "[]" : answer.trim() !== "",
     )
     .map(([questionKey, question, answer]) => ({
       questionKey,
@@ -365,6 +376,7 @@ export default function AssignLeadForm({
     form.setFieldValue("primaryProfile", "");
     form.setFieldValue("subProfile", "");
     form.setFieldValue("motivationAngles", []);
+    form.setFieldValue("objectionTypes", []);
     form.setFieldValue("isDecisionMaker", "");
     form.setFieldValue("decisionMakerName", "");
     form.setFieldValue("financialSource", "");
@@ -410,6 +422,7 @@ export default function AssignLeadForm({
       draft.primaryProfile === "latino_extranjero" ? draft.subProfile : "",
     );
     form.setFieldValue("motivationAngles", draft.motivationAngles);
+    form.setFieldValue("objectionTypes", draft.objectionTypes);
     form.setFieldValue("isDecisionMaker", draft.isDecisionMaker);
     form.setFieldValue("decisionMakerName", draft.decisionMakerName);
     form.setFieldValue("financialSource", draft.financialSource);
@@ -596,6 +609,21 @@ export default function AssignLeadForm({
                   );
                 })}
               </div>
+            </Field>
+          )}
+        </form.Field>
+
+        <form.Field name="objectionTypes">
+          {(field) => (
+            <Field>
+              <FieldLabel>Objeciones confirmadas</FieldLabel>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {OBJECTION_TYPES.map((item) => {
+                  const checked = field.state.value.includes(item.value);
+                  return <label key={item.value} className="flex items-start gap-2 text-sm"><Checkbox checked={checked} onCheckedChange={(next) => field.handleChange(next ? [...field.state.value, item.value] : field.state.value.filter((value) => value !== item.value))} /><span>{item.label}</span></label>;
+                })}
+              </div>
+              <p className="text-xs text-muted-foreground">Las sugerencias de IA no se guardan hasta que una persona revise y guarde este formulario.</p>
             </Field>
           )}
         </form.Field>

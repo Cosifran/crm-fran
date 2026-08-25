@@ -27,6 +27,7 @@ type ActivityKind = NonNullable<
 const ICON_BY_KIND: Record<ActivityKind, typeof HistoryIcon> = {
   lead_created: FileTextIcon,
   lead_type_changed: FileTextIcon,
+  lead_attribution_updated: FileTextIcon,
   caller_assigned: CircleUserRoundIcon,
   closer_assigned: UserRoundCheckIcon,
   state_changed: CheckCircle2Icon,
@@ -51,6 +52,28 @@ function formatActivityDate(value: Date | string | null) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
+}
+
+const ATTRIBUTION_LABELS = {
+  source: "Fuente",
+  campaign: "Campaña",
+  ad: "Anuncio",
+  creative: "Creatividad",
+  acquisitionAngle: "Ángulo de captación",
+} as const;
+
+export function attributionChangeSummary(metadata: Record<string, unknown>) {
+  const before = typeof metadata.before === "object" && metadata.before !== null
+    ? metadata.before as Record<string, unknown>
+    : {};
+  const after = typeof metadata.after === "object" && metadata.after !== null
+    ? metadata.after as Record<string, unknown>
+    : {};
+  return Object.entries(ATTRIBUTION_LABELS).flatMap(([key, label]) => {
+    const previous = typeof before[key] === "string" ? before[key] as string : null;
+    const current = typeof after[key] === "string" ? after[key] as string : null;
+    return previous === current ? [] : [{ key, label, previous, current }];
+  });
 }
 
 export function LeadActivityTimeline({
@@ -117,6 +140,15 @@ export function LeadActivityTimeline({
                   {event.description}
                 </p>
               )}
+              {event.kind === "lead_attribution_updated" ? (
+                <ul className="flex flex-col gap-1 text-xs text-muted-foreground">
+                  {attributionChangeSummary(event.metadata).map((change) => (
+                    <li key={change.key}>
+                      {change.label}: {change.previous ?? "Sin dato"} → {change.current ?? "Sin dato"}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
               <p className="text-xs text-muted-foreground">
                 {formatActivityDate(event.occurredAt)}
                 {event.actorName ? ` · ${event.actorName}` : ""}

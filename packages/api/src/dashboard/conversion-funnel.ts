@@ -9,6 +9,11 @@ export const CONVERSION_STAGE = {
 export type ConversionStage =
   (typeof CONVERSION_STAGE)[keyof typeof CONVERSION_STAGE];
 
+export type ConversionMilestone = {
+  kind: Exclude<ConversionStage, "assigned">;
+  occurredAt: Date;
+};
+
 type FunnelEvent = {
   id: string;
   kind: string;
@@ -46,6 +51,28 @@ const ATTENDED_OUTCOMES = new Set([
   "Venta",
   "No interesado",
 ]);
+
+export function getAuthoritativeConversionMilestones(
+  events: readonly FunnelEvent[],
+): ConversionMilestone[] {
+  return events.flatMap<ConversionMilestone>((event) => {
+    if (
+      event.kind === "caller_feedback" &&
+      getConversionEventOutcome(event) !== "Lead no contactado"
+    ) return [{ kind: "contacted" as const, occurredAt: event.occurredAt }];
+    if (event.kind === "appointment_scheduled" || event.kind === "appointment_rescheduled") {
+      return [{ kind: "appointment" as const, occurredAt: event.occurredAt }];
+    }
+    if (event.kind === "closer_feedback") {
+      const outcome = getConversionEventOutcome(event);
+      const milestones: { kind: "show" | "sale"; occurredAt: Date }[] = [];
+      if (ATTENDED_OUTCOMES.has(outcome ?? "")) milestones.push({ kind: "show", occurredAt: event.occurredAt });
+      if (outcome === "Venta") milestones.push({ kind: "sale", occurredAt: event.occurredAt });
+      return milestones;
+    }
+    return [];
+  });
+}
 
 const STAGE_LABELS: Record<ConversionStage, string> = {
   assigned: "Asignados",

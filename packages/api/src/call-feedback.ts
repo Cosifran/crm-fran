@@ -34,8 +34,19 @@ export const MOTIVATION_ANGLES = [
   { value: "family_quality_time", label: "Más tiempo/calidad de vida con la familia" },
 ] as const;
 
+export const OBJECTION_TYPES = [
+  { value: "price", label: "Precio o inversión" },
+  { value: "timing", label: "No es el momento" },
+  { value: "trust", label: "Confianza o credibilidad" },
+  { value: "decision_maker", label: "Debe consultarlo con otra persona" },
+  { value: "time_capacity", label: "Falta de tiempo o capacidad" },
+  { value: "product_fit", label: "No ve encaje con la formación" },
+  { value: "financing", label: "Financiación o liquidez" },
+] as const;
+
 export type FeedbackProfile = (typeof FEEDBACK_PROFILES)[number]["value"];
 export type MotivationAngle = (typeof MOTIVATION_ANGLES)[number]["value"];
+export type ObjectionType = (typeof OBJECTION_TYPES)[number]["value"];
 
 const profileValues = FEEDBACK_PROFILES.map((profile) => profile.value) as [
   FeedbackProfile,
@@ -45,6 +56,30 @@ const motivationAngleValues = MOTIVATION_ANGLES.map((angle) => angle.value) as [
   MotivationAngle,
   ...MotivationAngle[],
 ];
+const objectionTypeValues = OBJECTION_TYPES.map((item) => item.value) as [
+  ObjectionType,
+  ...ObjectionType[],
+];
+
+const confirmedTaxonomies = {
+  motivationAngles: new Set<string>(motivationAngleValues),
+  objectionTypes: new Set<string>(objectionTypeValues),
+} as const;
+
+export type ConfirmedFeedbackQuestion = { questionKey: string; question: string; answer: string };
+
+export function validateConfirmedFeedbackQuestions(questions: readonly ConfirmedFeedbackQuestion[]) {
+  for (const question of questions) {
+    if (question.questionKey !== "motivationAngles" && question.questionKey !== "objectionTypes") continue;
+    let values: unknown;
+    try { values = JSON.parse(question.answer); } catch { throw new Error(`Invalid ${question.questionKey} answer`); }
+    const allowed = confirmedTaxonomies[question.questionKey];
+    if (!Array.isArray(values) || values.some((value) => typeof value !== "string" || !allowed.has(value))) {
+      throw new Error(`Invalid ${question.questionKey} answer`);
+    }
+  }
+  return questions;
+}
 
 export const callFeedbackDraftSchema = z
   .object({
@@ -59,6 +94,7 @@ export const callFeedbackDraftSchema = z
     primaryProfile: z.union([z.literal(""), z.enum(profileValues)]),
     subProfile: z.union([z.literal(""), z.enum(profileValues)]),
     motivationAngles: z.array(z.enum(motivationAngleValues)).max(MOTIVATION_ANGLES.length),
+    objectionTypes: z.array(z.enum(objectionTypeValues)).max(OBJECTION_TYPES.length).optional().default([]),
     isDecisionMaker: z.enum(["", "Si", "No"]),
     decisionMakerName: nullableFormText,
     financialSource: nullableFormText,
@@ -121,6 +157,10 @@ const structuredDraftSchema = {
       type: "array",
       items: { type: "string", enum: motivationAngleValues },
     },
+    objectionTypes: {
+      type: "array",
+      items: { type: "string", enum: objectionTypeValues },
+    },
     isDecisionMaker: { type: "string", enum: ["", "Si", "No"] },
     decisionMakerName: { type: "string" },
     financialSource: { type: "string" },
@@ -140,6 +180,7 @@ const structuredDraftSchema = {
     "primaryProfile",
     "subProfile",
     "motivationAngles",
+    "objectionTypes",
     "isDecisionMaker",
     "decisionMakerName",
     "financialSource",

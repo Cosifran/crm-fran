@@ -19,6 +19,7 @@ export type QualityControlsInput = {
   to: string;
   callerId?: string;
   closerId?: string;
+  initializeSettings?: boolean;
 };
 
 const DEFAULT_SETTINGS: QualitySettings = {
@@ -41,11 +42,13 @@ function endOfDay(value: string) {
   return date;
 }
 
-export async function getQualitySettings() {
-  await db
-    .insert(qualityControlSettings)
-    .values({ id: "global", ...DEFAULT_SETTINGS })
-    .onConflictDoNothing();
+export async function getQualitySettings(options?: { initialize?: boolean }) {
+  if (options?.initialize !== false) {
+    await db
+      .insert(qualityControlSettings)
+      .values({ id: "global", ...DEFAULT_SETTINGS })
+      .onConflictDoNothing();
+  }
 
   const [settings] = await db
     .select()
@@ -104,7 +107,9 @@ export async function getQualityControls(input: QualityControlsInput) {
       .from(user)
       .where(inArray(user.roleId, ["role-caller", "role-closer"]))
       .orderBy(asc(user.name)),
-    getQualitySettings(),
+    getQualitySettings({
+      initialize: input.initializeSettings !== false,
+    }),
   ]);
 
   const assignmentsByLead = new Map<string, (typeof assignmentRows)[number]>();

@@ -30,11 +30,14 @@ describe("createLeadInput", () => {
     expect(result.data.type).toBe("maestra");
   });
 
-  it("accepts campaign and source from the incoming lead data", () => {
+  it("accepts complete acquisition attribution from incoming lead data", () => {
     const result = createLeadInput.safeParse({
       ...lead,
       source: "Meta Ads",
       campaign: "VSL Agosto",
+      ad: "Vídeo 03",
+      creative: "UGC testimonio",
+      acquisitionAngle: "Libertad de tiempo",
     });
 
     expect(result.success).toBe(true);
@@ -42,6 +45,14 @@ describe("createLeadInput", () => {
     expect(result.data).toMatchObject({
       source: "Meta Ads",
       campaign: "VSL Agosto",
+      ad: "Vídeo 03",
+      creative: "UGC testimonio",
+      acquisitionAngle: "Libertad de tiempo",
     });
+  });
+
+  it("rejects blank and unbounded acquisition values", () => {
+    expect(createLeadInput.safeParse({ ...lead, ad: "   " }).success).toBe(false);
+    expect(createLeadInput.safeParse({ ...lead, creative: "x".repeat(201) }).success).toBe(false);
   });
 });

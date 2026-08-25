@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
 import {
 	leads,
@@ -56,10 +57,43 @@ describe("leads schema", () => {
 		expect(leads.noContactImpactCount.default).toBe(0);
 	});
 
-	it("stores optional source and campaign attribution", () => {
+	it("stores optional current acquisition attribution", () => {
 		expect(leads.source).toBeDefined();
 		expect(leads.campaign).toBeDefined();
+		expect(leads.ad).toBeDefined();
+		expect(leads.creative).toBeDefined();
+		expect(leads.acquisitionAngle).toBeDefined();
 		expect(leads.source.notNull).toBe(false);
 		expect(leads.campaign.notNull).toBe(false);
+		expect(leads.ad.notNull).toBe(false);
+		expect(leads.creative.notNull).toBe(false);
+		expect(leads.acquisitionAngle.notNull).toBe(false);
+	});
+
+	it("generates attribution columns and widens the activity-kind constraint", () => {
+		const migration = readFileSync(
+			new URL("../migrations/0027_misty_prodigy.sql", import.meta.url),
+			"utf8",
+		);
+		const snapshot = readFileSync(
+			new URL("../migrations/meta/0027_snapshot.json", import.meta.url),
+			"utf8",
+		);
+		expect(migration).toContain('ADD COLUMN "ad" text');
+		expect(migration).toContain('ADD COLUMN "creative" text');
+		expect(migration).toContain('ADD COLUMN "acquisition_angle" text');
+		expect(migration).toContain("'lead_attribution_updated'");
+		expect(migration).toContain("lead_activity_events_append_only");
+		expect(migration).toContain("BEFORE UPDATE OR DELETE");
+		expect(migration).toContain("pg_trigger_depth() > 1");
+		expect(migration).toContain("OLD.actor_id IS NOT NULL");
+		expect(migration).toContain("NEW.actor_id IS NULL");
+		expect(migration).toContain("to_jsonb(NEW) - 'actor_id'");
+		expect(migration).toContain(
+			"lead activity events are immutable within a living lead aggregate",
+		);
+		expect(migration).not.toContain('ON DELETE restrict');
+		expect(snapshot).toContain('"onDelete": "cascade"');
+		expect(snapshot).toContain('"onDelete": "set null"');
 	});
 });

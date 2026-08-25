@@ -38,6 +38,7 @@ import {
   PopoverTrigger,
 } from "@crm-fran/ui/components/popover";
 import { Skeleton } from "@crm-fran/ui/components/skeleton";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@crm-fran/ui/components/select";
 import {
   Table,
   TableBody,
@@ -54,6 +55,8 @@ import {
 } from "@crm-fran/ui/components/tabs";
 
 import { trpc } from "@/utils/trpc";
+import { AdIntelligenceSection } from "./ad-intelligence-section";
+import { FinancialTruthSection } from "./financial-truth-section";
 
 type SpendForm = {
   id?: string;
@@ -63,6 +66,7 @@ type SpendForm = {
   periodEnd: string;
   spendEuros: string;
   referenceSaleValueEuros: string;
+  currency: string;
 };
 
 type MetricRow = {
@@ -96,13 +100,14 @@ const initialForm: SpendForm = {
   periodEnd: day(today),
   spendEuros: "",
   referenceSaleValueEuros: "",
+  currency: "EUR",
 };
-const money = (value: number | null) =>
+const money = (value: number | null, currency: string) =>
   value === null
     ? "—"
     : new Intl.NumberFormat("es-ES", {
         style: "currency",
-        currency: "EUR",
+        currency,
       }).format(value / 100);
 const percent = (value: number) => `${(value * 100).toFixed(1)}%`;
 const chartConfig = {
@@ -178,9 +183,11 @@ function MetricCard({
 function MetricsTable({
   rows,
   identity,
+  currency,
 }: {
   rows: readonly MetricRow[];
   identity: "name" | "campaign";
+  currency: string;
 }) {
   if (rows.length === 0) {
     return <Empty heading="Sin datos atribuibles" description="Añade gasto para una campaña con leads dentro del mismo periodo." />;
@@ -208,13 +215,13 @@ function MetricsTable({
                   ? `${row.source ?? "Sin fuente"} · ${row.campaign ?? "Sin campaña"}`
                   : row.name}
               </TableCell>
-              <TableCell>{money(row.spendCents)}</TableCell>
+              <TableCell>{money(row.spendCents, currency)}</TableCell>
               <TableCell>{row.leads}</TableCell>
               <TableCell>{row.sales}</TableCell>
-              <TableCell>{money(row.costPerLeadCents)}</TableCell>
-              <TableCell>{money(row.customerAcquisitionCostCents)}</TableCell>
+              <TableCell>{money(row.costPerLeadCents, currency)}</TableCell>
+              <TableCell>{money(row.customerAcquisitionCostCents, currency)}</TableCell>
               <TableCell>{row.roas === null ? "—" : `${row.roas.toFixed(2)}x`}</TableCell>
-              <TableCell>{money(row.estimatedContributionCents)}</TableCell>
+              <TableCell>{money(row.estimatedContributionCents, currency)}</TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -223,7 +230,7 @@ function MetricsTable({
   );
 }
 
-function CampaignTable({ rows }: { rows: readonly (MetricRow & { suggestion: { action: string; suggestedBudgetChangePercent: number; reasons: string[] } })[] }) {
+function CampaignTable({ rows, currency }: { rows: readonly (MetricRow & { suggestion: { action: string; suggestedBudgetChangePercent: number; reasons: string[] } })[]; currency: string }) {
   if (rows.length === 0) {
     return <Empty heading="Sin campañas calculables" description="Registra el gasto y el valor de venta de una campaña para generar sugerencias." />;
   }
@@ -238,7 +245,7 @@ function CampaignTable({ rows }: { rows: readonly (MetricRow & { suggestion: { a
       <Table>
         <TableHeader><TableRow><TableHead>Campaña</TableHead><TableHead>Embudo</TableHead><TableHead>Economía</TableHead><TableHead>Sugerencia</TableHead><TableHead>Motivo</TableHead></TableRow></TableHeader>
         <TableBody>
-          {rows.map((row) => <TableRow key={`${row.source}-${row.campaign}`}><TableCell>{row.source} · {row.campaign}</TableCell><TableCell>{row.leads} leads → {row.contacted} contactos → {row.appointments} agendas → {row.shows} shows → {row.sales} ventas</TableCell><TableCell>CPL {money(row.costPerLeadCents)} · CAC {money(row.customerAcquisitionCostCents)} · ROAS {row.roas?.toFixed(2) ?? "—"}x</TableCell><TableCell><Badge variant={row.suggestion.action === "reduce" ? "destructive" : "outline"}>{label(row.suggestion.action, row.suggestion.suggestedBudgetChangePercent)}</Badge></TableCell><TableCell>{row.suggestion.reasons.join(" ")}</TableCell></TableRow>)}
+          {rows.map((row) => <TableRow key={`${row.source}-${row.campaign}`}><TableCell>{row.source} · {row.campaign}</TableCell><TableCell>{row.leads} leads → {row.contacted} contactos → {row.appointments} agendas → {row.shows} shows → {row.sales} ventas</TableCell><TableCell>CPL {money(row.costPerLeadCents, currency)} · CAC {money(row.customerAcquisitionCostCents, currency)} · ROAS {row.roas?.toFixed(2) ?? "—"}x</TableCell><TableCell><Badge variant={row.suggestion.action === "reduce" ? "destructive" : "outline"}>{label(row.suggestion.action, row.suggestion.suggestedBudgetChangePercent)}</Badge></TableCell><TableCell>{row.suggestion.reasons.join(" ")}</TableCell></TableRow>)}
         </TableBody>
       </Table>
     </div>
@@ -249,13 +256,14 @@ export default function ProfitabilityPage() {
   const client = useQueryClient();
   const [from, setFrom] = useState(day(ninetyDaysAgo));
   const [to, setTo] = useState(day(today));
+  const [currency, setCurrency] = useState("EUR");
   const [form, setForm] = useState<SpendForm>(initialForm);
   const overview = useQuery(
-    trpc.profitability.overview.queryOptions({ from, to }),
+    trpc.profitability.overview.queryOptions({ from, to, currency }),
   );
   const refresh = () =>
     void client.invalidateQueries({
-      queryKey: trpc.profitability.overview.queryKey({ from, to }),
+      queryKey: trpc.profitability.overview.queryKey({ from, to, currency }),
     });
   const save = useMutation(
     trpc.profitability.saveSpend.mutationOptions({
@@ -293,6 +301,7 @@ export default function ProfitabilityPage() {
       periodEnd: form.periodEnd,
       spendEuros: Number(form.spendEuros),
       referenceSaleValueEuros: Number(form.referenceSaleValueEuros),
+      currency: form.currency,
     };
     save.mutate(form.id ? { ...value, id: form.id } : value);
   };
@@ -305,6 +314,7 @@ export default function ProfitabilityPage() {
       periodEnd: day(period.periodEnd),
       spendEuros: String(period.spendCents / 100),
       referenceSaleValueEuros: String(period.referenceSaleValueCents / 100),
+      currency: period.currency,
     });
   const chartData = data.campaigns.map((campaign) => ({
     campaign: campaign.campaign,
@@ -327,30 +337,32 @@ export default function ProfitabilityPage() {
 
       <Card>
         <CardHeader><SectionTitle title="Intervalo de análisis" information="Solo se incluyen periodos de gasto completamente contenidos en estas fechas y leads creados dentro del mismo intervalo." /></CardHeader>
-        <CardContent><FieldGroup><Field><FieldLabel htmlFor="profitability-from">Desde</FieldLabel><Input id="profitability-from" type="date" value={from} onChange={(event) => setFrom(event.target.value)} /></Field><Field><FieldLabel htmlFor="profitability-to">Hasta</FieldLabel><Input id="profitability-to" type="date" value={to} onChange={(event) => setTo(event.target.value)} /></Field></FieldGroup></CardContent>
+        <CardContent><FieldGroup><Field><FieldLabel htmlFor="profitability-from">Desde</FieldLabel><Input id="profitability-from" type="date" value={from} onChange={(event) => setFrom(event.target.value)} /></Field><Field><FieldLabel htmlFor="profitability-to">Hasta</FieldLabel><Input id="profitability-to" type="date" value={to} onChange={(event) => setTo(event.target.value)} /></Field><Field><FieldLabel htmlFor="profitability-currency">Moneda del análisis</FieldLabel><Select items={data.availableCurrencies.map((option) => ({ label: option, value: option }))} value={data.currency} onValueChange={(value) => value && setCurrency(value)}><SelectTrigger id="profitability-currency" aria-label="Moneda del análisis" className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectGroup>{data.availableCurrencies.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectGroup></SelectContent></Select><FieldDescription>Las monedas se analizan por separado; nunca se aplica un tipo de cambio implícito.</FieldDescription></Field></FieldGroup></CardContent>
       </Card>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard title="Gasto publicitario" value={money(data.summary.spendCents)} description={`${data.summary.leads} leads atribuidos`} />
-        <MetricCard title="Ingreso estimado" value={money(data.summary.estimatedRevenueCents)} description={`${data.summary.sales} ventas registradas`} />
+        <MetricCard title="Gasto publicitario" value={money(data.summary.spendCents, data.currency)} description={`${data.summary.leads} leads atribuidos`} />
+        <MetricCard title="Ingreso estimado" value={money(data.summary.estimatedRevenueCents, data.currency)} description={`${data.summary.sales} ventas registradas`} />
         <MetricCard title="ROAS estimado" value={data.summary.roas === null ? "—" : `${data.summary.roas.toFixed(2)}x`} description="Ingreso estimado dividido entre gasto" />
-        <MetricCard title="Retorno antes de costes" value={money(data.summary.estimatedContributionCents)} description="Ingreso estimado menos publicidad; no es beneficio neto" />
+        <MetricCard title="Retorno antes de costes" value={money(data.summary.estimatedContributionCents, data.currency)} description="Ingreso estimado menos publicidad; no es beneficio neto" />
       </div>
 
       <Tabs defaultValue="summary">
-        <TabsList className="flex h-auto flex-wrap"><TabsTrigger value="summary">Resumen</TabsTrigger><TabsTrigger value="campaigns">Campañas</TabsTrigger><TabsTrigger value="team">Equipo</TabsTrigger><TabsTrigger value="profiles">Perfiles</TabsTrigger><TabsTrigger value="spend">Gastos</TabsTrigger></TabsList>
+        <TabsList className="flex h-auto flex-wrap"><TabsTrigger value="summary">Resumen</TabsTrigger><TabsTrigger value="truth">Verdad económica</TabsTrigger><TabsTrigger value="campaigns">Campañas</TabsTrigger><TabsTrigger value="ads">Anuncios, creatividades y ángulos</TabsTrigger><TabsTrigger value="team">Equipo</TabsTrigger><TabsTrigger value="profiles">Perfiles</TabsTrigger><TabsTrigger value="spend">Gastos</TabsTrigger></TabsList>
 
         <TabsContent value="summary" className="flex flex-col gap-4">
-          <Card><CardHeader><SectionTitle title="Gasto frente a ingreso estimado" information="El ingreso no representa caja cobrada: ventas multiplicadas por el valor manual de referencia. Úsalo para comparar campañas con el mismo criterio." /><CardDescription>{data.methodology}</CardDescription></CardHeader><CardContent>{chartData.length === 0 ? <Empty heading="Sin comparativa" description="Añade un periodo de gasto para dibujar la comparativa." /> : <ChartContainer config={chartConfig} className="min-h-72 w-full"><BarChart accessibilityLayer data={chartData}><CartesianGrid vertical={false} /><XAxis dataKey="campaign" tickLine={false} axisLine={false} /><YAxis tickLine={false} axisLine={false} /><ChartTooltip content={<ChartTooltipContent formatter={(value) => money(Number(value) * 100)} />} /><Bar dataKey="spend" fill="var(--color-spend)" radius={4} /><Bar dataKey="revenue" fill="var(--color-revenue)" radius={4} /></BarChart></ChartContainer>}</CardContent></Card>
-          <Card><CardHeader><SectionTitle title="Embudo económico" information="Relaciona el coste de adquisición con cada etapa comercial para detectar si el problema está antes del contacto, la agenda, el show o la venta." /></CardHeader><CardContent className="flex flex-wrap gap-2"><Badge variant="secondary">CPL {money(data.summary.costPerLeadCents)}</Badge><Badge variant="secondary">CAC {money(data.summary.customerAcquisitionCostCents)}</Badge><Badge variant="outline">Contacto {percent(data.summary.leads === 0 ? 0 : data.summary.contacted / data.summary.leads)}</Badge><Badge variant="outline">Agenda {percent(data.summary.leads === 0 ? 0 : data.summary.appointments / data.summary.leads)}</Badge><Badge variant="outline">Show {percent(data.summary.leads === 0 ? 0 : data.summary.shows / data.summary.leads)}</Badge><Badge variant="outline">Venta {percent(data.summary.leadToSaleRate)}</Badge></CardContent></Card>
+          <Card><CardHeader><SectionTitle title="Gasto frente a ingreso estimado" information="El ingreso no representa caja cobrada: ventas multiplicadas por el valor manual de referencia. Úsalo para comparar campañas con el mismo criterio." /><CardDescription>{data.methodology}</CardDescription></CardHeader><CardContent>{chartData.length === 0 ? <Empty heading="Sin comparativa" description="Añade un periodo de gasto para dibujar la comparativa." /> : <ChartContainer config={chartConfig} className="min-h-72 w-full"><BarChart accessibilityLayer data={chartData}><CartesianGrid vertical={false} /><XAxis dataKey="campaign" tickLine={false} axisLine={false} /><YAxis tickLine={false} axisLine={false} /><ChartTooltip content={<ChartTooltipContent formatter={(value) => money(Number(value) * 100, data.currency)} />} /><Bar dataKey="spend" fill="var(--color-spend)" radius={4} /><Bar dataKey="revenue" fill="var(--color-revenue)" radius={4} /></BarChart></ChartContainer>}</CardContent></Card>
+          <Card><CardHeader><SectionTitle title="Embudo económico" information="Relaciona el coste de adquisición con cada etapa comercial para detectar si el problema está antes del contacto, la agenda, el show o la venta." /></CardHeader><CardContent className="flex flex-wrap gap-2"><Badge variant="secondary">CPL {money(data.summary.costPerLeadCents, data.currency)}</Badge><Badge variant="secondary">CAC {money(data.summary.customerAcquisitionCostCents, data.currency)}</Badge><Badge variant="outline">Contacto {percent(data.summary.leads === 0 ? 0 : data.summary.contacted / data.summary.leads)}</Badge><Badge variant="outline">Agenda {percent(data.summary.leads === 0 ? 0 : data.summary.appointments / data.summary.leads)}</Badge><Badge variant="outline">Show {percent(data.summary.leads === 0 ? 0 : data.summary.shows / data.summary.leads)}</Badge><Badge variant="outline">Venta {percent(data.summary.leadToSaleRate)}</Badge></CardContent></Card>
         </TabsContent>
 
-        <TabsContent value="campaigns"><Card><CardHeader><SectionTitle title="Sugerencias por campaña" information="Aumentar, mantener o reducir son propuestas limitadas basadas en muestra y ROAS. Nunca se envían a Google, Meta ni otra plataforma." /></CardHeader><CardContent><CampaignTable rows={data.campaigns} /></CardContent></Card></TabsContent>
-        <TabsContent value="team" className="flex flex-col gap-4"><Card><CardHeader><SectionTitle title="Rentabilidad atribuida a callers" information="El coste se reparte entre los leads asignados. Sirve para comparar operación, no para calcular comisiones ni demostrar causalidad individual." /></CardHeader><CardContent><MetricsTable rows={data.callers} identity="name" /></CardContent></Card><Card><CardHeader><SectionTitle title="Rentabilidad atribuida a closers" information="Las ventas y el coste de los leads se atribuyen a la última asignación registrada disponible dentro del periodo." /></CardHeader><CardContent><MetricsTable rows={data.closers} identity="name" /></CardContent></Card></TabsContent>
-        <TabsContent value="profiles"><Card><CardHeader><SectionTitle title="Rentabilidad por perfil" information="Compara perfiles usando la clasificación guardada en la conversación y el mismo reparto de gasto por lead." /></CardHeader><CardContent><MetricsTable rows={data.profiles} identity="name" /></CardContent></Card></TabsContent>
+        <TabsContent value="truth"><FinancialTruthSection /></TabsContent>
+        <TabsContent value="campaigns"><Card><CardHeader><SectionTitle title="Sugerencias por campaña" information="Aumentar, mantener o reducir son propuestas limitadas basadas en muestra y ROAS. Nunca se envían a Google, Meta ni otra plataforma." /></CardHeader><CardContent><CampaignTable rows={data.campaigns} currency={data.currency} /></CardContent></Card></TabsContent>
+        <TabsContent value="ads"><AdIntelligenceSection ads={data.ads} creatives={data.creatives} acquisitionAngles={data.acquisitionAngles} currency={data.currency} /></TabsContent>
+        <TabsContent value="team" className="flex flex-col gap-4"><Card><CardHeader><SectionTitle title="Rentabilidad atribuida a callers" information="El coste se reparte entre los leads asignados. Sirve para comparar operación, no para calcular comisiones ni demostrar causalidad individual." /></CardHeader><CardContent><MetricsTable rows={data.callers} identity="name" currency={data.currency} /></CardContent></Card><Card><CardHeader><SectionTitle title="Rentabilidad atribuida a closers" information="Las ventas y el coste de los leads se atribuyen a la última asignación registrada disponible dentro del periodo." /></CardHeader><CardContent><MetricsTable rows={data.closers} identity="name" currency={data.currency} /></CardContent></Card></TabsContent>
+        <TabsContent value="profiles"><Card><CardHeader><SectionTitle title="Rentabilidad por perfil" information="Compara perfiles usando la clasificación guardada en la conversación y el mismo reparto de gasto por lead." /></CardHeader><CardContent><MetricsTable rows={data.profiles} identity="name" currency={data.currency} /></CardContent></Card></TabsContent>
         <TabsContent value="spend" className="flex flex-col gap-4">
-          <Card><CardHeader><SectionTitle title={form.id ? "Editar gasto" : "Registrar gasto"} information="Cada fuente y campaña puede tener varios periodos, pero no se permiten fechas solapadas para evitar contar el mismo lead y el mismo gasto dos veces." /><CardDescription>Importes manuales. No existe conexión con APIs publicitarias.</CardDescription></CardHeader><CardContent><FieldGroup><Field><FieldLabel htmlFor="spend-source">Fuente</FieldLabel><Input id="spend-source" list="profitability-sources" value={form.source} onChange={(event) => setForm({ ...form, source: event.target.value })} /><datalist id="profitability-sources">{[...new Set(data.campaignOptions.map((option) => option.source))].map((source) => <option key={source} value={source} />)}</datalist></Field><Field><FieldLabel htmlFor="spend-campaign">Campaña</FieldLabel><Input id="spend-campaign" list="profitability-campaigns" value={form.campaign} onChange={(event) => setForm({ ...form, campaign: event.target.value })} /><datalist id="profitability-campaigns">{data.campaignOptions.filter((option) => !form.source || option.source === form.source).map((option) => <option key={`${option.source}-${option.campaign}`} value={option.campaign} />)}</datalist></Field><Field><FieldLabel htmlFor="spend-start">Inicio</FieldLabel><Input id="spend-start" type="date" value={form.periodStart} onChange={(event) => setForm({ ...form, periodStart: event.target.value })} /></Field><Field><FieldLabel htmlFor="spend-end">Fin</FieldLabel><Input id="spend-end" type="date" value={form.periodEnd} onChange={(event) => setForm({ ...form, periodEnd: event.target.value })} /></Field><Field><FieldLabel htmlFor="spend-amount">Gasto publicitario (€)</FieldLabel><Input id="spend-amount" type="number" min="0.01" step="0.01" value={form.spendEuros} onChange={(event) => setForm({ ...form, spendEuros: event.target.value })} /></Field><Field><FieldLabel htmlFor="sale-value">Valor de referencia por venta (€)</FieldLabel><Input id="sale-value" type="number" min="0.01" step="0.01" value={form.referenceSaleValueEuros} onChange={(event) => setForm({ ...form, referenceSaleValueEuros: event.target.value })} /><FieldDescription>Se usa para estimar ingreso; no equivale necesariamente a dinero cobrado.</FieldDescription></Field><div className="flex flex-wrap gap-2"><Button onClick={submit} disabled={save.isPending || !form.source || !form.campaign || !form.spendEuros || !form.referenceSaleValueEuros}>{form.id ? "Guardar cambios" : "Registrar gasto"}</Button>{form.id ? <Button variant="outline" onClick={() => setForm(initialForm)}>Cancelar edición</Button> : null}</div></FieldGroup></CardContent></Card>
-          <Card><CardHeader><SectionTitle title="Historial de gastos" information="Conserva el criterio económico aplicado a cada cohorte. Editar un periodo recalcula toda la vista; eliminarlo retira su atribución." /></CardHeader><CardContent>{data.spendPeriods.length === 0 ? <Empty heading="Sin gastos registrados" description="Introduce el primer periodo para comenzar el análisis." /> : <div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Fuente y campaña</TableHead><TableHead>Periodo</TableHead><TableHead>Gasto</TableHead><TableHead>Valor por venta</TableHead><TableHead>Acciones</TableHead></TableRow></TableHeader><TableBody>{data.spendPeriods.map((period) => <TableRow key={period.id}><TableCell>{period.source} · {period.campaign}</TableCell><TableCell>{day(period.periodStart)} — {day(period.periodEnd)}</TableCell><TableCell>{money(period.spendCents)}</TableCell><TableCell>{money(period.referenceSaleValueCents)}</TableCell><TableCell><div className="flex gap-2"><Button variant="outline" size="icon-sm" aria-label="Editar gasto" onClick={() => edit(period)}><PencilIcon data-icon="inline-start" /></Button><Button variant="outline" size="icon-sm" aria-label="Eliminar gasto" onClick={() => remove.mutate({ id: period.id })} disabled={remove.isPending}><Trash2Icon data-icon="inline-start" /></Button></div></TableCell></TableRow>)}</TableBody></Table></div>}</CardContent></Card>
+          <Card><CardHeader><SectionTitle title={form.id ? "Editar gasto" : "Registrar gasto"} information="Cada fuente y campaña puede tener varios periodos, pero no se permiten fechas solapadas para evitar contar el mismo lead y el mismo gasto dos veces." /><CardDescription>Importes manuales. No existe conexión con APIs publicitarias.</CardDescription></CardHeader><CardContent><FieldGroup><Field><FieldLabel htmlFor="spend-source">Fuente</FieldLabel><Input id="spend-source" list="profitability-sources" value={form.source} onChange={(event) => setForm({ ...form, source: event.target.value })} /><datalist id="profitability-sources">{[...new Set(data.campaignOptions.map((option) => option.source))].map((source) => <option key={source} value={source} />)}</datalist></Field><Field><FieldLabel htmlFor="spend-campaign">Campaña</FieldLabel><Input id="spend-campaign" list="profitability-campaigns" value={form.campaign} onChange={(event) => setForm({ ...form, campaign: event.target.value })} /><datalist id="profitability-campaigns">{data.campaignOptions.filter((option) => !form.source || option.source === form.source).map((option) => <option key={`${option.source}-${option.campaign}`} value={option.campaign} />)}</datalist></Field><Field><FieldLabel htmlFor="spend-start">Inicio</FieldLabel><Input id="spend-start" type="date" value={form.periodStart} onChange={(event) => setForm({ ...form, periodStart: event.target.value })} /></Field><Field><FieldLabel htmlFor="spend-end">Fin</FieldLabel><Input id="spend-end" type="date" value={form.periodEnd} onChange={(event) => setForm({ ...form, periodEnd: event.target.value })} /></Field><Field><FieldLabel htmlFor="spend-form-currency">Moneda ISO</FieldLabel><Input id="spend-form-currency" list="profitability-currencies" maxLength={3} value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value.toUpperCase() })} /><datalist id="profitability-currencies">{data.availableCurrencies.map((option) => <option key={option} value={option} />)}</datalist></Field><Field><FieldLabel htmlFor="spend-amount">Gasto publicitario ({form.currency})</FieldLabel><Input id="spend-amount" type="number" min="0.01" step="0.01" value={form.spendEuros} onChange={(event) => setForm({ ...form, spendEuros: event.target.value })} /></Field><Field><FieldLabel htmlFor="sale-value">Valor de referencia por venta ({form.currency})</FieldLabel><Input id="sale-value" type="number" min="0.01" step="0.01" value={form.referenceSaleValueEuros} onChange={(event) => setForm({ ...form, referenceSaleValueEuros: event.target.value })} /><FieldDescription>Se usa para estimar ingreso; no equivale necesariamente a dinero cobrado.</FieldDescription></Field><div className="flex flex-wrap gap-2"><Button onClick={submit} disabled={save.isPending || !form.source || !form.campaign || !form.spendEuros || !form.referenceSaleValueEuros}>{form.id ? "Guardar cambios" : "Registrar gasto"}</Button>{form.id ? <Button variant="outline" onClick={() => setForm(initialForm)}>Cancelar edición</Button> : null}</div></FieldGroup></CardContent></Card>
+          <Card><CardHeader><SectionTitle title="Historial de gastos" information="Conserva el criterio económico aplicado a cada cohorte. Editar un periodo recalcula toda la vista; eliminarlo retira su atribución." /></CardHeader><CardContent>{data.spendPeriods.length === 0 ? <Empty heading="Sin gastos registrados" description="Introduce el primer periodo para comenzar el análisis." /> : <div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Fuente y campaña</TableHead><TableHead>Periodo</TableHead><TableHead>Gasto</TableHead><TableHead>Valor por venta</TableHead><TableHead>Acciones</TableHead></TableRow></TableHeader><TableBody>{data.spendPeriods.map((period) => <TableRow key={period.id}><TableCell>{period.source} · {period.campaign}</TableCell><TableCell>{day(period.periodStart)} — {day(period.periodEnd)}</TableCell><TableCell>{money(period.spendCents, period.currency)}</TableCell><TableCell>{money(period.referenceSaleValueCents, period.currency)}</TableCell><TableCell><div className="flex gap-2"><Button variant="outline" size="icon-sm" aria-label="Editar gasto" onClick={() => edit(period)}><PencilIcon data-icon="inline-start" /></Button><Button variant="outline" size="icon-sm" aria-label="Eliminar gasto" onClick={() => remove.mutate({ id: period.id })} disabled={remove.isPending}><Trash2Icon data-icon="inline-start" /></Button></div></TableCell></TableRow>)}</TableBody></Table></div>}</CardContent></Card>
         </TabsContent>
       </Tabs>
     </main>

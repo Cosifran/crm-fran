@@ -6,6 +6,7 @@ export type ProfitabilitySpendPeriod = {
   periodEnd: Date;
   spendCents: number;
   referenceSaleValueCents: number;
+  currency: string;
 };
 
 export type ProfitabilityLead = {
@@ -13,6 +14,9 @@ export type ProfitabilityLead = {
   profile: string | null;
   source: string | null;
   campaign: string | null;
+  ad: string | null;
+  creative: string | null;
+  acquisitionAngle: string | null;
   createdAt: Date;
   callerId: string | null;
   callerName: string | null;
@@ -42,12 +46,19 @@ type Metrics = Totals & {
   customerAcquisitionCostCents: number | null;
   roas: number | null;
   leadToSaleRate: number;
+  confidence: "low" | "medium" | "high";
+  sampleLabel:
+    | "Muestra insuficiente"
+    | "Muestra orientativa"
+    | "Muestra suficiente";
 };
 
 type AttributedLead = ProfitabilityLead & {
   allocatedSpendCents: number;
   estimatedRevenueCents: number;
 };
+
+type GroupIdentity = { id: string; name: string; context?: string };
 
 const round = (value: number) => Math.round(value * 100) / 100;
 const cents = (value: number) => Math.round(value);
@@ -75,6 +86,8 @@ function addLead(totals: Totals, lead: AttributedLead) {
 }
 
 function metrics(totals: Totals): Metrics {
+  const confidence =
+    totals.leads >= 50 ? "high" : totals.leads >= 30 ? "medium" : "low";
   return {
     ...totals,
     spendCents: cents(totals.spendCents),
@@ -92,6 +105,13 @@ function metrics(totals: Totals): Metrics {
         : round(totals.estimatedRevenueCents / totals.spendCents),
     leadToSaleRate:
       totals.leads === 0 ? 0 : round(totals.sales / totals.leads),
+    confidence,
+    sampleLabel:
+      confidence === "high"
+        ? "Muestra suficiente"
+        : confidence === "medium"
+          ? "Muestra orientativa"
+          : "Muestra insuficiente",
   };
 }
 
@@ -138,9 +158,9 @@ function suggestion(row: Metrics): {
 
 function groupedRows(
   leads: readonly AttributedLead[],
-  keyFor: (lead: AttributedLead) => { id: string; name: string } | null,
+  keyFor: (lead: AttributedLead) => GroupIdentity | null,
 ) {
-  const grouped = new Map<string, { id: string; name: string; totals: Totals }>();
+  const grouped = new Map<string, GroupIdentity & { totals: Totals }>();
   for (const lead of leads) {
     const key = keyFor(lead);
     if (!key) continue;
@@ -160,12 +180,50 @@ function groupedRows(
     );
 }
 
+function attributionIdentity(
+  dimension: "ad" | "creative" | "acquisitionAngle",
+  value: string | null,
+  missingLabel: string,
+  lead: AttributedLead,
+): GroupIdentity {
+  const context = `${lead.source ?? "Sin fuente"} · ${lead.campaign ?? "Sin campaña"}`;
+  return {
+    id: JSON.stringify([
+      dimension,
+      lead.source,
+      lead.campaign,
+      value === null ? { missing: true } : { value },
+    ]),
+    name: value ?? missingLabel,
+    context,
+  };
+}
+
+function apportionSpendCents(
+  spendCents: number,
+  leads: readonly ProfitabilityLead[],
+) {
+  const sorted = [...leads].sort((left, right) => left.id.localeCompare(right.id));
+  if (sorted.length === 0) return [];
+  const base = Math.floor(spendCents / sorted.length);
+  const remainder = spendCents % sorted.length;
+  return sorted.map((lead, index) => ({
+    lead,
+    allocatedSpendCents: base + Number(index < remainder),
+  }));
+}
+
 export function buildProfitabilityAnalysis(input: {
   from: Date;
   to: Date;
+  currency?: string;
   spendPeriods: readonly ProfitabilitySpendPeriod[];
   leads: readonly ProfitabilityLead[];
 }) {
+  const currency = input.currency ?? input.spendPeriods[0]?.currency ?? "EUR";
+  if (input.spendPeriods.some((period) => period.currency !== currency)) {
+    throw new Error("Profitability analysis cannot aggregate mixed currency spend periods");
+  }
   const attributed: AttributedLead[] = [];
   const campaignTotals = new Map<
     string,
@@ -182,7 +240,6 @@ export function buildProfitabilityAnalysis(input: {
         lead.createdAt >= input.from &&
         lead.createdAt <= input.to,
     );
-    const allocatedSpend = leads.length === 0 ? 0 : period.spendCents / leads.length;
     const campaignKey = `${period.source}\u0000${period.campaign}`;
     const campaign = campaignTotals.get(campaignKey) ?? {
       source: period.source,
@@ -191,17 +248,17 @@ export function buildProfitabilityAnalysis(input: {
     };
 
     campaign.totals.spendCents += period.spendCents;
-    for (const lead of leads) {
+    for (const { lead, allocatedSpendCents } of apportionSpendCents(period.spendCents, leads)) {
       const row: AttributedLead = {
         ...lead,
-        allocatedSpendCents: allocatedSpend,
+        allocatedSpendCents,
         estimatedRevenueCents: lead.sale
           ? period.referenceSaleValueCents
           : 0,
       };
       attributed.push(row);
       addLead(campaign.totals, row);
-      campaign.totals.spendCents -= allocatedSpend;
+      campaign.totals.spendCents -= allocatedSpendCents;
     }
     campaignTotals.set(campaignKey, campaign);
   }
@@ -232,12 +289,30 @@ export function buildProfitabilityAnalysis(input: {
   );
 
   return {
+    currency,
     summary: metrics(summaryTotals),
     campaigns,
     profiles: groupedRows(attributed, (lead) => ({
-      id: lead.profile ?? "sin-perfil",
+      id: JSON.stringify([
+        "profile",
+        lead.profile === null ? { missing: true } : { value: lead.profile },
+      ]),
       name: lead.profile ?? "Sin perfil",
     })),
+    ads: groupedRows(attributed, (lead) =>
+      attributionIdentity("ad", lead.ad, "Sin anuncio", lead),
+    ),
+    creatives: groupedRows(attributed, (lead) =>
+      attributionIdentity("creative", lead.creative, "Sin creatividad", lead),
+    ),
+    acquisitionAngles: groupedRows(attributed, (lead) =>
+      attributionIdentity(
+        "acquisitionAngle",
+        lead.acquisitionAngle,
+        "Sin ángulo de captación",
+        lead,
+      ),
+    ),
     callers: groupedRows(attributed, (lead) =>
       lead.callerId
         ? { id: lead.callerId, name: lead.callerName ?? lead.callerId }
@@ -248,9 +323,9 @@ export function buildProfitabilityAnalysis(input: {
         ? { id: lead.closerId, name: lead.closerName ?? lead.closerId }
         : null,
     ),
+    attributionModel: "current_single_touch" as const,
     simulationOnly: true as const,
-    methodology:
-      "Atribución por cohorte: el gasto se reparte entre los leads creados en el periodo y el ingreso se estima con el valor manual por venta. No modifica campañas ni demuestra causalidad.",
+    methodology: `Atribución actual por cohorte en ${currency}: cada lead se agrupa por su atribución vigente, no por un histórico multicanal. El gasto publicitario asignado es una estimación separada del ledger financiero real. Las monedas nunca se agregan ni se convierten. No modifica campañas ni demuestra causalidad.`,
   };
 }
 

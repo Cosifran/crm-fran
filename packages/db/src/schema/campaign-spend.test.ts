@@ -11,6 +11,7 @@ describe("campaign spend schema", () => {
     expect(campaignSpendPeriods.periodEnd).toBeDefined();
     expect(campaignSpendPeriods.spendCents).toBeDefined();
     expect(campaignSpendPeriods.referenceSaleValueCents).toBeDefined();
+    expect(campaignSpendPeriods.currency).toBeDefined();
     expect(campaignSpendPeriods.createdById).toBeDefined();
   });
 

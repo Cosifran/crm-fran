@@ -20,6 +20,7 @@ export const campaignSpendPeriods = pgTable(
     periodEnd: timestamp("period_end").notNull(),
     spendCents: integer("spend_cents").notNull(),
     referenceSaleValueCents: integer("reference_sale_value_cents").notNull(),
+    currency: text("currency").default("EUR").notNull(),
     createdById: text("created_by_id")
       .notNull()
       .references(() => user.id, { onDelete: "restrict" }),
@@ -41,6 +42,10 @@ export const campaignSpendPeriods = pgTable(
     check(
       "campaign_spend_periods_sale_value_cents_check",
       sql`${table.referenceSaleValueCents} > 0`,
+    ),
+    check(
+      "campaign_spend_periods_currency_check",
+      sql`${table.currency} ~ '^[A-Z]{3}$'`,
     ),
     index("campaign_spend_periods_campaign_dates_idx").on(
       table.source,

@@ -14,7 +14,16 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@crm-fran/ui/components/sidebar"
-import { BrainCircuitIcon, FlaskConicalIcon, CircleAlertIcon, HouseIcon, ChartBarIcon, CalendarDaysIcon, ChartNoAxesCombinedIcon, CameraIcon, FileTextIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, CommandIcon, MessageSquareIcon, TrophyIcon, ListChecksIcon, BadgeEuroIcon } from "lucide-react"
+import { BrainCircuitIcon, FlaskConicalIcon, CircleAlertIcon, HouseIcon, ChartBarIcon, CalendarDaysIcon, ChartNoAxesCombinedIcon, CameraIcon, FileTextIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, CommandIcon, MessageSquareIcon, TrophyIcon, ListChecksIcon, BadgeEuroIcon, GoalIcon } from "lucide-react"
+import { usePermissions } from "@crm-fran/ui/permissions"
+import type { Permission } from "@crm-fran/db/schema/auth"
+
+export function canViewNavigationItem(
+  item: { globalOnly?: boolean },
+  permissions: readonly Permission[],
+) {
+  return !item.globalOnly || permissions.includes("*")
+}
 
 const data = {
   user: {
@@ -32,6 +41,12 @@ const data = {
       ),
     },
     {
+      title: "Centro de decisiones",
+      url: "/centro-de-decisiones",
+      icon: <GoalIcon />,
+      globalOnly: true,
+    },
+    {
       title: "Próxima mejor acción",
       url: "/next-best-action",
       icon: <ListChecksIcon />,
@@ -47,7 +62,7 @@ const data = {
       icon: <BrainCircuitIcon />,
     },
     {
-      title: "Rentabilidad",
+      title: "Rentabilidad y verdad económica",
       url: "/rentabilidad",
       icon: <BadgeEuroIcon />,
     },
@@ -288,6 +303,7 @@ export function AppSidebar({
   }
   onSignOut?: () => void
 }) {
+  const permissions = usePermissions()
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -305,7 +321,7 @@ export function AppSidebar({
       </SidebarHeader>
       <SidebarContent>
         <NavMain
-          items={data.navMain}
+          items={data.navMain.filter((item) => canViewNavigationItem(item, permissions))}
           LinkComponent={LinkComponent}
           currentPathname={currentPathname}
         />

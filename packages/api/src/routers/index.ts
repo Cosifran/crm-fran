@@ -10,6 +10,7 @@ import { personalGoalsRouter } from "./personal-goals";
 import { commercialIntelligenceRouter } from "./commercial-intelligence";
 import { commercialExperimentsRouter } from "./commercial-experiments";
 import { profitabilityRouter } from "./profitability";
+import { decisionCenterRouter } from "./decision-center";
 import { permittedProcedure } from "@crm-fran/api/trpc/trpc";
 import { publicProcedure, router } from "../index";
 
@@ -44,5 +45,6 @@ export const appRouter = router({
   commercialIntelligence: commercialIntelligenceRouter,
   commercialExperiments: commercialExperimentsRouter,
   profitability: profitabilityRouter,
+  decisionCenter: decisionCenterRouter,
 });
 export type AppRouter = typeof appRouter;

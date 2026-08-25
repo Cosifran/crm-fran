@@ -14,9 +14,12 @@ import {
   setLeadType,
   getLeadActivity,
   getFeedbackStatistics,
+  updateAcquisitionAttribution,
+  deleteLead,
 } from "../leads/services/index";
 import { permittedProcedure } from "@crm-fran/api/trpc/trpc";
 import { getMonthlyCallFeedbackUsage } from "../call-feedback-runtime";
+import { validateConfirmedFeedbackQuestions } from "../call-feedback";
 
 const idInput = z.object({ id: z.string() });
 export const createLeadInput = z.object({
@@ -25,9 +28,21 @@ export const createLeadInput = z.object({
   phone: z.string(),
   source: z.string().trim().min(1).max(200).optional(),
   campaign: z.string().trim().min(1).max(200).optional(),
+  ad: z.string().trim().min(1).max(200).optional(),
+  creative: z.string().trim().min(1).max(200).optional(),
+  acquisitionAngle: z.string().trim().min(1).max(200).optional(),
   type: z.enum(["maestra", "vsl"]).default("maestra"),
 });
 const updateLeadInput = createLeadInput.partial().extend({ id: z.string() });
+const nullableAttribution = z.string().trim().max(200).nullable();
+export const updateAcquisitionAttributionInput = z.object({
+  leadId: z.string().min(1),
+  source: nullableAttribution,
+  campaign: nullableAttribution,
+  ad: nullableAttribution,
+  creative: nullableAttribution,
+  acquisitionAngle: nullableAttribution,
+});
 
 const dateRangeInput = z
   .object({
@@ -66,14 +81,17 @@ const qaSessionInput = z.discriminatedUnion("isContacted", [
   }),
 ]);
 
-const callerQuestionsInput = z
+export const callerQuestionsInput = z
   .array(
     z.object({
       questionKey: z.string().min(1),
       question: z.string().min(1),
       answer: z.string(),
     }),
-  )
+  ).superRefine((questions, context) => {
+    try { validateConfirmedFeedbackQuestions(questions); }
+    catch (error) { context.addIssue({ code: "custom", message: error instanceof Error ? error.message : "Invalid confirmed feedback" }); }
+  })
   .optional();
 
 export const personalStatisticsInput = z
@@ -259,10 +277,21 @@ export const leadsRouter = router({
       return { id, ...rest };
     }),
 
+  updateAcquisitionAttribution: permittedProcedure(["*"])
+    .input(updateAcquisitionAttributionInput)
+    .mutation(async ({ ctx, input }) => {
+      const { leadId, ...attribution } = input;
+      return updateAcquisitionAttribution({
+        leadId,
+        actorId: ctx.session.user.id,
+        attribution,
+      });
+    }),
+
   delete: permittedProcedure(["leads:delete"])
     .input(idInput)
     .mutation(async ({ input }) => {
-      return { success: true, id: input.id };
+      return deleteLead(input.id);
     }),
 
   recordCloserAnswers: permittedProcedure(["leads:write"])

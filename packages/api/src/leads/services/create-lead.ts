@@ -14,8 +14,29 @@ export type CreateLeadInput = {
   phone: string;
   source?: string;
   campaign?: string;
+  ad?: string;
+  creative?: string;
+  acquisitionAngle?: string;
   type: LeadType;
 };
+
+export function leadCreatedAttributionMetadata(
+  lead: {
+    source?: string | null;
+    campaign?: string | null;
+    ad?: string | null;
+    creative?: string | null;
+    acquisitionAngle?: string | null;
+  },
+) {
+  return {
+    source: lead.source ?? null,
+    campaign: lead.campaign ?? null,
+    ad: lead.ad ?? null,
+    creative: lead.creative ?? null,
+    acquisitionAngle: lead.acquisitionAngle ?? null,
+  };
+}
 
 export async function createLead(input: CreateLeadInput) {
   return db.transaction(async (tx) => {
@@ -38,8 +59,7 @@ export async function createLead(input: CreateLeadInput) {
       description: `Lead ${lead.name} incorporado al CRM`,
 	      metadata: {
 	        type: lead.type,
-	        source: lead.source,
-	        campaign: lead.campaign,
+	        ...leadCreatedAttributionMetadata(lead),
 	      },
       dedupeKey: `lead_created:${lead.id}`,
       occurredAt: lead.createdAt,

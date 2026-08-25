@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  OBJECTION_TYPES,
   callFeedbackDraftSchema,
   canProcessLeadRecording,
   estimateCallFeedbackCostMicroUsd,
@@ -14,6 +15,7 @@ const validDraft = {
   primaryProfile: "latino_extranjero",
   subProfile: "parado_desempleado",
   motivationAngles: ["income_extra_to_primary"],
+  objectionTypes: ["price"],
   isDecisionMaker: "",
   decisionMakerName: "",
   financialSource: "",
@@ -85,6 +87,7 @@ describe("call feedback", () => {
         primaryProfile: "mayor_edad_avanzada",
         subProfile: "",
         motivationAngles: ["financial_stability"],
+        objectionTypes: ["timing"],
         isDecisionMaker: "Si",
         decisionMakerName: "",
         financialSource: "Ahorros",
@@ -104,6 +107,12 @@ describe("call feedback", () => {
         outcome: "won",
       }),
     ).toThrow();
+  });
+
+  it("accepts only explicit objection taxonomy values and defaults legacy data to empty", () => {
+    expect(OBJECTION_TYPES.length).toBeGreaterThan(0);
+    expect(callFeedbackDraftSchema.parse({ ...validDraft, objectionTypes: undefined }).objectionTypes).toEqual([]);
+    expect(() => callFeedbackDraftSchema.parse({ ...validDraft, objectionTypes: ["invented"] })).toThrow();
   });
 
   it.each(["transcription", "summary"] as const)(

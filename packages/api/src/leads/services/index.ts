@@ -13,6 +13,8 @@ import { createLead } from "./create-lead";
 import { setLeadType } from "./set-lead-type";
 import { getLeadActivity } from "./lead-activity";
 import { getFeedbackStatistics } from "./feedback-statistics";
+import { updateAcquisitionAttribution } from "./acquisition-attribution";
+import { deleteLead } from "./delete-lead";
 
 export {
 	getAll,
@@ -30,4 +32,6 @@ export {
 	setLeadType,
 	getLeadActivity,
 	getFeedbackStatistics,
+	updateAcquisitionAttribution,
+	deleteLead,
 };
