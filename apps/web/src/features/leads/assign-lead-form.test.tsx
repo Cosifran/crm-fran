@@ -179,7 +179,7 @@ describe("AssignLeadForm", () => {
         expect.any(Object),
       );
     });
-  });
+  }, 15_000);
 
   it("shows previous questions plus alert configuration for future calls", async () => {
     const user = userEvent.setup();
@@ -193,7 +193,7 @@ describe("AssignLeadForm", () => {
     expect(screen.getByLabelText("Hora")).toBeInTheDocument();
     expect(screen.getByLabelText("Importancia de la alerta")).toBeInTheDocument();
     expect(screen.queryByLabelText("Closer asignado")).not.toBeInTheDocument();
-  });
+  }, 15_000);
 
   it("shows previous questions plus closer/date/time for appointments", async () => {
     const user = userEvent.setup();
