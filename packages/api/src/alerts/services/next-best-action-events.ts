@@ -9,6 +9,8 @@ import {
 import type { Permission } from "@crm-fran/db/schema/auth";
 import { buildAlertRecommendationKey, buildRiskRecommendationKey } from "./next-best-actions";
 import { listLeadRiskQueue } from "./lead-risk-queue";
+import { COMMERCIAL_EVIDENCE_POLICY_VERSION, type EvidenceSnapshot } from "../../commercial-evidence/domain";
+import { buildEvidenceSnapshotForLead } from "../../commercial-evidence/service";
 
 export type RecommendationEventKind =
   | "recommendation_shown"
@@ -22,7 +24,24 @@ type RecommendationMetadata = LeadActivityMetadata & {
   actionType?: string;
   reactionTimeMs?: number;
   reason?: string;
+  evidenceSnapshot?: EvidenceSnapshot;
 };
+
+export function buildServerEvidenceSnapshot(actionType: string, asOf: Date): EvidenceSnapshot {
+  return {
+    policyVersion: COMMERCIAL_EVIDENCE_POLICY_VERSION,
+    asOf: asOf.toISOString(),
+    target: "sale",
+    probabilityBps: null,
+    expectedMarginCents: null,
+    currency: null,
+    fallback: "unavailable",
+    sample: 0,
+    confidence: "insufficient",
+    features: { actionType },
+    status: "economic_truth_missing",
+  };
+}
 
 type RecommendationEvent = {
   kind: RecommendationEventKind;
@@ -99,7 +118,7 @@ export async function recordRecommendationEvent(input: {
   const parsedAlertKey = parseAlertRecommendationKey(input.recommendationKey);
   const [sourceAlert] = parsedAlertKey ? await db.select({ id: alerts.id, kind: alerts.kind, targetUserId: alerts.targetUserId, nextShowAt: alerts.nextShowAt })
     .from(alerts).where(and(eq(alerts.leadId, input.leadId), eq(alerts.id, parsedAlertKey.alertId), eq(alerts.nextShowAt, parsedAlertKey.nextShowAt), isNull(alerts.dismissedAt), isNull(alerts.resolvedAt), isNull(alerts.expiredAt))) : [];
-  const isBoundAlert = Boolean(sourceAlert) && input.recommendationKey === buildAlertRecommendationKey({ alertId: sourceAlert.id, nextShowAt: sourceAlert.nextShowAt }) && (isPrivileged || sourceAlert.targetUserId === input.actorId);
+  const isBoundAlert = sourceAlert !== undefined && input.recommendationKey === buildAlertRecommendationKey({ alertId: sourceAlert.id, nextShowAt: sourceAlert.nextShowAt }) && (isPrivileged || sourceAlert.targetUserId === input.actorId);
   const riskItems = input.kind === "recommendation_completed" || isBoundAlert ? [] : await listLeadRiskQueue({ actorId: input.actorId, permissions: input.permissions });
   const isBoundRisk = riskItems.some((item) => item.lead.id === input.leadId && input.recommendationKey === buildRiskRecommendationKey({ leadId: item.lead.id, assignedAt: item.assignedAt, lastAttemptAt: item.lastAttemptAt }));
   if (input.kind !== "recommendation_completed" && ((!canManageLead({ lead, actorId: input.actorId, permissions: input.permissions }) && !isBoundAlert) || (!isBoundAlert && !isBoundRisk))) {
@@ -124,17 +143,20 @@ export async function recordRecommendationEvent(input: {
       reactionTimeMs = Math.max(0, Date.now() - shown.occurredAt.getTime());
     }
   }
+  const occurredAt = new Date();
+  const evidenceSnapshot = input.kind === "recommendation_shown" ? await buildEvidenceSnapshotForLead({ leadId: input.leadId, asOf: occurredAt, actionType: boundActionType }) : undefined;
   const metadata: RecommendationMetadata = {
     recommendationKey: input.recommendationKey,
     sourceAlertId: sourceAlert?.id ?? null,
     actionType: boundActionType,
     ...(input.reason ? { reason: input.reason.trim() } : {}),
     ...(reactionTimeMs === undefined ? {} : { reactionTimeMs }),
+    ...(evidenceSnapshot ? { evidenceSnapshot } : {}),
   };
   await db.insert(leadActivityEvents).values({
     id: crypto.randomUUID(), leadId: input.leadId, actorId: input.actorId,
     kind: input.kind, title: input.kind.replace("recommendation_", "Recomendación "),
-    description: input.reason?.trim() ?? null, metadata, dedupeKey,
+    description: input.reason?.trim() ?? null, metadata, dedupeKey, occurredAt,
   }).onConflictDoNothing();
   return { dedupeKey };
 }

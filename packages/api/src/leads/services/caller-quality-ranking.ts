@@ -1,4 +1,4 @@
-import { FEEDBACK_PROFILES } from "../../call-feedback";
+import { confirmedProfileValue, parseConfirmedFacts } from "../../commercial-evidence/facts";
 import {
   classifyConversionLead,
   getConversionEventOutcome,
@@ -7,7 +7,6 @@ import {
 
 export const DEFAULT_CALLER_RANKING_SAMPLE_SIZE = 10;
 
-const PROFILE_VALUES = new Set(FEEDBACK_PROFILES.map(({ value }) => value));
 const EXACT_SEGMENT_BASELINE_SIZE = 5;
 const QUALITY_WEIGHTS = {
   appointment: 0.25,
@@ -82,23 +81,12 @@ function round(value: number) {
 }
 
 function readProfile(events: readonly CallerQualityEvent[]) {
-  for (let eventIndex = events.length - 1; eventIndex >= 0; eventIndex -= 1) {
-    const questions = events[eventIndex]?.metadata.questions;
+  for (const event of [...events].reverse()) {
+    const questions = event.metadata.questions;
     if (!Array.isArray(questions)) continue;
-    for (let questionIndex = questions.length - 1; questionIndex >= 0; questionIndex -= 1) {
-      const question = questions[questionIndex];
-      if (
-        question &&
-        typeof question === "object" &&
-        "questionKey" in question &&
-        question.questionKey === "primaryProfile" &&
-        "answer" in question &&
-        typeof question.answer === "string" &&
-        PROFILE_VALUES.has(question.answer)
-      ) {
-        return question.answer;
-      }
-    }
+    const parsed = questions.filter((question): question is { questionKey: string; answer: string } => typeof question === "object" && question !== null && "questionKey" in question && "answer" in question && typeof question.questionKey === "string" && typeof question.answer === "string");
+    const profile = confirmedProfileValue(parseConfirmedFacts(parsed));
+    if (profile) return profile;
   }
   return null;
 }

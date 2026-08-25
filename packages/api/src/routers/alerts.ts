@@ -46,7 +46,7 @@ const alertIdInput = z.object({
 	id: z.string().min(1),
 });
 
-const recommendationEventInput = z.object({
+export const recommendationEventInput = z.object({
 	leadId: z.string().min(1),
 	recommendationKey: z.string().min(1),
 	actionType: z.string().min(1).max(100).optional(),

@@ -62,6 +62,11 @@ const data = {
       icon: <BrainCircuitIcon />,
     },
     {
+      title: "Evidencia comercial",
+      url: "/evidencia-comercial",
+      icon: <FileChartColumnIcon />,
+    },
+    {
       title: "Rentabilidad y verdad económica",
       url: "/rentabilidad",
       icon: <BadgeEuroIcon />,

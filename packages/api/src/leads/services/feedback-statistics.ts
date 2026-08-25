@@ -9,6 +9,7 @@ import {
 import type { FeedbackProfile, MotivationAngle } from "../../call-feedback";
 import { FEEDBACK_PROFILES, MOTIVATION_ANGLES } from "../../call-feedback";
 import { classifyConversionLead } from "../../dashboard/conversion-funnel";
+import { parseConfirmedFacts } from "../../commercial-evidence/facts";
 import {
   buildCallerQualityRanking,
   selectCallerQualityRanking,
@@ -254,9 +255,9 @@ export function buildFeedbackStatistics(rows: readonly FeedbackRow[]) {
   for (const row of rows) {
     const reaction = REACTION_BY_OUTCOME[row.description ?? ""] ?? "unknown";
     const answers = readAnswers(row.metadata);
-    const profileAnswer = answers.get("primaryProfile");
-    const profile = profileAnswer && profileValues.has(profileAnswer)
-      ? (profileAnswer as FeedbackProfile)
+    const facts = parseConfirmedFacts([...answers].map(([questionKey, answer]) => ({ questionKey, answer })));
+    const profile = facts.primaryProfile.kind === "value" && profileValues.has(facts.primaryProfile.value)
+      ? (facts.primaryProfile.value as FeedbackProfile)
       : undefined;
     if (!profile) missingProfile += 1;
     if (!row.source?.trim()) missingSource += 1;
@@ -274,7 +275,7 @@ export function buildFeedbackStatistics(rows: readonly FeedbackRow[]) {
       };
       entry.total += 1;
       entry.reactions[reaction] += 1;
-      const subProfileAnswer = answers.get("subProfile");
+      const subProfileAnswer = facts.subProfile.kind === "value" ? facts.subProfile.value : undefined;
       if (subProfileAnswer && profileValues.has(subProfileAnswer)) {
         const subProfile = subProfileAnswer as FeedbackProfile;
         const subEntry = entry.subProfiles.get(subProfile) ?? { profile: subProfile, total: 0 };

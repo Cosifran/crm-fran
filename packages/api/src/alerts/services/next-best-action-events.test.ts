@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildRecommendationMetrics } from "./next-best-action-events";
+import { buildRecommendationMetrics, buildServerEvidenceSnapshot } from "./next-best-action-events";
 
 describe("next best action metrics", () => {
   it("measures completion, skipping, compliance, and reaction time", () => {
@@ -34,6 +34,14 @@ describe("next best action metrics", () => {
       complianceRate: 50,
       averageReactionMinutes: 10,
     });
+  });
+});
+
+it("builds an immutable server policy snapshot when economic truth is unavailable", () => {
+  expect(buildServerEvidenceSnapshot("no_contact", new Date("2026-08-25T10:00:00.000Z"))).toEqual({
+    policyVersion: "commercial-evidence-v1", asOf: "2026-08-25T10:00:00.000Z", target: "sale",
+    probabilityBps: null, expectedMarginCents: null, currency: null, fallback: "unavailable", sample: 0,
+    confidence: "insufficient", features: { actionType: "no_contact" }, status: "economic_truth_missing",
   });
 });
 

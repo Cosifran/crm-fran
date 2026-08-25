@@ -3,7 +3,6 @@ import { db, eq } from "@crm-fran/db";
 import {
   leads,
   LEAD_ACTIVITY_KIND,
-  type LeadQASessionItem,
 } from "@crm-fran/db/schema/index";
 
 import { hasPermission } from "../../permissions";

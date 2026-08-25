@@ -3,6 +3,7 @@ import { alerts, leadActivityEvents, leads, LEAD_ACTIVITY_KIND, user, type LeadQ
 import type { Permission } from "@crm-fran/db/schema/auth";
 
 import { buildCommercialIntelligence, type IntelligenceLead, type IntelligenceObservation, type IntelligencePerson, type Outcome, type RecommendationOccurrence } from "./insights";
+import { confirmedProfileValue, parseConfirmedFacts } from "../commercial-evidence/facts";
 
 export type CommercialIntelligenceInput = { actorId: string; permissions: readonly Permission[]; from: Date; to: Date; referenceSaleValue?: number | null };
 type Activity = { id: string; leadId: string; actorId: string | null; kind: string; description: string | null; metadata: Record<string, unknown>; occurredAt: Date };
@@ -10,7 +11,7 @@ type Assignment = { role: "caller" | "closer"; userId: string; occurredAt: Date 
 type OutcomeEvent = { kind: Outcome; occurredAt: Date };
 type FollowUpAlert = { id: string; kind: string; nextShowAt: Date; resolvedAt: Date | null; dismissedAt: Date | null; expiredAt: Date | null };
 
-function profile(questions: LeadQASession) { return questions.find((item) => item.questionKey === "profile" || item.questionKey === "subprofile")?.answer ?? null; }
+function profile(questions: LeadQASession) { return confirmedProfileValue(parseConfirmedFacts(questions)); }
 function metadataString(metadata: Record<string, unknown>, key: string) { const value = metadata[key]; return typeof value === "string" ? value : null; }
 function actionType(metadata: Record<string, unknown>) {
   const stored = metadataString(metadata, "actionType");

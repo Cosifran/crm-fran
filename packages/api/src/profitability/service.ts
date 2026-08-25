@@ -24,6 +24,7 @@ import {
   isSameReversalRequest,
   reversalProblem,
 } from "./financial-event-rules";
+import { confirmedProfileValue, parseConfirmedFacts } from "../commercial-evidence/facts";
 
 type Activity = {
   leadId: string;
@@ -33,14 +34,7 @@ type Activity = {
   occurredAt: Date;
 };
 
-const profileFrom = (questions: LeadQASession) =>
-  [...questions]
-    .reverse()
-    .find(
-      (question) =>
-        question.questionKey === "profile" ||
-        question.questionKey === "subprofile",
-    )?.answer ?? null;
+const profileFrom = (questions: LeadQASession) => confirmedProfileValue(parseConfirmedFacts(questions));
 
 const metadataString = (metadata: LeadActivityMetadata, key: string) => {
   const value = metadata[key];
