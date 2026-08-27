@@ -14,7 +14,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@crm-fran/ui/components/sidebar"
-import { BrainCircuitIcon, FlaskConicalIcon, CircleAlertIcon, HouseIcon, ChartBarIcon, CalendarDaysIcon, ChartNoAxesCombinedIcon, CameraIcon, FileTextIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, CommandIcon, MessageSquareIcon, TrophyIcon, ListChecksIcon, BadgeEuroIcon, GoalIcon } from "lucide-react"
+import { BrainCircuitIcon, FlaskConicalIcon, CircleAlertIcon, HouseIcon, ChartBarIcon, CalendarDaysIcon, ChartNoAxesCombinedIcon, CameraIcon, FileTextIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, CommandIcon, MessageSquareIcon, TrophyIcon, ListChecksIcon, BadgeEuroIcon, GoalIcon, ChartSplineIcon, CalculatorIcon, BookOpenCheckIcon, MessageCircleQuestionIcon } from "lucide-react"
 import { usePermissions } from "@crm-fran/ui/permissions"
 import type { Permission } from "@crm-fran/db/schema/auth"
 
@@ -26,11 +26,6 @@ export function canViewNavigationItem(
 }
 
 const data = {
-  user: {
-    name: "shadcn",
-    email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
-  },
   navMain: [
     {
       title: "Dashboard",
@@ -44,6 +39,12 @@ const data = {
       title: "Centro de decisiones",
       url: "/centro-de-decisiones",
       icon: <GoalIcon />,
+      globalOnly: true,
+    },
+    {
+      title: "Pregúntale al CRM",
+      url: "/preguntale-al-crm",
+      icon: <MessageCircleQuestionIcon />,
       globalOnly: true,
     },
     {
@@ -62,9 +63,27 @@ const data = {
       icon: <BrainCircuitIcon />,
     },
     {
+      title: "Playbooks que aprenden",
+      url: "/playbooks-que-aprenden",
+      icon: <BookOpenCheckIcon />,
+      globalOnly: true,
+    },
+    {
       title: "Evidencia comercial",
       url: "/evidencia-comercial",
       icon: <FileChartColumnIcon />,
+    },
+    {
+      title: "Observatorio comercial",
+      url: "/observatorio-comercial",
+      icon: <ChartSplineIcon />,
+      globalOnly: true,
+    },
+    {
+      title: "Planificación comercial",
+      url: "/planificacion-comercial",
+      icon: <CalculatorIcon />,
+      globalOnly: true,
     },
     {
       title: "Rentabilidad y verdad económica",
@@ -339,9 +358,9 @@ export function AppSidebar({
           className="mt-auto"
         />
       </SidebarContent>
-      <SidebarFooter>
-        <NavUser user={user ?? data.user} onSignOut={onSignOut} />
-      </SidebarFooter>
+      {user ? <SidebarFooter>
+        <NavUser user={user} onSignOut={onSignOut} />
+      </SidebarFooter> : null}
     </Sidebar>
   )
 }

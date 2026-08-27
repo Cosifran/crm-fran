@@ -1,3 +1,5 @@
+import { getAuthoritativeFeedbackOutcome, isAuthoritativeCallerContact, isAuthoritativeCallerFeedback } from "../lead-feedback-events";
+
 export const CONVERSION_STAGE = {
   ASSIGNED: "assigned",
   CONTACTED: "contacted",
@@ -20,6 +22,7 @@ type FunnelEvent = {
   description: string | null;
   occurredAt: Date;
   metadata: Record<string, unknown>;
+  actorRole?: string | null;
 };
 
 export type FunnelLead = {
@@ -57,14 +60,13 @@ export function getAuthoritativeConversionMilestones(
 ): ConversionMilestone[] {
   return events.flatMap<ConversionMilestone>((event) => {
     if (
-      event.kind === "caller_feedback" &&
-      getConversionEventOutcome(event) !== "Lead no contactado"
+      isAuthoritativeCallerContact(event)
     ) return [{ kind: "contacted" as const, occurredAt: event.occurredAt }];
     if (event.kind === "appointment_scheduled" || event.kind === "appointment_rescheduled") {
       return [{ kind: "appointment" as const, occurredAt: event.occurredAt }];
     }
     if (event.kind === "closer_feedback") {
-      const outcome = getConversionEventOutcome(event);
+      const outcome = getAuthoritativeFeedbackOutcome(event);
       const milestones: { kind: "show" | "sale"; occurredAt: Date }[] = [];
       if (ATTENDED_OUTCOMES.has(outcome ?? "")) milestones.push({ kind: "show", occurredAt: event.occurredAt });
       if (outcome === "Venta") milestones.push({ kind: "sale", occurredAt: event.occurredAt });
@@ -87,36 +89,19 @@ function roundPercentage(value: number) {
 }
 
 export function getConversionEventOutcome(event: FunnelEvent) {
-  if (event.description) return event.description;
-  const questions = event.metadata.questions;
-  if (!Array.isArray(questions)) return undefined;
-  const outcome = [...questions]
-    .reverse()
-    .find(
-      (question): question is { questionKey: string; answer: string } =>
-        typeof question === "object" &&
-        question !== null &&
-        "questionKey" in question &&
-        (question.questionKey === "callerOutcome" ||
-          question.questionKey === "closerOutcome") &&
-        "answer" in question &&
-        typeof question.answer === "string",
-    );
-  return outcome?.answer;
+  return getAuthoritativeFeedbackOutcome(event) ?? undefined;
 }
 
 export function classifyConversionLead(lead: FunnelLead) {
   const events = lead.events
     .filter((event) => event.occurredAt >= lead.assignedAt)
     .sort((first, second) => first.occurredAt.getTime() - second.occurredAt.getTime());
-  const callerFeedback = events.filter((event) => event.kind === "caller_feedback");
-  const closerFeedback = events.filter((event) => event.kind === "closer_feedback");
+  const callerFeedback = events.filter(isAuthoritativeCallerFeedback);
+  const closerFeedback = events.filter((event) => event.kind === "closer_feedback" && getAuthoritativeFeedbackOutcome(event) !== null);
   const callerOutcomes = callerFeedback.map(getConversionEventOutcome);
   const closerOutcomes = closerFeedback.map(getConversionEventOutcome);
   const latestCloserOutcome = closerOutcomes.at(-1);
-  const contacted = callerFeedback.some(
-    (event) => getConversionEventOutcome(event) !== "Lead no contactado",
-  );
+  const contacted = callerFeedback.some(isAuthoritativeCallerContact);
   const appointment =
     contacted &&
     events.some(

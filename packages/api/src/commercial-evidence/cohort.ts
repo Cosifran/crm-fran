@@ -18,15 +18,22 @@ const emptyAcquisition = (): Acquisition => ({ source: null, campaign: null, ad:
 const readUserId = (event: CohortActivity) => typeof event.metadata.userId === "string" ? event.metadata.userId : null;
 const isAssignment = (event: CohortActivity) => event.kind === "caller_assigned" || event.kind === "closer_assigned";
 
+export function sortCohortActivities(events: readonly CohortActivity[]) {
+  return [...events].sort((left, right) =>
+    left.occurredAt.getTime() - right.occurredAt.getTime() ||
+    priority(left.kind) - priority(right.kind) ||
+    left.id.localeCompare(right.id));
+}
+
 function updateAcquisition(metadata: Record<string, unknown>, prior: Acquisition) {
   const source = metadata.after && typeof metadata.after === "object" ? metadata.after as Record<string, unknown> : metadata;
   const read = (key: keyof Acquisition) => typeof source[key] === "string" ? source[key] as string : source[key] === null ? null : prior[key];
   return { source: read("source"), campaign: read("campaign"), ad: read("ad"), creative: read("creative"), acquisitionAngle: read("acquisitionAngle") };
 }
 
-function questionsAt(events: readonly CohortActivity[], cutoff: Date, inclusive: boolean) {
+export function questionsAt(events: readonly CohortActivity[], cutoff: Date, inclusive: boolean) {
   let questions: { questionKey: string; answer: string }[] = [];
-  for (const event of events) {
+  for (const event of sortCohortActivities(events)) {
     const usable = inclusive ? event.occurredAt <= cutoff : event.occurredAt < cutoff;
     if (!usable || event.kind !== "caller_feedback" || !Array.isArray(event.metadata.questions)) continue;
     questions = event.metadata.questions.filter((question): question is { questionKey: string; answer: string } =>
@@ -36,9 +43,9 @@ function questionsAt(events: readonly CohortActivity[], cutoff: Date, inclusive:
   return questions;
 }
 
-function acquisitionAt(events: readonly CohortActivity[], cutoff: Date, inclusive: boolean) {
+export function acquisitionAt(events: readonly CohortActivity[], cutoff: Date, inclusive: boolean) {
   let result = emptyAcquisition();
-  for (const event of events) {
+  for (const event of sortCohortActivities(events)) {
     const usable = inclusive ? event.occurredAt <= cutoff : event.occurredAt < cutoff;
     if (usable && (event.kind === "lead_created" || event.kind === "lead_attribution_updated")) result = updateAcquisition(event.metadata, result);
   }
@@ -52,8 +59,7 @@ export function buildAsOfCases(input: {
   asOf: Date;
 }) {
   const byLead = new Map<string, CohortActivity[]>();
-  for (const event of input.activities.filter((item) => item.occurredAt <= input.asOf).sort((a, b) =>
-    a.occurredAt.getTime() - b.occurredAt.getTime() || priority(a.kind) - priority(b.kind) || a.id.localeCompare(b.id))) {
+  for (const event of sortCohortActivities(input.activities.filter((item) => item.occurredAt <= input.asOf))) {
     const rows = byLead.get(event.leadId) ?? [];
     rows.push(event);
     byLead.set(event.leadId, rows);

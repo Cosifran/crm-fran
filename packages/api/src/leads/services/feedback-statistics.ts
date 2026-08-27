@@ -10,6 +10,7 @@ import type { FeedbackProfile, MotivationAngle } from "../../call-feedback";
 import { FEEDBACK_PROFILES, MOTIVATION_ANGLES } from "../../call-feedback";
 import { classifyConversionLead } from "../../dashboard/conversion-funnel";
 import { parseConfirmedFacts } from "../../commercial-evidence/facts";
+import { isAdministrativeFeedbackEvent } from "../../lead-feedback-events";
 import {
   buildCallerQualityRanking,
   selectCallerQualityRanking,
@@ -20,6 +21,7 @@ export type FeedbackReaction = "appointment" | "future_call" | "not_interested" 
 type FeedbackRow = {
   actorId: string | null;
   actorName: string | null;
+  actorRole?: string | null;
   leadId: string;
   leadName: string;
   source: string | null;
@@ -232,6 +234,11 @@ export function buildAttributionFunnels(leadsInput: readonly AttributionFunnelLe
 }
 
 export function buildFeedbackStatistics(rows: readonly FeedbackRow[]) {
+  const feedbackRows = rows.filter((row) => !isAdministrativeFeedbackEvent({
+    kind: "caller_feedback",
+    actorRole: row.actorRole,
+    metadata: row.metadata,
+  }));
   const profiles = new Map<FeedbackProfile, {
     profile: FeedbackProfile;
     total: number;
@@ -252,7 +259,7 @@ export function buildFeedbackStatistics(rows: readonly FeedbackRow[]) {
   let missingOutcome = 0;
   const feedbacks = [];
 
-  for (const row of rows) {
+  for (const row of feedbackRows) {
     const reaction = REACTION_BY_OUTCOME[row.description ?? ""] ?? "unknown";
     const answers = readAnswers(row.metadata);
     const facts = parseConfirmedFacts([...answers].map(([questionKey, answer]) => ({ questionKey, answer })));
@@ -314,20 +321,20 @@ export function buildFeedbackStatistics(rows: readonly FeedbackRow[]) {
   }
 
   return {
-    totalFeedbacks: rows.length,
+    totalFeedbacks: feedbackRows.length,
     classifiedFeedbacks,
     appointmentRate: classifiedFeedbacks === 0 ? 0 : Math.round((classifiedAppointments / classifiedFeedbacks) * 1_000) / 10,
     profiles: [...profiles.values()]
       .map(({ subProfiles, ...entry }) => ({ ...entry, subProfiles: [...subProfiles.values()].sort((a, b) => b.total - a.total) }))
       .sort((a, b) => b.total - a.total),
     angles: [...angles.values()].sort((a, b) => b.total - a.total),
-    sources: aggregateAttribution(rows, (row) => row.source),
-    campaigns: aggregateAttribution(rows, (row) => row.campaign),
+    sources: aggregateAttribution(feedbackRows, (row) => row.source),
+    campaigns: aggregateAttribution(feedbackRows, (row) => row.campaign),
     dataQuality: {
-      missingProfile: qualityMetric(missingProfile, rows.length),
-      missingSource: qualityMetric(missingSource, rows.length),
-      missingCampaign: qualityMetric(missingCampaign, rows.length),
-      missingOutcome: qualityMetric(missingOutcome, rows.length),
+      missingProfile: qualityMetric(missingProfile, feedbackRows.length),
+      missingSource: qualityMetric(missingSource, feedbackRows.length),
+      missingCampaign: qualityMetric(missingCampaign, feedbackRows.length),
+      missingOutcome: qualityMetric(missingOutcome, feedbackRows.length),
     },
     feedbacks,
     callers: [...callers.values()].sort((a, b) => a.name.localeCompare(b.name)),
@@ -355,6 +362,7 @@ export async function getFeedbackStatistics(input: FeedbackStatisticsInput) {
       leadName: leads.name,
       actorId: leadActivityEvents.actorId,
       actorName: user.name,
+      actorRole: leadActivityEvents.actorRole,
       source: leads.source,
       campaign: leads.campaign,
       description: leadActivityEvents.description,
@@ -447,6 +455,7 @@ export async function getFeedbackStatistics(input: FeedbackStatisticsInput) {
           leadId: leadActivityEvents.leadId,
           kind: leadActivityEvents.kind,
           description: leadActivityEvents.description,
+          actorRole: leadActivityEvents.actorRole,
           metadata: leadActivityEvents.metadata,
           occurredAt: leadActivityEvents.occurredAt,
         })

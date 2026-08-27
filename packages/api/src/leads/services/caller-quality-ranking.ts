@@ -1,9 +1,9 @@
 import { confirmedProfileValue, parseConfirmedFacts } from "../../commercial-evidence/facts";
 import {
   classifyConversionLead,
-  getConversionEventOutcome,
   type FunnelLead,
 } from "../../dashboard/conversion-funnel";
+import { isAuthoritativeCallerContact, isAuthoritativeCallerFeedback } from "../../lead-feedback-events";
 
 export const DEFAULT_CALLER_RANKING_SAMPLE_SIZE = 10;
 
@@ -81,7 +81,7 @@ function round(value: number) {
 }
 
 function readProfile(events: readonly CallerQualityEvent[]) {
-  for (const event of [...events].reverse()) {
+  for (const event of [...events].filter(isAuthoritativeCallerFeedback).reverse()) {
     const questions = event.metadata.questions;
     if (!Array.isArray(questions)) continue;
     const parsed = questions.filter((question): question is { questionKey: string; answer: string } => typeof question === "object" && question !== null && "questionKey" in question && "answer" in question && typeof question.questionKey === "string" && typeof question.answer === "string");
@@ -110,16 +110,14 @@ function evaluateLead(lead: CallerQualityLead) {
     events,
   });
   const firstContact = events.find(
-    (event) =>
-      event.kind === "caller_feedback" &&
-      getConversionEventOutcome(event) !== "Lead no contactado",
+    isAuthoritativeCallerContact,
   );
   const firstContactMinutes = firstContact
     ? Math.max(0, (firstContact.occurredAt.getTime() - lead.assignedAt.getTime()) / 60_000)
     : null;
-  const callerFeedbackEvents = events.filter((event) => event.kind === "caller_feedback");
+  const callerFeedbackEvents = events.filter(isAuthoritativeCallerFeedback);
   const firstValidContactIndex = callerFeedbackEvents.findIndex(
-    (event) => getConversionEventOutcome(event) !== "Lead no contactado",
+    isAuthoritativeCallerContact,
   );
   const attemptEvents = firstValidContactIndex >= 0
     ? callerFeedbackEvents.slice(0, firstValidContactIndex + 1)

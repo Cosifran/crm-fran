@@ -9,6 +9,7 @@ import { hasPermission } from "../../permissions";
 import type { Context } from "../../context";
 import { appendLeadActivity } from "./lead-activity";
 import { validateConfirmedFeedbackQuestions } from "../../call-feedback";
+import { LEAD_FEEDBACK_ACTIVITY_SOURCE } from "../../lead-feedback-events";
 
 export type AdminEditLeadQASessionInput = {
   leadId: string;
@@ -81,7 +82,7 @@ export async function adminEditLeadQASession({
 			kind: LEAD_ACTIVITY_KIND.CALLER_FEEDBACK,
 			title: "Sesión editada por administración",
 			description: "Se actualizaron las respuestas registradas del lead",
-			metadata: { questions: storedQuestions },
+			metadata: { questions: storedQuestions, activitySource: LEAD_FEEDBACK_ACTIVITY_SOURCE.ADMINISTRATIVE_QA_EDIT },
 			dedupeKey: `admin_feedback:${leadId}:${new Date().toISOString()}`,
 		});
 

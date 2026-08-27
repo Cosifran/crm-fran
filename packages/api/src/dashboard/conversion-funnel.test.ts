@@ -35,13 +35,15 @@ function event(
     | "appointment_rescheduled",
   description: string,
   minute: number,
+  overrides: { actorRole?: string; metadata?: Record<string, unknown> } = {},
 ) {
   return {
     id: `${kind}-${minute}-${description}`,
     kind,
     description,
     occurredAt: new Date(assignedAt.getTime() + minute * 60_000),
-    metadata: {},
+    metadata: overrides.metadata ?? {},
+    actorRole: overrides.actorRole,
   };
 }
 
@@ -93,6 +95,19 @@ describe("buildConversionFunnel", () => {
     const result = buildConversionFunnel([repeated, repeated]);
 
     expect(result.stages.map((stage) => stage.count)).toEqual([1, 1, 1, 0, 0]);
+  });
+
+  it("does not count an administrative Q&A edit as caller contact", () => {
+    const result = buildConversionFunnel([
+      lead("admin-edited", {
+        events: [event("caller_feedback", "Se actualizaron las respuestas registradas del lead", 1, {
+          actorRole: "admin",
+          metadata: { activitySource: "administrative_qa_edit" },
+        })],
+      }),
+    ]);
+
+    expect(result.stages.map((stage) => stage.count)).toEqual([1, 0, 0, 0, 0]);
   });
 
   it("keeps no-show and not-interested as exits while follow-up remains open", () => {

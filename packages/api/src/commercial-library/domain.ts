@@ -1,6 +1,16 @@
 export type LibraryStatus = "draft" | "published" | "archived";
 export type LibraryAction = "create_draft" | "publish" | "archive";
 
+export type CommercialLibraryEvidenceLabel = "observational" | "experiment_supported";
+
+export function normalizeCommercialLibraryEvidenceLabel(value: string | null | undefined): CommercialLibraryEvidenceLabel {
+  return value === "experiment_supported" || value === "causal" ? "experiment_supported" : "observational";
+}
+
+export function commercialLibraryAdvisoryLockKey(lineageKey: string) {
+  return `commercial-library:${lineageKey}`;
+}
+
 export function planLibraryTransition(
   existing: readonly { version: number; status: LibraryStatus; type: string }[],
   action: LibraryAction,
@@ -17,6 +27,22 @@ export function planLibraryTransition(
   throw new Error(`Invalid library transition from ${latest.status}`);
 }
 
+export function planManualLibraryVersionAppend(
+  existing: readonly { id: string; version: number; status: LibraryStatus; type: string }[],
+  action: LibraryAction,
+  requestedType?: string,
+) {
+  const next = planLibraryTransition(existing, action, requestedType);
+  const parent = [...existing].sort((a, b) => b.version - a.version || a.id.localeCompare(b.id))[0] ?? null;
+  return {
+    ...next,
+    parentVersionId: parent?.id ?? null,
+    changeKind: "manual" as const,
+    changeReason: null,
+    restoredFromVersionId: null,
+  };
+}
+
 export function latestLibraryVersions<T extends { lineageKey: string; version: number; status: LibraryStatus }>(rows: readonly T[]) {
   const latest = new Map<string, T>();
   for (const row of [...rows].sort((a, b) => b.version - a.version)) if (!latest.has(row.lineageKey)) latest.set(row.lineageKey, row);
@@ -26,5 +52,5 @@ export function latestLibraryVersions<T extends { lineageKey: string; version: n
 export const latestVisibleLibraryVersions = <T extends { lineageKey: string; version: number; status: LibraryStatus }>(rows: readonly T[]) => latestLibraryVersions(rows).filter((row) => row.status === "published");
 
 export function experimentEvidenceLabel(input: { status: string; finalDecision: string | null; approvedById: string | null }) {
-  return input.status === "completed" && input.finalDecision === "approved" && input.approvedById ? "causal" as const : "observational" as const;
+  return input.status === "completed" && input.finalDecision === "approved" && input.approvedById ? "experiment_supported" as const : "observational" as const;
 }

@@ -8,6 +8,12 @@ import {
   SidebarMenuItem,
 } from "@crm-fran/ui/components/sidebar"
 
+export function isNavigationItemActive(currentPathname: string | undefined, itemUrl: string) {
+  if (!currentPathname) return false
+  if (currentPathname === itemUrl) return true
+  return itemUrl !== "/" && currentPathname.startsWith(`${itemUrl}/`)
+}
+
 export function NavMain({
   items,
   LinkComponent = "a",
@@ -47,9 +53,7 @@ export function NavMain({
         </SidebarMenu> */}
         <SidebarMenu>
           {items.map((item) => {
-            const isActive =
-              currentPathname === item.url ||
-              (item.url !== "/" && currentPathname?.startsWith(item.url))
+            const isActive = isNavigationItemActive(currentPathname, item.url)
             return (
               <SidebarMenuItem key={item.title}>
                 <SidebarMenuButton

@@ -4,9 +4,10 @@ import type { Permission } from "@crm-fran/db/schema/auth";
 
 import { buildCommercialIntelligence, type IntelligenceLead, type IntelligenceObservation, type IntelligencePerson, type Outcome, type RecommendationOccurrence } from "./insights";
 import { confirmedProfileValue, parseConfirmedFacts } from "../commercial-evidence/facts";
+import { getAuthoritativeFeedbackOutcome, isAuthoritativeCallerContact } from "../lead-feedback-events";
 
 export type CommercialIntelligenceInput = { actorId: string; permissions: readonly Permission[]; from: Date; to: Date; referenceSaleValue?: number | null };
-type Activity = { id: string; leadId: string; actorId: string | null; kind: string; description: string | null; metadata: Record<string, unknown>; occurredAt: Date };
+type Activity = { id: string; leadId: string; actorId: string | null; actorRole?: string | null; kind: string; description: string | null; metadata: Record<string, unknown>; occurredAt: Date };
 type Assignment = { role: "caller" | "closer"; userId: string; occurredAt: Date };
 type OutcomeEvent = { kind: Outcome; occurredAt: Date };
 type FollowUpAlert = { id: string; kind: string; nextShowAt: Date; resolvedAt: Date | null; dismissedAt: Date | null; expiredAt: Date | null };
@@ -30,10 +31,11 @@ function assignedAt(events: readonly Activity[], role: "caller" | "closer", at: 
 }
 function outcomeFor(event: Activity): Outcome | null {
   if (event.kind === LEAD_ACTIVITY_KIND.APPOINTMENT_SCHEDULED || event.kind === LEAD_ACTIVITY_KIND.APPOINTMENT_RESCHEDULED) return "appointment";
-  if (event.kind === LEAD_ACTIVITY_KIND.CALLER_FEEDBACK && event.description !== "Lead no contactado") return "contacted";
+  if (isAuthoritativeCallerContact(event)) return "contacted";
   if (event.kind !== LEAD_ACTIVITY_KIND.CLOSER_FEEDBACK) return null;
-  if (event.description === "Venta") return "sale";
-  if (["Agenda", "Reagenda", "Seguimiento"].includes(event.description ?? "")) return "show";
+  const outcome = getAuthoritativeFeedbackOutcome(event);
+  if (outcome === "Venta") return "sale";
+  if (["Agenda", "Reagenda", "Seguimiento"].includes(outcome ?? "")) return "show";
   return null;
 }
 function scheduledAt(event: Activity) {
@@ -127,7 +129,7 @@ export async function getCommercialIntelligence(input: CommercialIntelligenceInp
   ));
   const leadIds = rows.map((row) => row.id);
   const [allEvents, userRows, alertRows] = await Promise.all([
-    leadIds.length ? db.select({ id: leadActivityEvents.id, leadId: leadActivityEvents.leadId, actorId: leadActivityEvents.actorId, kind: leadActivityEvents.kind, description: leadActivityEvents.description, metadata: leadActivityEvents.metadata, occurredAt: leadActivityEvents.occurredAt }).from(leadActivityEvents).where(and(inArray(leadActivityEvents.leadId, leadIds), lte(leadActivityEvents.occurredAt, input.to))) : Promise.resolve([]),
+    leadIds.length ? db.select({ id: leadActivityEvents.id, leadId: leadActivityEvents.leadId, actorId: leadActivityEvents.actorId, actorRole: leadActivityEvents.actorRole, kind: leadActivityEvents.kind, description: leadActivityEvents.description, metadata: leadActivityEvents.metadata, occurredAt: leadActivityEvents.occurredAt }).from(leadActivityEvents).where(and(inArray(leadActivityEvents.leadId, leadIds), lte(leadActivityEvents.occurredAt, input.to))) : Promise.resolve([]),
     db.select({ id: user.id, name: user.name, roleId: user.roleId }).from(user).where(inArray(user.roleId, ["role-caller", "role-closer"])),
     leadIds.length ? db.select({ id: alerts.id, leadId: alerts.leadId, kind: alerts.kind, nextShowAt: alerts.nextShowAt, resolvedAt: alerts.resolvedAt, dismissedAt: alerts.dismissedAt, expiredAt: alerts.expiredAt }).from(alerts).where(inArray(alerts.leadId, leadIds)) : Promise.resolve([]),
   ]);

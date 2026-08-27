@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { experimentEvidenceLabel, latestLibraryVersions, latestVisibleLibraryVersions, planLibraryTransition } from "./domain";
+import { commercialLibraryAdvisoryLockKey, experimentEvidenceLabel, latestLibraryVersions, latestVisibleLibraryVersions, normalizeCommercialLibraryEvidenceLabel, planLibraryTransition, planManualLibraryVersionAppend } from "./domain";
 
 describe("commercial library domain", () => {
   it("enforces draft, publish and archive transitions", () => {
@@ -25,8 +25,21 @@ describe("commercial library domain", () => {
     expect(latestVisibleLibraryVersions(current).map((row) => row.lineageKey)).toEqual(["active"]);
   });
 
-  it("labels experiment origin causal only after completion and human approval", () => {
-    expect(experimentEvidenceLabel({ status: "completed", finalDecision: "approved", approvedById: "admin" })).toBe("causal");
+  it("labels approved experiments as supported without claiming causality and downgrades legacy causal rows", () => {
+    expect(experimentEvidenceLabel({ status: "completed", finalDecision: "approved", approvedById: "admin" })).toBe("experiment_supported");
     expect(experimentEvidenceLabel({ status: "active", finalDecision: null, approvedById: "admin" })).toBe("observational");
+    expect(normalizeCommercialLibraryEvidenceLabel("causal")).toBe("experiment_supported");
+    expect(normalizeCommercialLibraryEvidenceLabel("experiment_supported")).toBe("experiment_supported");
+    expect(normalizeCommercialLibraryEvidenceLabel(undefined)).toBe("observational");
+  });
+
+  it("uses one advisory-lock namespace and appends a coherent manual parent chain", () => {
+    expect(commercialLibraryAdvisoryLockKey("lineage-1")).toBe("commercial-library:lineage-1");
+    const draft = planManualLibraryVersionAppend([], "create_draft", "playbook");
+    expect(draft).toEqual({ version: 1, status: "draft", type: "playbook", parentVersionId: null, changeKind: "manual", changeReason: null, restoredFromVersionId: null });
+    const published = planManualLibraryVersionAppend([{ id: "v1", version: 1, status: "draft", type: "playbook" }], "publish");
+    expect(published).toMatchObject({ version: 2, status: "published", parentVersionId: "v1", changeKind: "manual", restoredFromVersionId: null });
+    const archived = planManualLibraryVersionAppend([{ id: "v1", version: 1, status: "draft", type: "playbook" }, { id: "v2", version: 2, status: "published", type: "playbook" }], "archive");
+    expect(archived).toMatchObject({ version: 3, status: "archived", parentVersionId: "v2", changeKind: "manual", restoredFromVersionId: null });
   });
 });

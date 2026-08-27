@@ -2,7 +2,7 @@ import { and, asc, db, inArray } from "@crm-fran/db";
 import { LEAD_ACTIVITY_KIND, leadActivityEvents } from "@crm-fran/db/schema/index";
 import type { Permission } from "@crm-fran/db/schema/auth";
 
-import { getConversionEventOutcome } from "../../dashboard/conversion-funnel";
+import { isAuthoritativeCallerContact, isAuthoritativeCallerFeedback } from "../../lead-feedback-events";
 
 type RiskLead = {
   id: string;
@@ -15,6 +15,7 @@ type RiskEvent = {
   id: string;
   leadId: string;
   actorId: string | null;
+  actorRole?: string | null;
   kind: string;
   description: string | null;
   metadata: Record<string, unknown>;
@@ -73,12 +74,10 @@ export function buildLeadRiskQueue<TLead extends RiskLead>({
 
     const feedbacks = leadEvents.filter(
       (event) =>
-        event.kind === "caller_feedback" &&
+        isAuthoritativeCallerFeedback(event) &&
         event.occurredAt >= assignment.occurredAt,
     );
-    const isContacted = feedbacks.some(
-      (event) => getConversionEventOutcome(event) !== "Lead no contactado",
-    );
+    const isContacted = feedbacks.some(isAuthoritativeCallerContact);
     if (isContacted) return [];
 
     const minutesSinceAssignment = differenceInMinutes(now, assignment.occurredAt);
@@ -128,6 +127,7 @@ export async function listLeadRiskQueue({
       id: leadActivityEvents.id,
       leadId: leadActivityEvents.leadId,
       actorId: leadActivityEvents.actorId,
+      actorRole: leadActivityEvents.actorRole,
       kind: leadActivityEvents.kind,
       description: leadActivityEvents.description,
       metadata: leadActivityEvents.metadata,

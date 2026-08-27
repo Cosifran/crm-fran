@@ -25,11 +25,13 @@ import {
   reversalProblem,
 } from "./financial-event-rules";
 import { confirmedProfileValue, parseConfirmedFacts } from "../commercial-evidence/facts";
+import { getAuthoritativeFeedbackOutcome, isAuthoritativeCallerContact } from "../lead-feedback-events";
 
 type Activity = {
   leadId: string;
   kind: string;
   description: string | null;
+  actorRole: string | null;
   metadata: LeadActivityMetadata;
   occurredAt: Date;
 };
@@ -54,11 +56,7 @@ function latestAssignment(
 
 function outcomeFlags(events: readonly Activity[]) {
   return {
-    contacted: events.some(
-      (event) =>
-        event.kind === LEAD_ACTIVITY_KIND.CALLER_FEEDBACK &&
-        event.description !== "Lead no contactado",
-    ),
+    contacted: events.some(isAuthoritativeCallerContact),
     appointment: events.some(
       (event) =>
         event.kind === LEAD_ACTIVITY_KIND.APPOINTMENT_SCHEDULED ||
@@ -68,13 +66,13 @@ function outcomeFlags(events: readonly Activity[]) {
       (event) =>
         event.kind === LEAD_ACTIVITY_KIND.CLOSER_FEEDBACK &&
         ["Agenda", "Reagenda", "Seguimiento"].includes(
-          event.description ?? "",
+          getAuthoritativeFeedbackOutcome(event) ?? "",
         ),
     ),
     sale: events.some(
       (event) =>
         event.kind === LEAD_ACTIVITY_KIND.CLOSER_FEEDBACK &&
-        event.description === "Venta",
+        getAuthoritativeFeedbackOutcome(event) === "Venta",
     ),
   };
 }
@@ -145,6 +143,7 @@ export const profitabilityService = {
               leadId: leadActivityEvents.leadId,
               kind: leadActivityEvents.kind,
               description: leadActivityEvents.description,
+              actorRole: leadActivityEvents.actorRole,
               metadata: leadActivityEvents.metadata,
               occurredAt: leadActivityEvents.occurredAt,
             })
@@ -184,7 +183,7 @@ export const profitabilityService = {
         .filter(
           (event) =>
             event.kind === LEAD_ACTIVITY_KIND.CLOSER_FEEDBACK &&
-            event.description === "Venta",
+            getAuthoritativeFeedbackOutcome(event) === "Venta",
         )
         .sort(
           (left, right) => left.occurredAt.getTime() - right.occurredAt.getTime(),

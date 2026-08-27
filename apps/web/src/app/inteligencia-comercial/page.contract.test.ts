@@ -16,4 +16,10 @@ describe("commercial intelligence phase-three UI contract", () => {
     expect(source).toContain("Publicar con aprobación humana");
     expect(source).not.toContain("extraInfo");
   });
+
+  it("never presents an experiment as causal evidence", () => {
+    expect(source).toContain("respaldado por experimento, nunca como evidencia causal");
+    expect(source).not.toContain("Solo se etiqueta causal");
+    expect(source).toContain("commercialUiLabel(item.evidence.evidenceLabel");
+  });
 });

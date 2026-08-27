@@ -12,6 +12,10 @@ import { commercialExperimentsRouter } from "./commercial-experiments";
 import { profitabilityRouter } from "./profitability";
 import { decisionCenterRouter } from "./decision-center";
 import { commercialEvidenceRouter } from "./commercial-evidence";
+import { commercialObservatoryRouter } from "./commercial-observatory";
+import { commercialPlanningRouter } from "./commercial-planning";
+import { commercialPlaybooksRouter } from "./commercial-playbooks";
+import { askCrmRouter } from "./ask-crm";
 import { permittedProcedure } from "@crm-fran/api/trpc/trpc";
 import { publicProcedure, router } from "../index";
 
@@ -48,5 +52,9 @@ export const appRouter = router({
   profitability: profitabilityRouter,
   decisionCenter: decisionCenterRouter,
   commercialEvidence: commercialEvidenceRouter,
+  commercialObservatory: commercialObservatoryRouter,
+  commercialPlanning: commercialPlanningRouter,
+  commercialPlaybooks: commercialPlaybooksRouter,
+  askCrm: askCrmRouter,
 });
 export type AppRouter = typeof appRouter;

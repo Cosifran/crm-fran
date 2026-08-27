@@ -3,13 +3,16 @@ import { commercialExperimentAssignments, commercialExperiments, leadActivityEve
 
 import type { CommercialExperimentOutcome } from "./domain";
 import type { CommercialExperimentsRepository, ExperimentAssignment, ExperimentLead, ExperimentRecord } from "./service";
+import { getAuthoritativeFeedbackOutcome, isAuthoritativeCallerContact } from "../lead-feedback-events";
 
 function profile(questions: LeadQASession) { return questions.find((item) => item.questionKey === "profile" || item.questionKey === "subprofile")?.answer ?? null; }
-function outcome(kind: string, description: string | null): CommercialExperimentOutcome | null {
+export function mapCommercialExperimentOutcome(kind: string, description: string | null, metadata: Record<string, unknown> = {}, actorRole: string | null = null): CommercialExperimentOutcome | null {
   if (kind === LEAD_ACTIVITY_KIND.APPOINTMENT_SCHEDULED || kind === LEAD_ACTIVITY_KIND.APPOINTMENT_RESCHEDULED) return "appointment";
-  if (kind === LEAD_ACTIVITY_KIND.CALLER_FEEDBACK && description !== "Lead no contactado") return "contacted";
-  if (kind === LEAD_ACTIVITY_KIND.CLOSER_FEEDBACK && description === "Venta") return "sale";
-  if (kind === LEAD_ACTIVITY_KIND.CLOSER_FEEDBACK && ["Agenda", "Reagenda", "Seguimiento"].includes(description ?? "")) return "show";
+  const event = { kind, description, metadata, actorRole };
+  if (isAuthoritativeCallerContact(event)) return "contacted";
+  const authoritativeOutcome = getAuthoritativeFeedbackOutcome(event);
+  if (kind === LEAD_ACTIVITY_KIND.CLOSER_FEEDBACK && authoritativeOutcome === "Venta") return "sale";
+  if (kind === LEAD_ACTIVITY_KIND.CLOSER_FEEDBACK && ["Agenda", "Reagenda", "Seguimiento"].includes(authoritativeOutcome ?? "")) return "show";
   return null;
 }
 
@@ -43,7 +46,7 @@ export function createCommercialExperimentsRepository(database: typeof db): Comm
       const [row] = await database.update(commercialExperimentAssignments).set({ treatmentAppliedAt: input.at, treatmentAppliedById: input.actorId }).where(and(eq(commercialExperimentAssignments.id, input.assignmentId), eq(commercialExperimentAssignments.arm, "treatment"), isNull(commercialExperimentAssignments.treatmentAppliedAt), exists(activeExperiment))).returning();
       return row ? row as unknown as ExperimentAssignment : null;
     },
-    async findOutcomeEvents(input) { if (input.leadIds.length === 0) return []; const rows = await database.select({ leadId: leadActivityEvents.leadId, kind: leadActivityEvents.kind, description: leadActivityEvents.description, occurredAt: leadActivityEvents.occurredAt }).from(leadActivityEvents).where(and(inArray(leadActivityEvents.leadId, [...input.leadIds]), lt(leadActivityEvents.occurredAt, input.before))); return rows.flatMap((row) => { const mapped = outcome(row.kind, row.description); return mapped ? [{ leadId: row.leadId, kind: mapped, occurredAt: row.occurredAt }] : []; }); },
+    async findOutcomeEvents(input) { if (input.leadIds.length === 0) return []; const rows = await database.select({ leadId: leadActivityEvents.leadId, kind: leadActivityEvents.kind, description: leadActivityEvents.description, metadata: leadActivityEvents.metadata, actorRole: leadActivityEvents.actorRole, occurredAt: leadActivityEvents.occurredAt }).from(leadActivityEvents).where(and(inArray(leadActivityEvents.leadId, [...input.leadIds]), lt(leadActivityEvents.occurredAt, input.before))); return rows.flatMap((row) => { const mapped = mapCommercialExperimentOutcome(row.kind, row.description, row.metadata, row.actorRole); return mapped ? [{ leadId: row.leadId, kind: mapped, occurredAt: row.occurredAt }] : []; }); },
   };
 }
 

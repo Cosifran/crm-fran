@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterEach } from "vitest";
-import { db, inArray } from "@crm-fran/db";
+import { db, desc, eq, inArray } from "@crm-fran/db";
 import {
+	leadActivityEvents,
 	leads,
 	roles,
 	user,
@@ -100,6 +101,17 @@ describe("adminEditLeadQASession", () => {
 		expect(updated.questions).toEqual(questions);
 		const stored = await db.query.leads.findFirst({ where: (table, { eq }) => eq(table.id, leadId) });
 		expect(stored?.questions).toEqual(questions.map((question) => ({ ...question, authorRole: "caller", authorId: adminId })));
+		const [administrativeEvent] = await db
+			.select({ kind: leadActivityEvents.kind, actorRole: leadActivityEvents.actorRole, metadata: leadActivityEvents.metadata })
+			.from(leadActivityEvents)
+			.where(eq(leadActivityEvents.leadId, leadId))
+			.orderBy(desc(leadActivityEvents.occurredAt))
+			.limit(1);
+		expect(administrativeEvent).toMatchObject({
+			kind: "caller_feedback",
+			actorRole: "admin",
+			metadata: { activitySource: "administrative_qa_edit" },
+		});
 	});
 
 	it("rejects a caller without wildcard permission", async () => {

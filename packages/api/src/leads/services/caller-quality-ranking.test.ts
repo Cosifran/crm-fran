@@ -14,11 +14,13 @@ function event(
   minutesAfterAssignment: number,
   description: string | null,
   profile = "busca_ingreso_extra",
-) {
+  actorRole: string | null = "caller",
+): CallerQualityLead["events"][number] {
   return {
     id,
     kind,
     description,
+    actorRole,
     occurredAt: new Date(start.getTime() + minutesAfterAssignment * 60_000),
     metadata: kind === "caller_feedback"
       ? {
@@ -53,6 +55,28 @@ function lead(
 }
 
 describe("buildCallerQualityRanking", () => {
+  it("does not let an administrative edit inflate caller quality or profile breakdowns", () => {
+    const administrative = event("admin-edit", "caller_feedback", 5, "Agenda", "latino_extranjero", "admin");
+    administrative.metadata = { ...administrative.metadata, activitySource: "administrative_qa_edit" };
+    const result = buildCallerQualityRanking([
+      lead("admin-only", "caller-a", "Ana", [administrative]),
+    ], 1);
+
+    expect(result.ranked[0]).toMatchObject({
+      callerId: "caller-a",
+      contactedRate: 0,
+      appointmentRate: 0,
+      showRate: 0,
+      saleRate: 0,
+      averageFirstContactMinutes: null,
+    });
+    expect(result.ranked[0]?.breakdowns.profiles).toEqual([
+      expect.objectContaining({ value: "Sin perfil", contactedRate: 0, appointmentRate: 0 }),
+    ]);
+    expect(result.ranked[0]?.breakdowns.profiles.some(({ value }) => value === "latino_extranjero")).toBe(false);
+    expect(result.attemptAnalysis.overall.averageAttempts).toBe(0);
+  });
+
   it("ranks callers against the expected result for the same lead mix", () => {
     const result = buildCallerQualityRanking([
       lead("a-sale", "caller-a", "Ana", [

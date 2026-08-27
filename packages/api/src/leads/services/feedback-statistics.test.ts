@@ -12,6 +12,10 @@ function feedback({
   angles = [],
   source,
   campaign,
+  actorId = "caller-1",
+  actorName = "Caller 1",
+  actorRole = "caller",
+  activitySource,
 }: {
   outcome: string;
   profile?: string;
@@ -19,17 +23,23 @@ function feedback({
   angles?: string[];
   source?: string;
   campaign?: string;
+  actorId?: string;
+  actorName?: string;
+  actorRole?: string;
+  activitySource?: string;
 }) {
   return {
     leadId: crypto.randomUUID(),
     leadName: "Lead de prueba",
-    actorId: "caller-1",
-    actorName: "Caller 1",
+    actorId,
+    actorName,
+    actorRole,
     source: source ?? null,
     campaign: campaign ?? null,
     description: outcome,
     occurredAt: new Date("2026-08-10T10:00:00.000Z"),
     metadata: {
+      ...(activitySource ? { activitySource } : {}),
       questions: [
         ...(profile
           ? [{ questionKey: "primaryProfile", answer: profile }]
@@ -115,6 +125,20 @@ describe("feedback statistics", () => {
       source: "Meta Ads",
       campaign: "VSL Agosto",
     });
+  });
+
+  it("excludes administrative edits from feedback, profiles, motivations and caller totals", () => {
+    const result = buildFeedbackStatistics([
+      feedback({ outcome: "Agenda", profile: "parado_desempleado", angles: ["financial_stability"] }),
+      feedback({ outcome: "Agenda", profile: "latino_extranjero", angles: ["income_extra_to_primary"], actorId: "admin-1", actorName: "Admin", actorRole: "admin" }),
+      feedback({ outcome: "Agenda", profile: "mayor_edad_avanzada", angles: ["freedom_time"], actorId: "admin-2", actorName: "Admin 2", activitySource: "administrative_qa_edit" }),
+    ]);
+
+    expect(result.totalFeedbacks).toBe(1);
+    expect(result.feedbacks).toHaveLength(1);
+    expect(result.profiles.map(({ profile }) => profile)).toEqual(["parado_desempleado"]);
+    expect(result.angles.map(({ angle }) => angle)).toEqual(["financial_stability"]);
+    expect(result.callers).toEqual([{ id: "caller-1", name: "Caller 1", total: 1 }]);
   });
 
   it("builds received-to-sale funnels by source and campaign", () => {
