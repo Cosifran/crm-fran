@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Send } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Send } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Avatar, AvatarFallback } from "@crm-fran/ui/components/avatar";
@@ -17,6 +17,7 @@ import { Empty } from "@crm-fran/ui/components/empty";
 import { Separator } from "@crm-fran/ui/components/separator";
 import { Skeleton } from "@crm-fran/ui/components/skeleton";
 import { Textarea } from "@crm-fran/ui/components/textarea";
+import { cn } from "@crm-fran/ui/lib/utils";
 
 import { authClient } from "@/lib/auth-client";
 
@@ -43,6 +44,7 @@ export function MessagesView() {
   const activeConversation = conversations.find(
     (conversation) => conversation.id === activeConversationId,
   );
+  const showConversationOnMobile = Boolean(selectedConversationId);
   const messagesQuery = useConversationMessages(activeConversationId);
   const sendMessage = useSendMessage();
   const completeTask = useCompleteTask();
@@ -71,9 +73,9 @@ export function MessagesView() {
   };
 
   return (
-    <Card className="min-h-[42rem] overflow-hidden">
-      <CardContent className="grid min-h-[42rem] p-0 md:grid-cols-[19rem_minmax(0,1fr)]">
-        <aside className="flex min-h-0 flex-col border-r">
+    <Card className="min-h-dvh overflow-hidden md:min-h-[42rem]">
+      <CardContent className="grid min-h-dvh p-0 md:min-h-[42rem] md:grid-cols-[19rem_minmax(0,1fr)]">
+        <aside className={cn("min-h-0 flex-col border-r md:flex", showConversationOnMobile ? "hidden" : "flex")}>
           <div className="flex items-center justify-between gap-3 p-4">
             <div className="flex flex-col gap-1">
               <h2 className="font-semibold">Bandeja de entrada</h2>
@@ -123,9 +125,19 @@ export function MessagesView() {
         </aside>
 
         {activeConversation ? (
-          <section className="flex min-h-0 min-w-0 flex-col">
+          <section className={cn("min-h-0 min-w-0 flex-col md:flex", showConversationOnMobile ? "flex" : "hidden")}>
             <CardHeader className="flex-row items-center justify-between gap-3 border-b">
               <div className="flex min-w-0 items-center gap-3">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="md:hidden"
+                  aria-label="Volver a conversaciones"
+                  onClick={() => setSelectedConversationId(undefined)}
+                >
+                  <ArrowLeft />
+                </Button>
                 <Avatar>
                   <AvatarFallback>{getInitials(activeConversation.participant.name)}</AvatarFallback>
                 </Avatar>
@@ -140,7 +152,7 @@ export function MessagesView() {
               />
             </CardHeader>
 
-            <div className="flex max-h-[30rem] min-h-[25rem] flex-1 flex-col gap-3 overflow-y-auto p-4">
+            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 sm:p-4 md:max-h-[30rem] md:min-h-[25rem]">
               {messagesQuery.isLoading ? (
                 <Skeleton className="h-full w-full" />
               ) : (messagesQuery.data ?? []).length === 0 ? (
@@ -201,7 +213,7 @@ export function MessagesView() {
               )}
             </div>
 
-            <div className="flex items-end gap-2 border-t p-4">
+            <div className="sticky bottom-0 flex items-end gap-2 border-t bg-card p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4">
               <Textarea
                 value={messageBody}
                 placeholder="Escribe un mensaje..."

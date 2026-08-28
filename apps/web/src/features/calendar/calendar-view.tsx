@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Button } from "@crm-fran/ui/components/button";
 import {
@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@crm-fran/ui/components/select";
 import { Skeleton } from "@crm-fran/ui/components/skeleton";
+import { useIsMobile } from "@crm-fran/ui/hooks/use-mobile";
 import { Can } from "@crm-fran/ui/permissions/can";
 
 import { filterAgendaLeads } from "@/features/agendas/agenda-utils";
@@ -71,8 +72,10 @@ type CalendarEntry = {
 const VIEW_DAY_OPTIONS = [1, 2, 3, 4, 5, 6, 7];
 
 export function CalendarView() {
+  const isMobile = useIsMobile();
   const [startDate, setStartDate] = useState(() => new Date());
   const [viewDays, setViewDays] = useState(3);
+  const [hasAppliedMobileDefault, setHasAppliedMobileDefault] = useState(false);
   const [callerFilter, setCallerFilter] = useState("all");
   const [closerFilter, setCloserFilter] = useState("all");
   const days = getCalendarDays(startDate, viewDays);
@@ -82,6 +85,12 @@ export function CalendarView() {
   const eventsQuery = useCalendarEvents(firstDay?.key ?? "", lastDay?.key ?? "");
   const assigneesQuery = useCalendarAssignees();
   const preferencesQuery = useCalendarPreferences();
+
+  useEffect(() => {
+    if (!isMobile || hasAppliedMobileDefault) return;
+    setViewDays(1);
+    setHasAppliedMobileDefault(true);
+  }, [hasAppliedMobileDefault, isMobile]);
 
   if (
     leadsQuery.isLoading ||

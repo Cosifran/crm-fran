@@ -7,7 +7,6 @@ import {
   DndContext,
   KeyboardSensor,
   MouseSensor,
-  TouchSensor,
   useSensor,
   useSensors,
   type DragEndEvent,
@@ -121,7 +120,6 @@ export function DataTable<TData>({ data: initialData, columns, getRowId }: DataT
   const sortableId = React.useId()
   const sensors = useSensors(
     useSensor(MouseSensor, {}),
-    useSensor(TouchSensor, {}),
     useSensor(KeyboardSensor, {})
   )
   const dataIds = React.useMemo<UniqueIdentifier[]>(

@@ -1,7 +1,5 @@
+import { redirect } from "next/navigation";
+
 export default function UsersPage() {
-    return (
-        <div>
-            <h1>Usuarios</h1>
-        </div>
-    );
+  redirect("/usuarios-accesos");
 }

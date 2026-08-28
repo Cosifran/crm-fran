@@ -46,7 +46,7 @@ export function DecisionCenterNavigation() {
     >
       <TabsList
         aria-label="Secciones del centro de decisiones"
-        className="flex h-auto w-full max-w-full flex-wrap items-stretch justify-start gap-1 rounded-lg border bg-background p-1 sm:w-fit"
+        className="flex h-auto w-full max-w-full flex-nowrap items-stretch justify-start gap-1 rounded-lg border bg-background p-1 sm:w-fit"
       >
         <TabsTrigger
           value="decisions"

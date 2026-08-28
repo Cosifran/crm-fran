@@ -127,7 +127,8 @@
 }
 
 .timeSlot :global([data-slot="button"]) {
-  height: 1.5rem;
+  min-height: 2.75rem;
+  height: auto;
   width: 100%;
   min-width: 0;
   justify-content: flex-start;

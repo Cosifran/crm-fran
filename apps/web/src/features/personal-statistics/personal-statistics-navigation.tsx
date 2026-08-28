@@ -15,7 +15,7 @@ export function PersonalStatisticsNavigation() {
 
   return (
     <Tabs value={activeTab} onValueChange={(value) => router.push(value === "rankings" ? RANKINGS_ROUTE : PERSONAL_STATISTICS_ROUTE)} className="w-full gap-0">
-      <TabsList aria-label="Secciones de estadísticas personales" className="flex h-auto w-fit max-w-full flex-wrap items-stretch justify-start gap-1 rounded-lg border bg-background p-1">
+      <TabsList aria-label="Secciones de estadísticas personales" className="flex h-auto w-fit max-w-full flex-nowrap items-stretch justify-start gap-1 rounded-lg border bg-background p-1">
         <TabsTrigger value="statistics" className="h-12! min-h-12! flex-none rounded-md px-4 py-2 text-sm font-medium data-active:bg-accent data-active:text-accent-foreground after:hidden">
           <ChartNoAxesCombinedIcon data-icon="inline-start" aria-hidden="true" />
           Estadísticas

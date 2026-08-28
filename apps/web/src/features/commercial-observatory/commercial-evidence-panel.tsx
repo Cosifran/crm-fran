@@ -115,7 +115,7 @@ export function CommercialEvidencePanel() {
       </Card>
 
       <Tabs defaultValue="score">
-        <TabsList className="h-auto w-fit max-w-full flex-wrap justify-start gap-1 rounded-lg border bg-muted/40 p-1">
+        <TabsList className="h-auto w-fit max-w-full flex-nowrap justify-start gap-1 rounded-lg border bg-muted/40 p-1">
           <TabsTrigger className="h-11! min-h-11! flex-none rounded-md px-3 py-2 text-sm data-active:bg-background" value="score">Score económico</TabsTrigger>
           <TabsTrigger className="h-11! min-h-11! flex-none rounded-md px-3 py-2 text-sm data-active:bg-background" value="twins">Casos gemelos</TabsTrigger>
           {admin ? <TabsTrigger className="h-11! min-h-11! flex-none rounded-md px-3 py-2 text-sm data-active:bg-background" value="micro">Microsegmentos</TabsTrigger> : null}

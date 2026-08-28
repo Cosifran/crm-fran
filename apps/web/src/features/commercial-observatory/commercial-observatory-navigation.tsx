@@ -52,7 +52,7 @@ export function CommercialObservatoryNavigation() {
     >
       <TabsList
         aria-label="Secciones del observatorio comercial"
-        className="flex h-auto w-full max-w-full flex-wrap items-stretch justify-start gap-1 rounded-lg border bg-background p-1 sm:w-fit"
+        className="flex h-auto w-full max-w-full flex-nowrap items-stretch justify-start gap-1 rounded-lg border bg-background p-1 sm:w-fit"
       >
         {tabs.map((tab) => {
           const Icon = tab.icon;

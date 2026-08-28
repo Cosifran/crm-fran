@@ -131,7 +131,7 @@ export function LeadAssignmentQueue({
       </section>
 
       <Tabs defaultValue="new">
-        <TabsList className="flex h-auto w-fit max-w-full flex-wrap gap-1 rounded-lg border bg-muted/40 p-1">
+        <TabsList className="flex h-auto w-fit max-w-full flex-nowrap gap-1 rounded-lg border bg-muted/40 p-1">
           <TabsTrigger value="new" className="h-11! min-h-11! data-active:bg-background">
             Nuevos <Badge variant="secondary">{newLeads.data?.length ?? 0}</Badge>
           </TabsTrigger>
