@@ -19,9 +19,39 @@ export type AgendaLeadInput = {
 export type AgendaLead = AgendaLeadInput & {
   scheduledDate: string;
   scheduledTime: string;
+  closerOutcome: CloserOutcome | null;
 };
 
 export type AgendaCloser = { id: string; name: string };
+
+export const CLOSER_OUTCOMES = [
+  "Agenda",
+  "Reagenda",
+  "Seguimiento",
+  "Venta",
+  "No interesado",
+  "No-show",
+] as const;
+
+export type CloserOutcome = (typeof CLOSER_OUTCOMES)[number];
+export type CloserOutcomeFilter = "all" | "none" | CloserOutcome;
+
+function getLatestCloserOutcome(
+  questions: readonly AgendaQuestion[],
+): CloserOutcome | null {
+  for (let index = questions.length - 1; index >= 0; index -= 1) {
+    const question = questions[index];
+    if (
+      question?.authorRole === "closer" &&
+      question.questionKey === "closerOutcome" &&
+      CLOSER_OUTCOMES.includes(question.answer as CloserOutcome)
+    ) {
+      return question.answer as CloserOutcome;
+    }
+  }
+
+  return null;
+}
 
 export function getLatestCallerQuestionAnswer(
   questions: readonly AgendaQuestion[],
@@ -71,9 +101,21 @@ export function filterAgendaLeads(
         scheduledTime:
           getLatestAgendaQuestionAnswer(lead.questions, "scheduledTime") ??
           "Sin asignar",
+        closerOutcome: getLatestCloserOutcome(lead.questions),
       },
     ];
   });
+}
+
+export function filterAgendaLeadsByCloserOutcome(
+  leads: readonly AgendaLead[],
+  outcome: CloserOutcomeFilter,
+): AgendaLead[] {
+  if (outcome === "all") return [...leads];
+  if (outcome === "none") {
+    return leads.filter((lead) => lead.closerOutcome === null);
+  }
+  return leads.filter((lead) => lead.closerOutcome === outcome);
 }
 
 export function filterAgendaLeadsByCloser(

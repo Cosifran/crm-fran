@@ -64,6 +64,7 @@ describe("AgendasPage", () => {
             { questionKey: "callerOutcome", answer: "Agenda", authorRole: "caller" },
             { questionKey: "scheduledDate", answer: "2099-01-01", authorRole: "caller" },
             { questionKey: "scheduledTime", answer: "10:00", authorRole: "caller" },
+            { questionKey: "closerOutcome", answer: "Seguimiento", authorRole: "closer" },
           ],
         },
         {
@@ -83,12 +84,15 @@ describe("AgendasPage", () => {
     render(<AgendasPage />);
 
     expect(screen.getByTestId("agenda-table")).toHaveTextContent(
-      "Lead|Teléfono|Caller|Feedback del caller|Closer|Fecha|Hora|Acciones",
+      "Lead|Teléfono|Caller|Feedback del caller|Closer|Feedback closer|Fecha|Hora|Acciones",
     );
     expect(screen.getByText(/Agenda Lead/)).toBeInTheDocument();
     expect(screen.getByText(/555-0100 Caller feedback/)).toBeInTheDocument();
     expect(screen.queryByText("Other Lead")).not.toBeInTheDocument();
     expect(mocks.listAllQueryOptions).toHaveBeenCalledWith();
+    expect(
+      screen.getByRole("combobox", { name: "Filtrar por lo que sucedió" }),
+    ).toBeInTheDocument();
   });
 
   it("shows an empty state when there are no agenda leads", () => {

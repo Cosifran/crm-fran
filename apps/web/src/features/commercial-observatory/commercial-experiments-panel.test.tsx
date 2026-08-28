@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 
-import CommercialExperimentsPage from "./page";
+import { CommercialExperimentsPanel } from "./commercial-experiments-panel";
 
 afterEach(cleanup);
 
@@ -31,10 +31,47 @@ function mockExperiment(status: "active" | "stopped") {
     ], treatmentConfig: {} }, isPending: false, isError: false });
 }
 
-describe("CommercialExperimentsPage", () => {
+describe("CommercialExperimentsPanel", () => {
+  it("shows the selected intervention label instead of its internal id", () => {
+    mocks.useQuery.mockReturnValue({ data: [], isPending: false, isError: false });
+
+    render(<CommercialExperimentsPanel />);
+
+    expect(screen.getByText("Enrutamiento de asignación")).toBeInTheDocument();
+    expect(screen.queryByText("assignment_routing")).not.toBeInTheDocument();
+  });
+
+  it("keeps metrics and optional fields visible in a compact responsive split", () => {
+    mocks.useQuery.mockReturnValue({ data: [], isPending: false, isError: false });
+    render(<CommercialExperimentsPanel />);
+
+    const profiles = screen.getByLabelText(/Perfiles elegibles/i);
+    const metrics = screen.getByRole("region", { name: "Métricas" });
+    const optional = screen.getByRole("region", { name: "Opcional" });
+
+    expect(metrics.parentElement).toBe(optional.parentElement);
+    expect(metrics.parentElement).toHaveClass("md:grid-cols-2");
+    expect(within(metrics).getByLabelText("Métrica principal")).toBeInTheDocument();
+    fireEvent.change(profiles, { target: { value: "Perfil premium" } });
+
+    expect(screen.getByLabelText(/Perfiles elegibles/i)).toHaveValue("Perfil premium");
+  });
+
+  it("explains the real tolerance guardrail through an accessible information target", () => {
+    mocks.useQuery.mockReturnValue({ data: [], isPending: false, isError: false });
+    render(<CommercialExperimentsPanel />);
+
+    const information = screen.getByRole("button", { name: "Información sobre la tolerancia" });
+    expect(information).toHaveClass("size-11");
+    fireEvent.click(information);
+
+    expect(screen.getByText(/no cambia qué leads se asignan a cada brazo/i)).toBeInTheDocument();
+    expect(screen.getByText(/umbral de posible daño/i)).toBeInTheDocument();
+  });
+
   it("renders the three empty cohort tabs", () => {
     mocks.useQuery.mockReturnValue({ data: [], isPending: false, isError: false });
-    render(<CommercialExperimentsPage />);
+    render(<CommercialExperimentsPanel />);
     expect(screen.getByText("Borradores")).toBeInTheDocument();
     expect(screen.getByText("Activos")).toBeInTheDocument();
     expect(screen.getByText("Resultados")).toBeInTheDocument();
@@ -43,7 +80,7 @@ describe("CommercialExperimentsPage", () => {
 
   it("keeps control secret, shows treatment instructions, and renders per-row maturity", () => {
     mockExperiment("active");
-    render(<CommercialExperimentsPage />);
+    render(<CommercialExperimentsPanel />);
     fireEvent.click(screen.getAllByRole("tab", { name: "Activos" }).at(-1)!);
     expect(screen.getByText("Control: sin instrucciones")).toBeInTheDocument();
     expect(screen.getByText("Prioridad manual")).toBeInTheDocument();
@@ -51,11 +88,15 @@ describe("CommercialExperimentsPage", () => {
     expect(screen.getByText("Maduro")).toBeInTheDocument();
     expect(screen.getByText("Pendiente")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Marcar aplicada" })).toBeInTheDocument();
+
+    const assignments = screen.getByRole("region", { name: "Asignaciones" });
+    expect(assignments).toHaveClass("max-h-64", "overflow-auto");
+    expect(within(assignments).getByText("lead-control").closest("tr")).toHaveClass("h-9");
   });
 
   it("hides treatment application once an experiment is stopped", () => {
     mockExperiment("stopped");
-    render(<CommercialExperimentsPage />);
+    render(<CommercialExperimentsPanel />);
     fireEvent.click(screen.getAllByRole("tab", { name: "Activos" }).at(-1)!);
     expect(screen.queryByRole("button", { name: "Marcar aplicada" })).not.toBeInTheDocument();
     expect(screen.getByText("Tratamiento cerrado")).toBeInTheDocument();

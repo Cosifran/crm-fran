@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { ArrowDownIcon, UsersRoundIcon } from "lucide-react";
+import { ArrowDownIcon, InfoIcon, UsersRoundIcon } from "lucide-react";
 
 import { Badge } from "@crm-fran/ui/components/badge";
 import { Button } from "@crm-fran/ui/components/button";
@@ -30,6 +30,14 @@ import {
   FieldLabel,
 } from "@crm-fran/ui/components/field";
 import { Input } from "@crm-fran/ui/components/input";
+import {
+  Popover,
+  PopoverContent,
+  PopoverDescription,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@crm-fran/ui/components/popover";
 import {
   Select,
   SelectContent,
@@ -68,6 +76,31 @@ function getInitialInterval() {
 
 const initialInterval = getInitialInterval();
 
+function Information({ title, children }: { title: string; children: string }) {
+  return (
+    <Popover>
+      <PopoverTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            className="size-11"
+            aria-label={`Información sobre ${title}`}
+          />
+        }
+      >
+        <InfoIcon aria-hidden="true" />
+      </PopoverTrigger>
+      <PopoverContent className="dashboard-arc-theme" align="start">
+        <PopoverHeader>
+          <PopoverTitle>{title}</PopoverTitle>
+          <PopoverDescription>{children}</PopoverDescription>
+        </PopoverHeader>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export function ConversionFunnel() {
   const [from, setFrom] = useState(initialInterval.from);
   const [to, setTo] = useState(initialInterval.to);
@@ -91,20 +124,20 @@ export function ConversionFunnel() {
 
   return (
     <section className="px-4 lg:px-6" aria-labelledby="conversion-funnel-title">
-      <Card>
-        <CardHeader>
-          <CardTitle id="conversion-funnel-title">Embudo de conversión</CardTitle>
-          <CardDescription>
-            Sigue la evolución posterior de los leads asignados dentro del intervalo.
-            Los filtros son independientes del resto del Dashboard. Las asignaciones
-            antiguas sin fecha en el historial no se estiman.
-          </CardDescription>
+      <Card size="sm">
+        <CardHeader className="gap-0.5">
+          <div className="flex items-center gap-1">
+            <CardTitle id="conversion-funnel-title">Embudo de conversión</CardTitle>
+            <Information title="Embudo de conversión">
+              Sigue la evolución posterior de los leads asignados dentro del intervalo. Los filtros son independientes del resto del Dashboard. Las asignaciones antiguas sin fecha en el historial no se estiman.
+            </Information>
+          </div>
           <CardAction>
             <Badge variant="outline">Cohorte por asignación</Badge>
           </CardAction>
         </CardHeader>
-        <CardContent className="flex flex-col gap-6">
-          <FieldGroup className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <CardContent className="flex flex-col gap-4">
+          <FieldGroup className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <Field invalid={invalidInterval}>
               <FieldLabel htmlFor="funnel-from">Desde</FieldLabel>
               <Input
@@ -142,7 +175,7 @@ export function ConversionFunnel() {
                         "Todos los callers"}
                   </SelectValue>
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="dashboard-arc-theme">
                   <SelectGroup>
                     <SelectItem value="all">Todos los callers</SelectItem>
                     {funnel.data?.callers.map((caller) => (
@@ -165,7 +198,7 @@ export function ConversionFunnel() {
                         "Todos los closers"}
                   </SelectValue>
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="dashboard-arc-theme">
                   <SelectGroup>
                     <SelectItem value="all">Todos los closers</SelectItem>
                     {funnel.data?.closers.map((closer) => (
@@ -188,7 +221,7 @@ export function ConversionFunnel() {
                     {type === "all" ? "Todos los tipos" : type === "vsl" ? "VSL" : "Maestra"}
                   </SelectValue>
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="dashboard-arc-theme">
                   <SelectGroup>
                     <SelectItem value="all">Todos los tipos</SelectItem>
                     <SelectItem value="maestra">Maestra</SelectItem>
@@ -205,25 +238,29 @@ export function ConversionFunnel() {
           {invalidInterval ? (
             <Empty heading="Corrige el intervalo de fechas" />
           ) : funnel.isPending ? (
-            <div className="flex flex-col gap-3" aria-label="Cargando embudo">
-              <Skeleton className="h-24 w-full" />
-              <Skeleton className="h-24 w-11/12" />
-              <Skeleton className="h-24 w-10/12" />
+            <div className="grid gap-2 md:grid-cols-5" aria-label="Cargando embudo">
+              {Array.from({ length: 5 }, (_, index) => (
+                <Skeleton key={index} className="h-20 w-full" />
+              ))}
             </div>
           ) : funnel.isError ? (
             <Empty heading="No se pudo cargar el embudo" />
           ) : funnel.data ? (
             <>
-              <div className="flex flex-col items-center gap-2">
+              <ol className="grid items-stretch gap-2 md:grid-cols-5" aria-label="Etapas del embudo">
                 {funnel.data.stages.map((stage, index) => (
-                  <div
+                  <li
                     key={stage.key}
-                    className="flex w-full flex-col items-center gap-2"
-                    style={{ maxWidth: `${100 - index * 9}%` }}
+                    className="relative flex min-w-0 flex-col items-stretch gap-1"
                   >
-                    {index > 0 && <ArrowDownIcon className="text-muted-foreground" aria-hidden="true" />}
-                    <Card size="sm" className="w-full bg-primary/5">
-                      <CardHeader>
+                    {index > 0 && (
+                      <ArrowDownIcon
+                        className="mx-auto text-muted-foreground md:hidden"
+                        aria-hidden="true"
+                      />
+                    )}
+                    <Card size="sm" className="h-full bg-primary/5">
+                      <CardHeader className="gap-0.5">
                         <CardTitle>{stage.label}</CardTitle>
                         <CardDescription>
                           {index === 0
@@ -234,6 +271,7 @@ export function ConversionFunnel() {
                           <Button
                             variant="outline"
                             size="sm"
+                            aria-label={`Ver ${stage.count} leads en ${stage.label}`}
                             onClick={() => setSelectedStage(stage.key)}
                           >
                             <UsersRoundIcon data-icon="inline-start" />
@@ -242,14 +280,14 @@ export function ConversionFunnel() {
                         </CardAction>
                       </CardHeader>
                     </Card>
-                  </div>
+                  </li>
                 ))}
-              </div>
+              </ol>
 
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-muted p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-muted p-3">
                 <div className="flex flex-col gap-1">
                   <p className="text-sm font-medium">Conversión total a venta</p>
-                  <p className="text-3xl font-semibold tabular-nums">
+                  <p className="text-2xl font-semibold tabular-nums">
                     {funnel.data.totalConversion}%
                   </p>
                 </div>
@@ -267,7 +305,7 @@ export function ConversionFunnel() {
       </Card>
 
       <Dialog open={Boolean(selected)} onOpenChange={(open) => !open && setSelectedStage(null)}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="dashboard-arc-theme max-w-4xl">
           <DialogHeader>
             <DialogTitle>{selected?.label ?? "Leads de la etapa"}</DialogTitle>
             <DialogDescription>

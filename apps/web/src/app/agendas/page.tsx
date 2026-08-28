@@ -34,11 +34,14 @@ import { Can } from "@crm-fran/ui/permissions/can";
 import { trpc } from "@/utils/trpc";
 import { createAgendaColumns } from "@/features/agendas/agenda-columns";
 import {
+  CLOSER_OUTCOMES,
   filterAgendaLeads,
   filterAgendaLeadsByCloser,
+  filterAgendaLeadsByCloserOutcome,
   filterAgendaLeadsByDateRange,
   formatLocalDate,
   getAgendaClosers,
+  type CloserOutcomeFilter,
 } from "@/features/agendas/agenda-utils";
 import { AgendaRescheduleDialog } from "@/features/agendas/agenda-reschedule-dialog";
 import LeadViewDrawer from "@/features/leads/lead-view-drawer";
@@ -59,6 +62,8 @@ export default function AgendasPage() {
 
 function AgendasPageContent() {
   const [closerFilter, setCloserFilter] = useState("all");
+  const [closerOutcomeFilter, setCloserOutcomeFilter] =
+    useState<CloserOutcomeFilter>("all");
   const [dateRange, setDateRange] = useState({ from: "", to: "" });
   const { data, isLoading, isError } = useQuery(
     trpc.leads.listAll.queryOptions(),
@@ -85,8 +90,12 @@ function AgendasPageContent() {
   const agendaLeads = filterAgendaLeads(data ?? []);
   const closers = getAgendaClosers(agendaLeads);
   const closerAgendaLeads = filterAgendaLeadsByCloser(agendaLeads, closerFilter);
-  const filteredAgendaLeads = filterAgendaLeadsByDateRange(
+  const outcomeAgendaLeads = filterAgendaLeadsByCloserOutcome(
     closerAgendaLeads,
+    closerOutcomeFilter,
+  );
+  const filteredAgendaLeads = filterAgendaLeadsByDateRange(
+    outcomeAgendaLeads,
     dateRange.from,
     dateRange.to,
   );
@@ -144,7 +153,7 @@ function AgendasPageContent() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <FieldGroup className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <FieldGroup className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <Field>
               <FieldLabel htmlFor="agenda-closer">Closer</FieldLabel>
               <Select
@@ -163,6 +172,38 @@ function AgendasPageContent() {
                     {closers.map((closer) => (
                       <SelectItem key={closer.id} value={closer.id}>
                         {closer.name}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </Field>
+
+            <Field>
+              <FieldLabel htmlFor="agenda-closer-outcome">
+                ¿Qué sucedió?
+              </FieldLabel>
+              <Select
+                value={closerOutcomeFilter}
+                onValueChange={(value) =>
+                  setCloserOutcomeFilter(
+                    (value ?? "all") as CloserOutcomeFilter,
+                  )
+                }
+              >
+                <SelectTrigger
+                  id="agenda-closer-outcome"
+                  aria-label="Filtrar por lo que sucedió"
+                >
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent className={styles.overlayTheme}>
+                  <SelectGroup>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="none">Sin feedback</SelectItem>
+                    {CLOSER_OUTCOMES.map((outcome) => (
+                      <SelectItem key={outcome} value={outcome}>
+                        {outcome}
                       </SelectItem>
                     ))}
                   </SelectGroup>
@@ -245,7 +286,7 @@ function AgendasPageContent() {
         <CardContent className="px-0">
           <div className="min-w-0 overflow-x-auto">
             {filteredAgendaLeads.length === 0 ? (
-              <Empty heading="No hay agendas para este closer" />
+              <Empty heading="No hay agendas para estos filtros" />
             ) : (
               <DataTable
                 data={filteredAgendaLeads}

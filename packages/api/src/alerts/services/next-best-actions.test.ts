@@ -1,6 +1,6 @@
 ﻿import { describe, expect, it } from "vitest";
 
-import { buildNextBestActions } from "./next-best-actions";
+import { availableNextBestActionModes, buildNextBestActions } from "./next-best-actions";
 
 const now = new Date("2026-08-22T12:00:00.000Z");
 const lead = (id: string, name: string) => ({
@@ -10,6 +10,78 @@ const lead = (id: string, name: string) => ({
 });
 
 describe("next best actions", () => {
+  it("only exposes work modes the authenticated role can exercise", () => {
+    expect(availableNextBestActionModes({ roleId: "role-caller", permissions: ["alerts:read"] })).toEqual(["caller"]);
+    expect(availableNextBestActionModes({ roleId: "role-closer", permissions: ["alerts:read"] })).toEqual(["closer"]);
+    expect(availableNextBestActionModes({ roleId: "role-admin", permissions: ["*"] })).toEqual(["caller", "closer"]);
+    expect(availableNextBestActionModes({ roleId: "role-caller", permissions: ["alerts:read"], ownsCloserWork: true })).toEqual(["caller", "closer"]);
+  });
+
+  it("filters the queue using the real caller and closer action taxonomies", () => {
+    const callerLead = lead("caller", "Caller lead");
+    const closerLead = { ...lead("closer", "Closer lead"), closer: { id: "closer-1", name: "Closer" } };
+    const saleLead = { ...lead("sale", "Sale lead"), closer: { id: "closer-1", name: "Closer" } };
+    const alerts = [
+      { id: "call", lead: callerLead, targetUser: { roleId: "role-caller" }, kind: "future_call", severity: "info", message: "Llamar", nextShowAt: now },
+      { id: "agenda", lead: closerLead, targetUser: { roleId: "role-closer" }, kind: "appointment", severity: "info", message: "Revisar agenda", nextShowAt: now },
+      { id: "sale", lead: saleLead, targetUser: { roleId: "role-closer" }, kind: "sale", severity: "info", message: "Registrar venta", nextShowAt: now },
+    ];
+
+    expect(buildNextBestActions({ now, alerts, riskItems: [], mode: "caller" }).map(({ actionType }) => actionType)).toEqual(["future_call"]);
+    expect(buildNextBestActions({ now, alerts, riskItems: [], mode: "closer" }).map(({ actionType }) => actionType).sort()).toEqual(["appointment", "sale"]);
+  });
+
+  it.each(["no_contact", "follow_up", "rescheduled"])(
+    "keeps closer %s work out of Caller mode and isolated to its assigned closer",
+    (kind) => {
+      const closerLead = {
+        ...lead("closer-owned", "Closer owned"),
+        callerId: "caller-1",
+        closerId: "closer-1",
+        closer: { id: "closer-1", name: "Closer" },
+      };
+      const otherCloserLead = {
+        ...lead("other-closer", "Other closer"),
+        callerId: "caller-1",
+        closerId: "closer-2",
+        closer: { id: "closer-2", name: "Other closer" },
+      };
+      const alerts = [
+        {
+          id: "own",
+          lead: closerLead,
+          targetUserId: "closer-1",
+          kind,
+          severity: "info",
+          message: "Trabajo del closer",
+          nextShowAt: now,
+        },
+        {
+          id: "other",
+          lead: otherCloserLead,
+          targetUserId: "closer-2",
+          kind,
+          severity: "info",
+          message: "Trabajo de otro closer",
+          nextShowAt: now,
+        },
+      ];
+
+      expect(
+        buildNextBestActions({ now, alerts, riskItems: [], mode: "caller" }),
+      ).toEqual([]);
+      expect(
+        buildNextBestActions({ now, alerts: [alerts[0]!], riskItems: [], mode: "closer" }),
+      ).toMatchObject([
+        {
+          lead: { id: "closer-owned" },
+          actionType: kind,
+          workMode: "closer",
+          scheduledAt: now,
+        },
+      ]);
+    },
+  );
   it("puts an overdue scheduled call before ordinary risk work", () => {
     const futureLead = lead("future", "Future lead");
     const riskLead = lead("risk", "Risk lead");

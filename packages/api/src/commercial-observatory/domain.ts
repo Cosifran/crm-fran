@@ -214,7 +214,7 @@ function projectionFor(rows: readonly ObservatoryObservation[], from: Date, to: 
 }
 
 function economicBridge(rows: readonly ObservatoryObservation[], from: Date, to: Date, currencies: readonly string[], currency?: string) {
-  if (!currency && currencies.length) return { status: "currency_required" as const, availableCurrencies: currencies, rule: "Selecciona una moneda explícita; no existe conversión FX implícita." };
+  if (!currency && currencies.length) return { status: "currency_required" as const, availableCurrencies: currencies, rule: "Hay varias monedas en los periodos comparados; la evidencia se mantiene separada y no existe conversión FX implícita." };
   if (!currency) return { status: "insufficient_evidence" as const, availableCurrencies: currencies, rule: "No existen eventos económicos registrados." };
   if (!currencies.includes(currency)) return { status: "not_comparable" as const, availableCurrencies: currencies, rule: `No hay verdad económica comparable en ${currency}.` };
   const baselineFrom = priorComparableRange(from, to).from;
@@ -401,6 +401,7 @@ export function buildCommercialObservatory(input: BuildInput) {
     const cutoff = inRange(row, input.from, input.to) ? input.to : inRange(row, baselineFrom, input.from) ? input.from : null;
     return cutoff ? row.financialEvents.filter((event) => event.occurredAt < cutoff).map((event) => event.currency) : [];
   }))].sort();
+  const resolvedCurrency = input.currency ?? (currencies.length === 1 ? currencies[0] : undefined);
   return {
     policyVersion: COMMERCIAL_OBSERVATORY_POLICY_VERSION,
     generatedAt: input.asOf,
@@ -408,14 +409,15 @@ export function buildCommercialObservatory(input: BuildInput) {
     range: { from: input.from, to: input.to },
     coverage: { observations: rows.length, duplicateObservationsExcluded: duplicates },
     currencies,
+    resolvedCurrency: resolvedCurrency ?? null,
     seasonality: seasonality(rows, input.from, input.to),
     anomalies: anomalyRadar(rows, input.from, input.to),
     bridge: {
       status: rows.length ? "available" as const : "insufficient_evidence" as const,
       commercial: commercialBridge(rows, input.from, input.to),
-      economic: economicBridge(rows, input.from, input.to, currencies, input.currency),
+      economic: economicBridge(rows, input.from, input.to, currencies, resolvedCurrency),
       note: "Las barras son una contribución aritmética que suma exactamente el delta. No implica causalidad.",
     },
-    risk: riskMap(rows, input.from, input.to, input.asOf, input.currency),
+    risk: riskMap(rows, input.from, input.to, input.asOf, resolvedCurrency),
   };
 }

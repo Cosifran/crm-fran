@@ -1,18 +1,18 @@
 "use client";
-import { SectionCards } from "@crm-fran/ui/components/section-cards";
 import { ChartAreaInteractive } from "@crm-fran/ui/components/chart-area-interactive";
 import { ConversionFunnel } from "@/features/dashboard/conversion-funnel";
+import { DashboardSummaryCards } from "@/features/dashboard/dashboard-summary-cards";
 import { QualityControls } from "@/features/dashboard/quality-controls";
 
 export default function Dashboard() {
   return (
-    <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-      <SectionCards />
-      <ConversionFunnel />
-      <QualityControls />
+    <div className="dashboard-arc-theme flex min-h-full flex-col gap-4 bg-background py-4 text-foreground md:gap-5 md:py-5">
+      <DashboardSummaryCards />
       <div className="px-4 lg:px-6">
         <ChartAreaInteractive />
       </div>
+      <ConversionFunnel />
+      <QualityControls />
     </div>
   );
 }

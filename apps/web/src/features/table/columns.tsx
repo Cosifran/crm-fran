@@ -7,9 +7,11 @@ import {
   SelectValue,
 } from "@crm-fran/ui/components/select";
 import type { ColumnDef } from "@tanstack/react-table";
+import { Badge } from "@crm-fran/ui/components/badge";
 import type { Lead } from "../leads/assign-lead-drawer";
 import { getLeadPoolProgress } from "../leads/lead-pool";
 import { getCallerResponseStatus } from "../leads/response-status";
+import { getCanonicalCallerFeedback } from "../leads/caller-feedback";
 
 export function createLeadColumns(
   renderAction: (lead: Lead) => React.ReactNode,
@@ -35,6 +37,7 @@ export function createLeadColumns(
     {
       accessorKey: "state",
       header: "Estado",
+      cell: ({ row }) => <Badge variant="outline">{row.original.state}</Badge>,
     },
     {
       accessorKey: "response",
@@ -44,6 +47,10 @@ export function createLeadColumns(
     {
       accessorKey: "feedback",
       header: "Feedback",
+      cell: ({ row }) => {
+        const feedback = getCanonicalCallerFeedback(row.original.questions);
+        return <Badge variant={feedback.value ? "secondary" : "outline"}>{feedback.label}</Badge>;
+      },
     },
     {
       accessorKey: "callerId",

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { SearchIcon } from "lucide-react";
 import { trpc } from "@/utils/trpc";
 import { useQuery } from "@tanstack/react-query";
 import { authClient } from "@/lib/auth-client";
@@ -11,10 +12,16 @@ import {
   CardHeader,
   CardTitle,
 } from "@crm-fran/ui/components/card";
+import { Badge } from "@crm-fran/ui/components/badge";
+import { Empty } from "@crm-fran/ui/components/empty";
+import { Field, FieldLabel } from "@crm-fran/ui/components/field";
+import { Input } from "@crm-fran/ui/components/input";
+import { Skeleton } from "@crm-fran/ui/components/skeleton";
 import { createLeadColumns } from "@/features/table/columns";
 import LeadViewDrawer from "@/features/leads/lead-view-drawer";
 import AssignLeadDrawer from "@/features/leads/assign-lead-drawer";
 import { getCallerResponseStatus } from "@/features/leads/response-status";
+import { CALLER_FEEDBACK_OPTIONS, matchesCallerFeedbackFilter, type CallerFeedbackFilter } from "@/features/leads/caller-feedback";
 import { DateRangePicker } from "@/components/date-range-picker";
 import {
   Select,
@@ -87,6 +94,8 @@ export function AssignedLeadsTable({
   const [selectedCloserId, setSelectedCloserId] = useState<CloserFilter>("all");
   const [selectedResponse, setSelectedResponse] =
     useState<ResponseFilter>("all");
+  const [search, setSearch] = useState("");
+  const [selectedFeedback, setSelectedFeedback] = useState<CallerFeedbackFilter>("all");
 
   const isAdmin = session?.user?.roleId === "role-admin";
 
@@ -102,6 +111,7 @@ export function AssignedLeadsTable({
   });
 
   const rawLeads = isAdmin ? allLeadsQuery.data : userLeadsQuery.data;
+  const activeQuery = isAdmin ? allLeadsQuery : userLeadsQuery;
   const leads = rawLeads?.filter(
     (lead) =>
       lead.type === type &&
@@ -146,8 +156,27 @@ export function AssignedLeadsTable({
       selectedResponse === "all" ||
       getCallerResponseStatus(lead.questions) === selectedResponse;
 
-    return matchesDate && matchesCloser && matchesResponse;
+    const normalizedSearch = search.trim().toLocaleLowerCase("es");
+    const matchesSearch = normalizedSearch.length === 0 || [
+      lead.name,
+      lead.email,
+      lead.phone,
+      lead.state,
+      lead.caller?.name,
+      lead.closer?.name,
+    ].some((value) => value?.toLocaleLowerCase("es").includes(normalizedSearch));
+
+    const matchesFeedback = matchesCallerFeedbackFilter(lead.questions, selectedFeedback);
+
+    return matchesDate && matchesCloser && matchesResponse && matchesFeedback && matchesSearch;
   });
+
+  const summary = {
+    total: leads?.length ?? 0,
+    caller: leads?.filter(({ callerId }) => Boolean(callerId)).length ?? 0,
+    closer: leads?.filter(({ closerId }) => Boolean(closerId)).length ?? 0,
+    answered: leads?.filter(({ questions }) => getCallerResponseStatus(questions) === "Si").length ?? 0,
+  };
 
   const columns = createLeadColumns((lead) => (
     <div className="flex gap-2">
@@ -156,27 +185,56 @@ export function AssignedLeadsTable({
     </div>
   ));
 
-  return (
-    <section className="mx-auto flex w-full max-w-6xl min-w-0 flex-col gap-6 py-4 md:py-6">
-      <div className="flex flex-col gap-1 px-4 lg:px-6">
-        <h1 data-slot="assigned-leads-heading" className="text-2xl font-bold tracking-tight">
-          {title}
-        </h1>
-        <p className="text-muted-foreground">{description}</p>
-      </div>
+  if (isSessionPending || activeQuery.isLoading) {
+    return <main className="dashboard-arc-theme flex flex-col gap-4 bg-background p-4 sm:p-6"><Skeleton className="h-20 w-full" /><Skeleton className="h-24 w-full" /><Skeleton className="h-72 w-full" /></main>;
+  }
 
-      <Card>
-        <CardHeader>
+  if (activeQuery.isError) {
+    return <main className="dashboard-arc-theme bg-background p-4 sm:p-6"><Empty heading="No se pudieron cargar los leads personales" description="Reintenta cuando vuelva la conexión. Tus filtros y asignaciones no se han modificado." /></main>;
+  }
+
+  return (
+    <main className="dashboard-arc-theme flex min-h-full w-full min-w-0 flex-col gap-4 bg-background p-4 text-foreground sm:p-6">
+      <header className="flex flex-col gap-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 data-slot="assigned-leads-heading" className="text-3xl font-bold tracking-tight">
+          {title}
+          </h1>
+          <Badge variant="outline">{isAdmin ? "Supervisión" : "Mi cartera"}</Badge>
+        </div>
+        <p className="max-w-3xl text-sm text-muted-foreground">{description}</p>
+      </header>
+
+      <section aria-label="Resumen de leads personales" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          ["Leads visibles", summary.total],
+          ["Con caller", summary.caller],
+          ["Con closer", summary.closer],
+          ["Con respuesta", summary.answered],
+        ].map(([label, value]) => (
+          <Card size="sm" key={String(label)}>
+            <CardHeader className="pb-1"><CardDescription>{label}</CardDescription><CardTitle className="text-2xl">{value}</CardTitle></CardHeader>
+          </Card>
+        ))}
+      </section>
+
+      <Card size="sm">
+        <CardHeader className="pb-2">
           <CardTitle>Filtros</CardTitle>
-          <CardDescription>
-            Combina fecha, closer y respuesta para encontrar tus leads.
-          </CardDescription>
+          <CardDescription>Combina búsqueda, fecha, closer y respuesta sin alterar tu selección.</CardDescription>
         </CardHeader>
         <CardContent className="px-0">
           <div
             data-slot="assigned-lead-filters"
-            className="flex flex-wrap items-center gap-2 px-4 lg:px-6"
+            className="grid gap-3 px-4 md:grid-cols-2 lg:px-6 xl:grid-cols-[minmax(16rem,1.5fr)_repeat(5,minmax(10rem,1fr))] xl:items-end"
           >
+            <Field>
+              <FieldLabel htmlFor="personal-leads-search">Buscar</FieldLabel>
+              <div className="relative">
+                <SearchIcon aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input id="personal-leads-search" aria-label="Buscar leads personales" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nombre, correo, teléfono o responsable" className="h-11 pl-9" />
+              </div>
+            </Field>
             <DateRangePicker
               from={dateRange?.from}
               to={dateRange?.to}
@@ -192,7 +250,7 @@ export function AssignedLeadsTable({
             >
               <SelectTrigger
                 size="sm"
-                className="w-full min-w-0 sm:w-[180px]"
+                className="h-11 w-full min-w-0"
                 aria-label="Campo de fecha para filtrar"
               >
                 <SelectValue>
@@ -214,7 +272,7 @@ export function AssignedLeadsTable({
             >
               <SelectTrigger
                 size="sm"
-                className="w-full min-w-0 sm:w-[180px]"
+                className="h-11 w-full min-w-0"
                 aria-label="Closer para filtrar"
               >
                 <SelectValue>{activeCloserName}</SelectValue>
@@ -245,7 +303,7 @@ export function AssignedLeadsTable({
             >
               <SelectTrigger
                 size="sm"
-                className="w-full min-w-0 sm:w-[180px]"
+                className="h-11 w-full min-w-0"
                 aria-label="Respuesta para filtrar"
               >
                 <SelectValue>
@@ -263,29 +321,61 @@ export function AssignedLeadsTable({
                 </SelectGroup>
               </SelectContent>
             </Select>
+            <Field>
+              <FieldLabel>Tipo de feedback</FieldLabel>
+              <Select
+              value={selectedFeedback}
+              onValueChange={(value) => {
+                if (value === "all" || value === "none" || CALLER_FEEDBACK_OPTIONS.some((option) => option.value === value)) {
+                  setSelectedFeedback(value as CallerFeedbackFilter);
+                }
+              }}
+              >
+                <SelectTrigger size="sm" className="h-11 w-full min-w-0" aria-label="Tipo de feedback">
+                <SelectValue>
+                  {selectedFeedback === "all"
+                    ? "Todos los feedbacks"
+                    : selectedFeedback === "none"
+                      ? "Sin feedback"
+                      : CALLER_FEEDBACK_OPTIONS.find(({ value }) => value === selectedFeedback)?.label}
+                </SelectValue>
+                </SelectTrigger>
+                <SelectContent className={overlayClassName}>
+                  <SelectGroup>
+                    <SelectItem value="all">Todos los feedbacks</SelectItem>
+                    <SelectItem value="none">Sin feedback</SelectItem>
+                    {CALLER_FEEDBACK_OPTIONS.map(({ value, label }) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </Field>
           </div>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
+      <Card size="sm" className="min-w-0">
+        <CardHeader className="pb-2">
           <CardTitle>Leads asignados</CardTitle>
           <CardDescription>
             {filteredLeads?.length === 1
               ? "1 lead encontrado"
-              : `${filteredLeads?.length ?? 0} leads encontrados`}
+              : `${filteredLeads?.length ?? 0} leads encontrados`}. Acciones disponibles según tus permisos y tu rol operativo.
           </CardDescription>
         </CardHeader>
-        <CardContent className="px-0">
-          <div className="min-w-0 overflow-x-auto">
+        <CardContent className="px-0 pb-0">
+          {filteredLeads?.length === 0 ? (
+            <Empty heading={leads?.length === 0 ? "Todavía no tienes leads asignados" : "Ningún lead coincide con los filtros"} description={leads?.length === 0 ? "Cuando recibas una asignación aparecerá aquí, sin mezclar la cartera de otros usuarios." : "Prueba a ampliar el intervalo o limpiar alguno de los filtros."} />
+          ) : (
+          <div className="max-h-[36rem] min-w-0 overflow-auto border-t">
             <DataTable
               data={filteredLeads ?? []}
               columns={columns}
               getRowId={(row) => row.id}
             />
           </div>
+          )}
         </CardContent>
       </Card>
-    </section>
+    </main>
   );
 }

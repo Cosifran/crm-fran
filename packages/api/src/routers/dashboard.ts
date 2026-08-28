@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { madridDayKey } from "../commercial-observatory/domain";
+import { getDashboardSummary } from "../dashboard/dashboard-summary";
 import { getConversionFunnel } from "../dashboard/conversion-funnel-service";
 import {
   getQualityControls,
@@ -9,6 +11,36 @@ import { router } from "../index";
 import { permittedProcedure } from "../trpc/trpc";
 
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
+const calendarDay = date.refine((value) => {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(Date.UTC(year!, month! - 1, day!)).toISOString().slice(0, 10) === value;
+}, "Invalid calendar day");
+
+export const dashboardSummaryInput = z
+  .object({
+    from: calendarDay,
+    to: calendarDay.refine(
+      (value) => value <= madridDayKey(new Date()),
+      "The end date cannot be in the future",
+    ),
+  })
+  .superRefine((input, context) => {
+    if (input.from > input.to) {
+      context.addIssue({
+        code: "custom",
+        message: "The end date cannot be before the start date",
+        path: ["to"],
+      });
+    }
+    if (input.from >= madridDayKey(new Date())) {
+      context.addIssue({
+        code: "custom",
+        message: "The range must contain at least one closed Madrid day",
+        path: ["from"],
+      });
+    }
+  });
 
 const conversionFunnelInput = z
   .object({
@@ -45,6 +77,9 @@ const qualitySettingsInput = z.object({
 });
 
 export const dashboardRouter = router({
+  summary: permittedProcedure(["leads:read"])
+    .input(dashboardSummaryInput)
+    .query(({ input }) => getDashboardSummary(input)),
   conversionFunnel: permittedProcedure(["leads:read"])
     .input(conversionFunnelInput)
     .query(({ input }) => getConversionFunnel(input)),

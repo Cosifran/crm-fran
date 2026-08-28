@@ -31,6 +31,11 @@ export function createAgendaColumns(
       cell: ({ row }) => row.original.closer?.name ?? "Sin asignar",
     },
     {
+      accessorKey: "closerOutcome",
+      header: "Feedback closer",
+      cell: ({ row }) => row.original.closerOutcome ?? "Sin feedback",
+    },
+    {
       accessorKey: "scheduledDate",
       header: "Fecha",
     },

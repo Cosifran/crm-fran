@@ -2,11 +2,12 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 describe("commercial intelligence phase-three UI contract", () => {
-  const source = readFileSync("src/app/inteligencia-comercial/page.tsx", "utf8");
+  const source = readFileSync("src/features/commercial-observatory/commercial-intelligence-panel.tsx", "utf8");
 
   it("keeps the original tabs and adds objection intelligence and library", () => {
     for (const label of ["Asignación simulada", "Aprendizaje", "Fugas", "Objeciones y motivaciones", "Biblioteca comercial inteligente"]) expect(source).toContain(label);
-    expect(source).toContain('TabsList className="flex h-auto flex-wrap"');
+    expect(source).toContain("bg-muted/40");
+    expect(source).toContain("h-11!");
   });
 
   it("renders loading, error, empty and human approval states", () => {

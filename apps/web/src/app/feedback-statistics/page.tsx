@@ -1,7 +1,5 @@
-import { Can } from "@crm-fran/ui/permissions/can";
+import { redirect } from "next/navigation";
 
-import { FeedbackStatisticsView } from "@/features/feedback-statistics/feedback-statistics-view";
-
-export default function FeedbackStatisticsPage() {
-  return <Can permission="leads:read"><FeedbackStatisticsView /></Can>;
+export default function LegacyFeedbackStatisticsPage() {
+  redirect("/observatorio-comercial/feedback");
 }

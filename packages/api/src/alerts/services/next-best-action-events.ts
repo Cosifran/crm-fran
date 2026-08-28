@@ -7,7 +7,7 @@ import {
   type LeadActivityMetadata,
 } from "@crm-fran/db/schema/index";
 import type { Permission } from "@crm-fran/db/schema/auth";
-import { buildAlertRecommendationKey, buildRiskRecommendationKey } from "./next-best-actions";
+import { actionTypeMatchesMode, buildAlertRecommendationKey, buildRiskRecommendationKey, type NextBestActionMode } from "./next-best-actions";
 import { listLeadRiskQueue } from "./lead-risk-queue";
 import { COMMERCIAL_EVIDENCE_POLICY_VERSION, type EvidenceSnapshot } from "../../commercial-evidence/domain";
 import { buildEvidenceSnapshotForLead } from "../../commercial-evidence/service";
@@ -86,7 +86,7 @@ export function buildRecommendationMetrics(events: readonly RecommendationEvent[
 }
 
 function canManageLead(input: { lead: { callerId: string | null; closerId: string | null }; actorId: string; permissions: readonly Permission[] }) {
-  return input.permissions.includes("*") || input.permissions.includes("alerts:*") || input.lead.callerId === input.actorId || input.lead.closerId === input.actorId;
+  return input.permissions.includes("*") || input.lead.callerId === input.actorId || input.lead.closerId === input.actorId;
 }
 
 export async function recordRecommendationEvent(input: {
@@ -106,7 +106,7 @@ export async function recordRecommendationEvent(input: {
   if (!lead) {
     throw new Error("No tienes acceso a esta recomendación");
   }
-  const isPrivileged = input.permissions.includes("*") || input.permissions.includes("alerts:*");
+  const isPrivileged = input.permissions.includes("*");
   const priorEvents = await db.select({ kind: leadActivityEvents.kind, metadata: leadActivityEvents.metadata, occurredAt: leadActivityEvents.occurredAt })
     .from(leadActivityEvents)
     .where(and(eq(leadActivityEvents.leadId, input.leadId), eq(leadActivityEvents.actorId, input.actorId), inArray(leadActivityEvents.kind, [LEAD_ACTIVITY_KIND.RECOMMENDATION_SHOWN, LEAD_ACTIVITY_KIND.RECOMMENDATION_OPENED])))
@@ -161,15 +161,16 @@ export async function recordRecommendationEvent(input: {
   return { dedupeKey };
 }
 
-export async function listRecommendationMetrics({ actorId, permissions, now = new Date() }: { actorId: string; permissions: readonly Permission[]; now?: Date }) {
+export async function listRecommendationMetrics({ actorId, permissions, mode, now = new Date() }: { actorId: string; permissions: readonly Permission[]; mode?: NextBestActionMode; now?: Date }) {
   const since = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const rows = await db.select({ kind: leadActivityEvents.kind, metadata: leadActivityEvents.metadata, occurredAt: leadActivityEvents.occurredAt })
     .from(leadActivityEvents).innerJoin(leads, eq(leads.id, leadActivityEvents.leadId))
     .where(and(gte(leadActivityEvents.occurredAt, since), inArray(leadActivityEvents.kind, [
       LEAD_ACTIVITY_KIND.RECOMMENDATION_SHOWN, LEAD_ACTIVITY_KIND.RECOMMENDATION_OPENED,
       LEAD_ACTIVITY_KIND.RECOMMENDATION_COMPLETED, LEAD_ACTIVITY_KIND.RECOMMENDATION_SKIPPED,
-    ]), permissions.includes("*") || permissions.includes("alerts:*") ? undefined : eq(leadActivityEvents.actorId, actorId)));
-  return buildRecommendationMetrics(rows.map((row) => ({ kind: row.kind as RecommendationEventKind, metadata: row.metadata as RecommendationMetadata, occurredAt: row.occurredAt })));
+    ]), permissions.includes("*") ? undefined : eq(leadActivityEvents.actorId, actorId)));
+  const events = rows.map((row) => ({ kind: row.kind as RecommendationEventKind, metadata: row.metadata as RecommendationMetadata, occurredAt: row.occurredAt }));
+  return buildRecommendationMetrics(mode ? events.filter((event) => event.metadata.actionType && actionTypeMatchesMode(event.metadata.actionType, mode)) : events);
 }
 
 export async function listSkippedRecommendationKeys(input: { actorId: string; permissions: readonly Permission[] }) {

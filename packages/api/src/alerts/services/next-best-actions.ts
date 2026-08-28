@@ -1,3 +1,4 @@
+import { db } from "@crm-fran/db";
 import type { Permission } from "@crm-fran/db/schema/auth";
 
 import { listAlerts } from "./list-alerts";
@@ -10,16 +11,21 @@ import { listSkippedRecommendationKeys } from "./next-best-action-events";
 type ActionLead = {
   id: string;
   name: string;
+  callerId?: string | null;
+  closerId?: string | null;
   caller: { id: string; name: string } | null;
+  closer?: { id: string; name: string } | null;
 };
 
 type ActionAlert<TLead extends ActionLead> = {
   id: string;
   lead: TLead | null;
+  targetUserId?: string | null;
   kind: string;
   severity: string;
   message: string;
   nextShowAt: Date;
+  targetUser?: { roleId?: string | null } | null;
 };
 
 type ActionRiskItem<TLead extends ActionLead> = {
@@ -33,6 +39,7 @@ type ActionRiskItem<TLead extends ActionLead> = {
 };
 
 export type NextBestActionUrgency = "critical" | "high" | "medium" | "low";
+export type NextBestActionMode = "caller" | "closer";
 
 export type NextBestAction<TLead extends ActionLead = ActionLead> = {
   position: number;
@@ -48,7 +55,84 @@ export type NextBestAction<TLead extends ActionLead = ActionLead> = {
   /** Stable lifecycle identity; alert recommendations keep their alert source. */
   recommendationKey: string;
   sourceAlertId: string | null;
+  workMode: NextBestActionMode;
 };
+
+export function availableNextBestActionModes({
+  roleId,
+  permissions,
+  ownsCallerWork = false,
+  ownsCloserWork = false,
+}: {
+  roleId: string;
+  permissions: readonly Permission[];
+  ownsCallerWork?: boolean;
+  ownsCloserWork?: boolean;
+}): NextBestActionMode[] {
+  if (permissions.includes("*")) return ["caller", "closer"];
+  const modes = new Set<NextBestActionMode>();
+  if (roleId === "role-caller" || ownsCallerWork) modes.add("caller");
+  if (roleId === "role-closer" || ownsCloserWork) modes.add("closer");
+  return [...modes];
+}
+
+export async function resolveNextBestActionModes({
+  actorId,
+  roleId,
+  permissions,
+}: {
+  actorId: string;
+  roleId: string;
+  permissions: readonly Permission[];
+}) {
+  if (permissions.includes("*")) return ["caller", "closer"] satisfies NextBestActionMode[];
+
+  const [callerLead, closerLead] = await Promise.all([
+    db.query.leads.findFirst({
+      columns: { id: true },
+      where: (table, { eq }) => eq(table.callerId, actorId),
+    }),
+    db.query.leads.findFirst({
+      columns: { id: true },
+      where: (table, { eq }) => eq(table.closerId, actorId),
+    }),
+  ]);
+
+  return availableNextBestActionModes({
+    roleId,
+    permissions,
+    ownsCallerWork: Boolean(callerLead),
+    ownsCloserWork: Boolean(closerLead),
+  });
+}
+
+const CALLER_ACTION_TYPES = new Set(["no_contact", "future_call", "follow_up"]);
+const CLOSER_ACTION_TYPES = new Set(["appointment", "sale", "rescheduled", "follow_up"]);
+
+export function actionTypeMatchesMode(actionType: string, mode: NextBestActionMode, targetRole?: string | null) {
+  if (actionType === "follow_up") {
+    if (targetRole === "role-caller") return mode === "caller";
+    if (targetRole === "role-closer") return mode === "closer";
+  }
+  return (mode === "caller" ? CALLER_ACTION_TYPES : CLOSER_ACTION_TYPES).has(actionType);
+}
+
+function alertMatchesMode(alert: ActionAlert<ActionLead>, mode: NextBestActionMode) {
+  if (alert.kind === "appointment" || alert.kind === "rescheduled") {
+    return mode === "closer";
+  }
+  if (alert.kind === "future_call") return mode === "caller";
+
+  const targetUserId = alert.targetUserId;
+  if (targetUserId && alert.lead) {
+    const isCallerWork = alert.lead.callerId === targetUserId;
+    const isCloserWork = alert.lead.closerId === targetUserId;
+    if (isCloserWork && !isCallerWork) return mode === "closer";
+    if (isCallerWork && !isCloserWork) return mode === "caller";
+  }
+
+  return actionTypeMatchesMode(alert.kind, mode, alert.targetUser?.roleId);
+}
 
 export function buildRiskRecommendationKey(input: {
   leadId: string;
@@ -81,6 +165,7 @@ const ALERT_BASE_SCORE: Record<string, number> = {
   follow_up: 75,
   appointment: 85,
   rescheduled: 95,
+  sale: 100,
 };
 
 function urgencyForScore(score: number): NextBestActionUrgency {
@@ -139,17 +224,19 @@ export function buildNextBestActions<TLead extends ActionLead>({
   alerts,
   riskItems,
   now,
+  mode = "caller",
 }: {
   alerts: readonly ActionAlert<TLead>[];
   riskItems: readonly ActionRiskItem<TLead>[];
   now: Date;
+  mode?: NextBestActionMode;
 }): NextBestAction<TLead>[] {
   const actions = new Map<
     string,
     Omit<NextBestAction<TLead>, "position" | "urgency">
   >();
 
-  for (const item of riskItems) {
+  for (const item of mode === "caller" ? riskItems : []) {
     // A failed attempt should not immediately be presented again as the next action.
     if (item.minutesSinceLastAttempt !== null && item.minutesSinceLastAttempt < 15) {
       continue;
@@ -169,23 +256,25 @@ export function buildNextBestActions<TLead extends ActionLead>({
         lastAttemptAt: item.lastAttemptAt,
       }),
       sourceAlertId: null,
+      workMode: "caller",
     });
   }
 
   for (const alert of alerts) {
-    if (!alert.lead) continue;
+    if (!alert.lead || !alertMatchesMode(alert, mode)) continue;
     const score = alertScore(alert, now);
     mergeAction(actions, {
       lead: alert.lead,
       actionType: alert.kind,
       score,
       reasons: [alert.message],
-      scheduledAt: alert.kind === "future_call" ? alert.nextShowAt : null,
+      scheduledAt: alert.nextShowAt,
       attemptCount: null,
       minutesSinceAssignment: null,
       minutesSinceLastAttempt: null,
       recommendationKey: buildAlertRecommendationKey({ alertId: alert.id, nextShowAt: alert.nextShowAt }),
       sourceAlertId: alert.id,
+      workMode: mode,
     });
   }
 
@@ -204,14 +293,23 @@ export function buildNextBestActions<TLead extends ActionLead>({
 export async function listNextBestActions({
   actorId,
   permissions,
+  roleId,
+  mode,
+  authorizedModes,
   now = new Date(),
 }: {
   actorId: string;
   permissions: readonly Permission[];
+  roleId: string;
+  mode: NextBestActionMode;
+  authorizedModes?: readonly NextBestActionMode[];
   now?: Date;
 }) {
-  const canSeeAllAlerts =
-    permissions.includes("*") || permissions.includes("alerts:*");
+  const resolvedModes = authorizedModes ?? await resolveNextBestActionModes({ actorId, roleId, permissions });
+  if (!resolvedModes.includes(mode)) {
+    throw new Error("Requested work mode is not available to this authenticated role");
+  }
+  const canSeeAllAlerts = permissions.includes("*");
   const [alerts, riskItems] = await Promise.all([
     listAlerts({
       actorId,
@@ -219,11 +317,19 @@ export async function listNextBestActions({
       targetUserId: canSeeAllAlerts ? undefined : actorId,
       limit: 100,
     }),
-    listLeadRiskQueue({ actorId, permissions, now }),
+    mode === "caller" ? listLeadRiskQueue({ actorId, permissions, now }) : Promise.resolve([]),
   ]);
 
+  const ownedAlerts = canSeeAllAlerts
+    ? alerts
+    : alerts.filter(({ lead }) =>
+        mode === "caller"
+          ? lead?.callerId === actorId
+          : lead?.closerId === actorId,
+      );
+
   const [actions, terminalKeys] = await Promise.all([
-    Promise.resolve(buildNextBestActions({ alerts, riskItems, now })),
+    Promise.resolve(buildNextBestActions({ alerts: ownedAlerts, riskItems, now, mode })),
     listSkippedRecommendationKeys({ actorId, permissions }),
   ]);
   return actions.filter((action) => !terminalKeys.has(action.recommendationKey));

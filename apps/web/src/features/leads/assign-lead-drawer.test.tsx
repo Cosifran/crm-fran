@@ -73,6 +73,7 @@ vi.mock("./assign-lead-form", () => ({
 
 const baseLead = {
   id: "lead-1",
+  type: "maestra" as const,
   name: "Test Lead",
   email: "test@example.com",
   phone: "+54 11 5555 5555",
@@ -192,6 +193,17 @@ describe("AssignLeadDrawer — orquesta submitFormId por rol", () => {
       "form",
       "closer-qa-form",
     );
+  });
+
+  it("multi-role user can open closer feedback only for a lead assigned to their identity", async () => {
+    setupRole("role-caller");
+    const user = userEvent.setup();
+
+    render(<AssignLeadDrawer lead={{ ...baseLead, closerId: "user-1" }} triggerLabel="Gestionar ahora" mode="agenda-feedback" />);
+    await user.click(screen.getByRole("button", { name: "Gestionar ahora" }));
+
+    expect(screen.getByTestId("closer-qa-form")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /guardar/i })).toHaveAttribute("form", "closer-qa-form");
   });
 
   it("admin: muestra el formulario operativo de acciones del caller", async () => {

@@ -1,7 +1,13 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckIcon, InfoIcon, PlayIcon, XIcon } from "lucide-react";
+import {
+  CheckIcon,
+  InfoIcon,
+  PlayIcon,
+  ShieldCheckIcon,
+  XIcon,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@crm-fran/ui/components/badge";
@@ -91,7 +97,14 @@ function Information({ title, children }: { title: string; children: string }) {
   return (
     <Popover>
       <PopoverTrigger
-        render={<Button variant="ghost" size="icon-xs" aria-label={`Información sobre ${title}`} />}
+        render={
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            className="size-11"
+            aria-label={`Información sobre ${title}`}
+          />
+        }
       >
         <InfoIcon aria-hidden="true" />
       </PopoverTrigger>
@@ -107,6 +120,7 @@ function Information({ title, children }: { title: string; children: string }) {
 
 function Evidence({ evidence }: { evidence: Record<string, unknown> }) {
   const rows = Object.entries(evidence).filter(([, value]) => value !== null);
+
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-1">
@@ -115,16 +129,24 @@ function Evidence({ evidence }: { evidence: Record<string, unknown> }) {
           Esta copia conserva los datos usados al crear la propuesta. No cambia aunque la señal de origen se actualice después.
         </Information>
       </div>
-      <dl className="grid gap-2 text-sm sm:grid-cols-2">
-        {rows.map(([key, value]) => (
-          <div key={key} className="flex flex-col gap-1 rounded-md border p-2">
-            <dt className="text-muted-foreground">{key}</dt>
-            <dd className="break-words">
-              {typeof value === "object" ? JSON.stringify(value) : String(value)}
-            </dd>
-          </div>
-        ))}
-      </dl>
+      {rows.length === 0 ? (
+        <p className="text-xs text-muted-foreground">
+          La propuesta no incluye indicadores adicionales.
+        </p>
+      ) : (
+        <dl className="grid gap-2 sm:grid-cols-2">
+          {rows.map(([key, value]) => (
+            <div key={key} className="rounded-md bg-muted p-2">
+              <dt className="text-xs text-muted-foreground">{key}</dt>
+              <dd className="break-words text-sm font-medium">
+                {typeof value === "object"
+                  ? JSON.stringify(value)
+                  : String(value)}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
     </div>
   );
 }
@@ -141,11 +163,20 @@ function DecisionActions({
   if (decision.status === "proposed") {
     return (
       <div className="flex flex-wrap gap-2">
-        <Button onClick={() => run("approve")} disabled={pending} aria-label="Aprobar decisión">
+        <Button
+          onClick={() => run("approve")}
+          disabled={pending}
+          aria-label="Aprobar decisión"
+        >
           <CheckIcon data-icon="inline-start" />
           Aprobar
         </Button>
-        <Button variant="outline" onClick={() => run("reject")} disabled={pending} aria-label="Rechazar decisión">
+        <Button
+          variant="outline"
+          onClick={() => run("reject")}
+          disabled={pending}
+          aria-label="Rechazar decisión"
+        >
           <XIcon data-icon="inline-start" />
           Rechazar
         </Button>
@@ -154,7 +185,11 @@ function DecisionActions({
   }
   if (decision.status === "approved") {
     return (
-      <Button onClick={() => run("start")} disabled={pending} aria-label="Iniciar decisión">
+      <Button
+        onClick={() => run("start")}
+        disabled={pending}
+        aria-label="Iniciar decisión"
+      >
         <PlayIcon data-icon="inline-start" />
         Iniciar
       </Button>
@@ -162,7 +197,11 @@ function DecisionActions({
   }
   if (decision.status === "in_progress") {
     return (
-      <Button onClick={() => run("complete")} disabled={pending} aria-label="Completar decisión">
+      <Button
+        onClick={() => run("complete")}
+        disabled={pending}
+        aria-label="Completar decisión"
+      >
         <CheckIcon data-icon="inline-start" />
         Completar
       </Button>
@@ -181,32 +220,37 @@ function DecisionCard({
   transition: (decisionId: string, action: DecisionAction) => void;
 }) {
   return (
-    <Card>
+    <Card size="sm" className="rounded-lg shadow-sm">
       <CardHeader>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant={decision.priority === "critical" ? "destructive" : "outline"}>
+          <Badge variant="outline">#{decision.rank}</Badge>
+          <Badge
+            variant={
+              decision.priority === "critical" ? "destructive" : "outline"
+            }
+          >
             Prioridad {priorityLabels[decision.priority]}
           </Badge>
           <Badge variant="secondary">{statusLabels[decision.status]}</Badge>
-          <Badge variant="outline">{sourceLabels[decision.sourceType] ?? decision.sourceType}</Badge>
+          <Badge variant="outline">
+            {sourceLabels[decision.sourceType] ?? decision.sourceType}
+          </Badge>
         </div>
         <CardTitle>{decision.title}</CardTitle>
         <CardDescription>{decision.summary}</CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <div className="flex flex-wrap gap-2">
-          {decision.estimatedImpactCents !== null ? (
-            <Badge variant="outline">
-              Impacto estimado · {money(decision.estimatedImpactCents)}
-            </Badge>
-          ) : (
-            <Badge variant="outline">Impacto sin estimar</Badge>
-          )}
-          {decision.confidencePercent !== null ? (
-            <Badge variant="outline">Confianza {decision.confidencePercent}%</Badge>
-          ) : (
-            <Badge variant="outline">Confianza no calculada</Badge>
-          )}
+      <CardContent className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="outline">
+            {decision.estimatedImpactCents !== null
+              ? `Impacto estimado · ${money(decision.estimatedImpactCents)}`
+              : "Impacto sin estimar"}
+          </Badge>
+          <Badge variant="outline">
+            {decision.confidencePercent !== null
+              ? `Confianza ${decision.confidencePercent}%`
+              : "Confianza no calculada"}
+          </Badge>
           {decision.sampleSize !== null ? (
             <Badge variant="outline">{decision.sampleSize} casos</Badge>
           ) : null}
@@ -214,19 +258,37 @@ function DecisionCard({
             El impacto es una estimación transparente, no dinero garantizado. La confianza solo aparece cuando la señal de origen proporciona una medida válida.
           </Information>
         </div>
-        <p className="text-sm text-muted-foreground">
-          Alcance: {decision.scope} · Responsable: {decision.assignee?.name ?? "Sin asignar"} · Fecha límite: {decision.dueAt ? new Date(decision.dueAt).toLocaleDateString("es-ES") : "Sin definir"}
-        </p>
+        <dl className="grid gap-2 text-sm sm:grid-cols-3">
+          <div>
+            <dt className="text-xs text-muted-foreground">Alcance</dt>
+            <dd className="break-words">{decision.scope}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted-foreground">Responsable</dt>
+            <dd>{decision.assignee?.name ?? "Sin asignar"}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted-foreground">Fecha límite</dt>
+            <dd>
+              {decision.dueAt
+                ? new Date(decision.dueAt).toLocaleDateString("es-ES")
+                : "Sin definir"}
+            </dd>
+          </div>
+        </dl>
         <Evidence evidence={decision.evidence} />
         {decision.events.length > 0 ? (
           <div className="flex flex-col gap-2">
             <Separator />
             <h3 className="text-sm font-medium">Historial inmutable</h3>
-            {decision.events.map((event) => (
-              <p key={event.id} className="text-sm text-muted-foreground">
-                {new Date(event.occurredAt).toLocaleString("es-ES")} · {event.actor.name} · {statusLabels[event.toStatus]}
-              </p>
-            ))}
+            <div className="flex max-h-32 flex-col gap-1 overflow-y-auto">
+              {decision.events.map((event) => (
+                <p key={event.id} className="text-xs text-muted-foreground">
+                  {new Date(event.occurredAt).toLocaleString("es-ES")} ·{" "}
+                  {event.actor.name} · {statusLabels[event.toStatus]}
+                </p>
+              ))}
+            </div>
           </div>
         ) : null}
       </CardContent>
@@ -258,55 +320,64 @@ export default function DecisionCenterPage() {
 
   if (weekly.isPending) {
     return (
-      <main className="flex flex-col gap-4 p-4 sm:p-6">
-        <Skeleton className="h-24 w-full" />
-        <Skeleton className="h-80 w-full" />
-      </main>
+      <section className="grid gap-3 md:grid-cols-2" aria-live="polite">
+        <Skeleton className="h-48 w-full" />
+        <Skeleton className="h-48 w-full" />
+      </section>
     );
   }
   if (weekly.isError || !weekly.data) {
     return (
-      <main className="p-4 sm:p-6">
+      <section>
         <Empty
           heading="No se pudo cargar el centro de decisiones"
           description="Esta sección contiene datos económicos y de equipo y requiere administración global."
         />
-      </main>
+      </section>
     );
   }
 
   return (
-    <main className="flex flex-col gap-6 p-4 sm:p-6">
-      <header className="flex flex-col gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-2xl font-semibold">Centro de decisiones semanal</h1>
-          <Information title="Centro de decisiones semanal">
-            Reúne un máximo de cinco propuestas procedentes de señales ya existentes. Una persona debe aprobar y ejecutar cada decisión; esta pantalla nunca modifica campañas, asignaciones, reglas ni señales de origen.
-          </Information>
-          <Badge variant="outline">Solo sugerencias</Badge>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          Semana del {new Date(weekly.data.weekStart).toLocaleDateString("es-ES")}. Prioriza evidencia, responsabilidad y seguimiento sin automatizaciones ciegas.
-        </p>
-      </header>
+    <section className="flex flex-col gap-4">
+      <Card size="sm" className="rounded-lg shadow-sm">
+        <CardHeader>
+          <div className="flex flex-wrap items-center gap-2">
+            <ShieldCheckIcon aria-hidden="true" />
+            <CardTitle>Centro de decisiones semanal</CardTitle>
+            <Information title="Centro de decisiones semanal">
+              Reúne un máximo de cinco propuestas procedentes de señales ya existentes. Una persona debe aprobar y ejecutar cada decisión; esta pantalla nunca modifica campañas, asignaciones, reglas ni señales de origen.
+            </Information>
+            <Badge variant="outline">Solo sugerencias</Badge>
+          </div>
+          <CardDescription>
+            Semana del{" "}
+            {new Date(weekly.data.weekStart).toLocaleDateString("es-ES")}. Un
+            máximo de {weekly.data.maximumDecisions} decisiones congeladas y
+            explicables.
+          </CardDescription>
+        </CardHeader>
+      </Card>
 
       {weekly.data.decisions.length === 0 ? (
         <Empty
+          className="rounded-lg bg-card px-4 ring-1 ring-foreground/10"
           heading="Sin decisiones para esta semana"
           description="No se detectaron decisiones al congelar esta semana. El snapshot permanecerá sin cambios hasta la siguiente semana."
         />
       ) : (
-        <section className="grid gap-4 xl:grid-cols-2">
+        <div className="grid items-start gap-4 xl:grid-cols-2">
           {weekly.data.decisions.map((decision) => (
             <DecisionCard
               key={decision.id}
               decision={decision}
               pending={transition.isPending}
-              transition={(decisionId, action) => transition.mutate({ decisionId, action })}
+              transition={(decisionId, action) =>
+                transition.mutate({ decisionId, action })
+              }
             />
           ))}
-        </section>
+        </div>
       )}
-    </main>
+    </section>
   );
 }

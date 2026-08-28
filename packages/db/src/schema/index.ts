@@ -15,3 +15,4 @@ export * from "./commercial-decisions";
 export * from "./lead-financial-events";
 export * from "./commercial-library";
 export * from "./commercial-playbooks";
+export * from "./navigation-visibility";

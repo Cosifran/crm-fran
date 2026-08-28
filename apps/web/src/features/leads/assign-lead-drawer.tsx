@@ -88,6 +88,7 @@ export default function AssignLeadDrawer({
         (session?.user as { roleId?: string } | undefined)?.roleId,
     );
     const isAgendaFeedback = mode === "agenda-feedback";
+		const isAssignedCloser = session?.user?.id === lead.closerId;
 		const completeRecommendation = async () => {
 			setCompletionState("pending");
 			setCompletionError(null);
@@ -107,7 +108,7 @@ export default function AssignLeadDrawer({
 			void completeRecommendation();
 		};
     const showsCloserFeedback =
-      role === "role-closer" || (isAgendaFeedback && role === "role-admin");
+      role === "role-closer" || (isAgendaFeedback && (role === "role-admin" || isAssignedCloser));
     const showsCallerActions =
       !isAgendaFeedback && (role === "role-caller" || role === "role-admin");
 
@@ -138,7 +139,7 @@ export default function AssignLeadDrawer({
         }
       : titleByRole[role];
 
-    if (isAgendaFeedback && role === "role-caller") {
+    if (isAgendaFeedback && !showsCloserFeedback) {
       return null;
     }
 

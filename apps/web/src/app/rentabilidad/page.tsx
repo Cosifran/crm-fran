@@ -127,7 +127,7 @@ function Info({
   return (
     <Popover>
       <PopoverTrigger
-        render={<Button variant="ghost" size="icon-xs" aria-label={label} />}
+        render={<Button variant="ghost" size="icon-xs" className="size-11" aria-label={label} />}
       >
         <InfoIcon aria-hidden="true" />
       </PopoverTrigger>
@@ -286,10 +286,10 @@ export default function ProfitabilityPage() {
   );
 
   if (overview.isPending) {
-    return <main className="flex flex-col gap-4 p-4 sm:p-6"><Skeleton className="h-24 w-full" /><Skeleton className="h-80 w-full" /></main>;
+    return <main className="dashboard-arc-theme flex flex-col gap-4 bg-background p-4 sm:p-6"><Skeleton className="h-20 w-full" /><Skeleton className="h-64 w-full" /></main>;
   }
   if (overview.isError || !overview.data) {
-    return <main className="p-4 sm:p-6"><Empty heading="No se pudo cargar la rentabilidad" description="Esta sección requiere permisos de administración global." /></main>;
+    return <main className="dashboard-arc-theme bg-background p-4 sm:p-6"><Empty heading="No se pudo cargar la rentabilidad" description="Esta sección requiere permisos de administración global." /></main>;
   }
 
   const data = overview.data;
@@ -323,10 +323,10 @@ export default function ProfitabilityPage() {
   }));
 
   return (
-    <main className="flex flex-col gap-6 p-4 sm:p-6">
+    <main className="dashboard-arc-theme flex min-h-full flex-col gap-4 bg-background p-4 text-foreground sm:p-6">
       <header className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-2xl font-semibold">Rentabilidad y atribución</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Rentabilidad y atribución</h1>
           <Info label="Información sobre rentabilidad" title="Cómo se calcula">
             El gasto se introduce manualmente y se reparte entre los leads de la misma fuente, campaña y periodo. Las ventas proceden del feedback real del closer y se valoran con el importe manual por venta. No se conecta ni modifica ninguna plataforma publicitaria.
           </Info>
@@ -335,9 +335,9 @@ export default function ProfitabilityPage() {
         <p className="text-sm text-muted-foreground">Convierte el embudo comercial en recomendaciones económicas transparentes, sin automatizar presupuesto.</p>
       </header>
 
-      <Card>
-        <CardHeader><SectionTitle title="Intervalo de análisis" information="Solo se incluyen periodos de gasto completamente contenidos en estas fechas y leads creados dentro del mismo intervalo." /></CardHeader>
-        <CardContent><FieldGroup><Field><FieldLabel htmlFor="profitability-from">Desde</FieldLabel><Input id="profitability-from" type="date" value={from} onChange={(event) => setFrom(event.target.value)} /></Field><Field><FieldLabel htmlFor="profitability-to">Hasta</FieldLabel><Input id="profitability-to" type="date" value={to} onChange={(event) => setTo(event.target.value)} /></Field><Field><FieldLabel htmlFor="profitability-currency">Moneda del análisis</FieldLabel><Select items={data.availableCurrencies.map((option) => ({ label: option, value: option }))} value={data.currency} onValueChange={(value) => value && setCurrency(value)}><SelectTrigger id="profitability-currency" aria-label="Moneda del análisis" className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectGroup>{data.availableCurrencies.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectGroup></SelectContent></Select><FieldDescription>Las monedas se analizan por separado; nunca se aplica un tipo de cambio implícito.</FieldDescription></Field></FieldGroup></CardContent>
+      <Card size="sm" className="w-fit max-w-full">
+        <CardHeader className="pb-2"><SectionTitle title="Intervalo de análisis" information="Solo se incluyen periodos de gasto completamente contenidos en estas fechas y leads creados dentro del mismo intervalo." /></CardHeader>
+        <CardContent className="p-3 pt-0"><FieldGroup className="flex flex-col gap-3 sm:flex-row sm:items-end"><Field className="w-full sm:w-40"><FieldLabel htmlFor="profitability-from">Desde</FieldLabel><Input className="h-11" id="profitability-from" type="date" value={from} onChange={(event) => setFrom(event.target.value)} /></Field><Field className="w-full sm:w-40"><FieldLabel htmlFor="profitability-to">Hasta</FieldLabel><Input className="h-11" id="profitability-to" type="date" value={to} onChange={(event) => setTo(event.target.value)} /></Field><Field className="w-full sm:w-52"><FieldLabel htmlFor="profitability-currency">Moneda del análisis</FieldLabel><Select items={data.availableCurrencies.map((option) => ({ label: option, value: option }))} value={data.currency} onValueChange={(value) => value && setCurrency(value)}><SelectTrigger id="profitability-currency" aria-label="Moneda del análisis" className="h-11 w-full"><SelectValue /></SelectTrigger><SelectContent><SelectGroup>{data.availableCurrencies.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectGroup></SelectContent></Select><FieldDescription>Las monedas se analizan por separado; nunca se aplica un tipo de cambio implícito.</FieldDescription></Field></FieldGroup></CardContent>
       </Card>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -348,7 +348,7 @@ export default function ProfitabilityPage() {
       </div>
 
       <Tabs defaultValue="summary">
-        <TabsList className="flex h-auto flex-wrap"><TabsTrigger value="summary">Resumen</TabsTrigger><TabsTrigger value="truth">Verdad económica</TabsTrigger><TabsTrigger value="campaigns">Campañas</TabsTrigger><TabsTrigger value="ads">Anuncios, creatividades y ángulos</TabsTrigger><TabsTrigger value="team">Equipo</TabsTrigger><TabsTrigger value="profiles">Perfiles</TabsTrigger><TabsTrigger value="spend">Gastos</TabsTrigger></TabsList>
+        <TabsList className="flex h-auto w-fit max-w-full flex-wrap gap-1 rounded-lg border bg-muted/40 p-1"><TabsTrigger className="h-11! min-h-11! data-active:bg-background" value="summary">Resumen</TabsTrigger><TabsTrigger className="h-11! min-h-11! data-active:bg-background" value="truth">Verdad económica</TabsTrigger><TabsTrigger className="h-11! min-h-11! data-active:bg-background" value="campaigns">Campañas</TabsTrigger><TabsTrigger className="h-11! min-h-11! data-active:bg-background" value="ads">Anuncios, creatividades y ángulos</TabsTrigger><TabsTrigger className="h-11! min-h-11! data-active:bg-background" value="team">Equipo</TabsTrigger><TabsTrigger className="h-11! min-h-11! data-active:bg-background" value="profiles">Perfiles</TabsTrigger><TabsTrigger className="h-11! min-h-11! data-active:bg-background" value="spend">Gastos</TabsTrigger></TabsList>
 
         <TabsContent value="summary" className="flex flex-col gap-4">
           <Card><CardHeader><SectionTitle title="Gasto frente a ingreso estimado" information="El ingreso no representa caja cobrada: ventas multiplicadas por el valor manual de referencia. Úsalo para comparar campañas con el mismo criterio." /><CardDescription>{data.methodology}</CardDescription></CardHeader><CardContent>{chartData.length === 0 ? <Empty heading="Sin comparativa" description="Añade un periodo de gasto para dibujar la comparativa." /> : <ChartContainer config={chartConfig} className="min-h-72 w-full"><BarChart accessibilityLayer data={chartData}><CartesianGrid vertical={false} /><XAxis dataKey="campaign" tickLine={false} axisLine={false} /><YAxis tickLine={false} axisLine={false} /><ChartTooltip content={<ChartTooltipContent formatter={(value) => money(Number(value) * 100, data.currency)} />} /><Bar dataKey="spend" fill="var(--color-spend)" radius={4} /><Bar dataKey="revenue" fill="var(--color-revenue)" radius={4} /></BarChart></ChartContainer>}</CardContent></Card>

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   filterAgendaLeads,
   filterAgendaLeadsByCloser,
+  filterAgendaLeadsByCloserOutcome,
   filterAgendaLeadsByDateRange,
   formatLocalDate,
   getAgendaClosers,
@@ -144,5 +145,50 @@ describe("agenda lead helpers", () => {
 
   it("formats quick-filter dates in the local calendar timezone", () => {
     expect(formatLocalDate(new Date(2026, 7, 17, 23, 30))).toBe("2026-08-17");
+  });
+
+  it("exposes only the latest canonical closer answer as agenda feedback", () => {
+    const [agenda] = filterAgendaLeads([
+      lead([
+        { questionKey: "callerOutcome", answer: "Agenda", authorRole: "caller" },
+        { questionKey: "closerOutcome", answer: "Seguimiento", authorRole: "closer" },
+        { questionKey: "closerFeedback", answer: "Texto libre", authorRole: "closer" },
+        { questionKey: "closerOutcome", answer: "Venta", authorRole: "closer" },
+      ]),
+    ]);
+
+    expect(agenda?.closerOutcome).toBe("Venta");
+    expect(agenda?.closerOutcome).not.toBe("Texto libre");
+  });
+
+  it("filters independently by canonical closer outcome and missing feedback", () => {
+    const agendas = filterAgendaLeads([
+      lead([
+        { questionKey: "callerOutcome", answer: "Agenda", authorRole: "caller" },
+        { questionKey: "closerOutcome", answer: "No-show", authorRole: "closer" },
+      ]),
+      {
+        ...lead([
+          { questionKey: "callerOutcome", answer: "Agenda", authorRole: "caller" },
+        ]),
+        id: "lead-2",
+      },
+      {
+        ...lead([
+          { questionKey: "callerOutcome", answer: "Agenda", authorRole: "caller" },
+          { questionKey: "closerOutcome", answer: "Texto libre", authorRole: "closer" },
+        ]),
+        id: "lead-3",
+      },
+    ]);
+
+    expect(filterAgendaLeadsByCloserOutcome(agendas, "No-show")).toMatchObject([
+      { id: "lead-1" },
+    ]);
+    expect(filterAgendaLeadsByCloserOutcome(agendas, "none")).toMatchObject([
+      { id: "lead-2" },
+      { id: "lead-3" },
+    ]);
+    expect(filterAgendaLeadsByCloserOutcome(agendas, "all")).toHaveLength(3);
   });
 });

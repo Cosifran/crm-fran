@@ -92,16 +92,25 @@ export function useLeadRiskQueue() {
   });
 }
 
-export function useNextBestActions() {
+export function useNextBestActionModes() {
 	return useQuery({
-		...trpc.alerts.listNextBestActions.queryOptions(),
+		...trpc.alerts.getNextBestActionModes.queryOptions(),
+		staleTime: 60_000,
+	});
+}
+
+export function useNextBestActions(mode: "caller" | "closer", enabled = true) {
+	return useQuery({
+		...trpc.alerts.listNextBestActions.queryOptions({ mode }),
+		enabled,
 		refetchInterval: 60_000,
 	});
 }
 
-export function useNextBestActionMetrics() {
+export function useNextBestActionMetrics(mode: "caller" | "closer", enabled = true) {
 	return useQuery({
-		...trpc.alerts.getNextBestActionMetrics.queryOptions(),
+		...trpc.alerts.getNextBestActionMetrics.queryOptions({ mode }),
+		enabled,
 		refetchInterval: 60_000,
 	});
 }

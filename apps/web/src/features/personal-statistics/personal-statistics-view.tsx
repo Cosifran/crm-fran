@@ -155,16 +155,9 @@ export function PersonalStatisticsView() {
     <div
       className={cn(
         styles.theme,
-        "mx-auto flex w-full max-w-6xl flex-col gap-6 pt-4 sm:pt-6",
+        "flex w-full min-w-0 flex-col gap-4",
       )}
     >
-      <div className="flex flex-col gap-1">
-        <h1 className={styles.heading}>Estadísticas personales</h1>
-        <p className={cn(styles.subtitle, "text-muted-foreground")}>
-          Distribución de leads según su última modificación.
-        </p>
-      </div>
-
       <Card>
         <CardHeader>
           <CardTitle>Filtros</CardTitle>

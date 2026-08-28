@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../index";
 import { permittedProcedure } from "@crm-fran/api/trpc/trpc";
 import {
@@ -8,6 +9,7 @@ import {
 	listAlerts,
 	listLeadRiskQueue,
 	listNextBestActions,
+	resolveNextBestActionModes,
 	listRecommendationMetrics,
 	recordRecommendationEvent,
 	resolveAlert,
@@ -58,6 +60,8 @@ export const recommendationEventInput = z.object({
 		ctx.addIssue({ code: "custom", path: ["reason"], message: "Skip reason is required" });
 	}
 });
+
+export const nextBestActionModeInput = z.object({ mode: z.enum(["caller", "closer"]) });
 
 export const alertPreferencesInput = z
 	.object({
@@ -124,15 +128,34 @@ export const alertsRouter = router({
 		});
 	}),
 
-	listNextBestActions: permittedProcedure(["alerts:read"]).query(async ({ ctx }) => {
-		return await listNextBestActions({
+	getNextBestActionModes: permittedProcedure(["alerts:read"]).query(async ({ ctx }) => {
+		return await resolveNextBestActionModes({
 			actorId: ctx.session.user.id,
+			roleId: ctx.session.user.roleId,
 			permissions: ctx.permissions,
 		});
 	}),
 
-	getNextBestActionMetrics: permittedProcedure(["alerts:read"]).query(async ({ ctx }) => {
-		return await listRecommendationMetrics({ actorId: ctx.session.user.id, permissions: ctx.permissions });
+	listNextBestActions: permittedProcedure(["alerts:read"]).input(nextBestActionModeInput).query(async ({ ctx, input }) => {
+		const authorizedModes = await resolveNextBestActionModes({ actorId: ctx.session.user.id, roleId: ctx.session.user.roleId, permissions: ctx.permissions });
+		if (!authorizedModes.includes(input.mode)) {
+			throw new TRPCError({ code: "FORBIDDEN", message: "El modo de trabajo no corresponde al rol autenticado" });
+		}
+		return await listNextBestActions({
+			actorId: ctx.session.user.id,
+			permissions: ctx.permissions,
+			roleId: ctx.session.user.roleId,
+			mode: input.mode,
+			authorizedModes,
+		});
+	}),
+
+	getNextBestActionMetrics: permittedProcedure(["alerts:read"]).input(nextBestActionModeInput.optional()).query(async ({ ctx, input }) => {
+		const authorizedModes = await resolveNextBestActionModes({ actorId: ctx.session.user.id, roleId: ctx.session.user.roleId, permissions: ctx.permissions });
+		if (input && !authorizedModes.includes(input.mode)) {
+			throw new TRPCError({ code: "FORBIDDEN", message: "El modo de trabajo no corresponde al rol autenticado" });
+		}
+		return await listRecommendationMetrics({ actorId: ctx.session.user.id, permissions: ctx.permissions, mode: input?.mode });
 	}),
 
 	recordNextBestActionEvent: permittedProcedure(["alerts:write"])

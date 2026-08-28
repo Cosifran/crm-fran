@@ -26,6 +26,11 @@ const mocks = vi.hoisted(() => ({
     | undefined,
   responseSelectValueLabel: undefined as string | undefined,
   responseSelectOptions: [] as { value: string; label: string }[],
+  feedbackSelectOnValueChange: undefined as
+    | ((value: string | null) => void)
+    | undefined,
+  feedbackSelectValueLabel: undefined as string | undefined,
+  feedbackSelectOptions: [] as { value: string; label: string }[],
   dataTableData: [] as unknown[][],
 }));
 
@@ -111,10 +116,14 @@ vi.mock("@crm-fran/ui/components/select", () => ({
       mocks.closerSelectOnValueChange = props.onValueChange;
       mocks.closerSelectValueLabel = getCloserSelectValueLabel(props.children);
       mocks.closerSelectOptions = getCloserSelectOptions(props.children);
-    } else {
+    } else if (getSelectTriggerAriaLabel(props.children) === "Respuesta para filtrar") {
       mocks.responseSelectOnValueChange = props.onValueChange;
       mocks.responseSelectValueLabel = getCloserSelectValueLabel(props.children);
       mocks.responseSelectOptions = getCloserSelectOptions(props.children);
+    } else if (getSelectTriggerAriaLabel(props.children) === "Tipo de feedback") {
+      mocks.feedbackSelectOnValueChange = props.onValueChange;
+      mocks.feedbackSelectValueLabel = getCloserSelectValueLabel(props.children);
+      mocks.feedbackSelectOptions = getCloserSelectOptions(props.children);
     }
     return null;
   },
@@ -143,6 +152,9 @@ describe("LeadsPage", () => {
     mocks.dataTableData = [];
     mocks.dateFieldSelectOnValueChange = undefined;
     mocks.dateFieldSelectValueLabel = undefined;
+    mocks.feedbackSelectOnValueChange = undefined;
+    mocks.feedbackSelectValueLabel = undefined;
+    mocks.feedbackSelectOptions = [];
     mocks.closerSelectOnValueChange = undefined;
     mocks.closerSelectValueLabel = undefined;
     mocks.closerSelectOptions = [];
@@ -539,5 +551,38 @@ describe("LeadsPage", () => {
 
     expect(mocks.dataTableData.at(-1)).toEqual([callerYes, callerNo]);
     expect(mocks.responseSelectValueLabel).toBe("Todas las respuestas");
+  });
+
+  it("combines Tipo de feedback with response while keeping both filters independent", () => {
+    const lead = (id: string, response: "Si" | "No", outcome?: "Agenda" | "No encaja") => ({
+      id,
+      type: "maestra",
+      callerId: "caller-a",
+      closerId: null,
+      caller: { id: "caller-a", name: "Caller A" },
+      closer: null,
+      createdAt: new Date(2026, 0, 15),
+      updatedAt: new Date(2026, 0, 15),
+      questions: [
+        { questionKey: "isContacted", answer: response, authorRole: "caller" },
+        ...(outcome ? [{ questionKey: "callerOutcome", answer: outcome, authorRole: "caller" }] : []),
+      ],
+    });
+    const agendaYes = lead("agenda-yes", "Si", "Agenda");
+    const notFitYes = lead("not-fit-yes", "Si", "No encaja");
+    const agendaNo = lead("agenda-no", "No", "Agenda");
+    mocks.useQuery.mockReturnValue({ data: [agendaYes, notFitYes, agendaNo], isLoading: false });
+
+    render(<LeadsPage />);
+    expect(mocks.feedbackSelectOptions).toContainEqual({ value: "none", label: "Sin feedback" });
+
+    act(() => mocks.feedbackSelectOnValueChange?.("appointment"));
+    expect(mocks.dataTableData.at(-1)).toEqual([agendaYes, agendaNo]);
+
+    act(() => mocks.responseSelectOnValueChange?.("Si"));
+    expect(mocks.dataTableData.at(-1)).toEqual([agendaYes]);
+
+    act(() => mocks.feedbackSelectOnValueChange?.("all"));
+    expect(mocks.dataTableData.at(-1)).toEqual([agendaYes, notFitYes]);
   });
 });

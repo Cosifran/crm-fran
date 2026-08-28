@@ -3,7 +3,6 @@
 import * as React from "react"
 
 import { NavMain } from "@crm-fran/ui/components/nav-main"
-import { NavSecondary } from "@crm-fran/ui/components/nav-secondary"
 import { NavUser } from "@crm-fran/ui/components/nav-user"
 import {
   Sidebar,
@@ -14,193 +13,50 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@crm-fran/ui/components/sidebar"
-import { BrainCircuitIcon, FlaskConicalIcon, CircleAlertIcon, HouseIcon, ChartBarIcon, CalendarDaysIcon, ChartNoAxesCombinedIcon, CameraIcon, FileTextIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, CommandIcon, MessageSquareIcon, TrophyIcon, ListChecksIcon, BadgeEuroIcon, GoalIcon, ChartSplineIcon, CalculatorIcon, BookOpenCheckIcon, MessageCircleQuestionIcon } from "lucide-react"
-import { usePermissions } from "@crm-fran/ui/permissions"
+import { CircleAlertIcon, HouseIcon, ChartBarIcon, CalendarDaysIcon, ChartNoAxesCombinedIcon, CameraIcon, FileTextIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, CommandIcon, MessageSquareIcon, ListChecksIcon, BadgeEuroIcon, GoalIcon, ChartSplineIcon, UsersIcon } from "lucide-react"
+import { usePermissions, useRole } from "@crm-fran/ui/permissions"
 import type { Permission } from "@crm-fran/db/schema/auth"
+import {
+  canAccessNavigationItem,
+  canViewConfiguredNavigationItem,
+  PRIMARY_NAVIGATION_ITEMS,
+  type NavigationVisibilityConfiguration,
+  type PrimaryNavigationItem,
+} from "@crm-fran/ui/lib/navigation-policy"
 
 export function canViewNavigationItem(
-  item: { globalOnly?: boolean },
+  item: { id?: string; globalOnly?: boolean; requiredPermission?: PrimaryNavigationItem["requiredPermission"] },
   permissions: readonly Permission[],
 ) {
-  return !item.globalOnly || permissions.includes("*")
+  return canAccessNavigationItem(item, permissions)
+}
+
+export function observatoryNavigationUrl(permissions: readonly Permission[]) {
+  return permissions.includes("*") ? "/observatorio-comercial" : "/observatorio-comercial/evidencia-comercial"
+}
+
+const NAVIGATION_ICONS: Record<PrimaryNavigationItem["id"], React.ReactNode> = {
+  dashboard: <HouseIcon />,
+  "decision-center": <GoalIcon />,
+  "next-best-action": <ListChecksIcon />,
+  "commercial-observatory": <ChartSplineIcon />,
+  profitability: <BadgeEuroIcon />,
+  "general-leads": <DatabaseIcon />,
+  "vsl-leads": <CalendarDaysIcon />,
+  "personal-leads": <ChartBarIcon />,
+  alerts: <CircleAlertIcon />,
+  agendas: <CalendarDaysIcon />,
+  calendar: <CalendarDaysIcon />,
+  messages: <MessageSquareIcon />,
+  "personal-statistics": <ChartNoAxesCombinedIcon />,
+  "users-access": <UsersIcon />,
 }
 
 const data = {
-  navMain: [
-    {
-      title: "Dashboard",
-      url: "/",
-      icon: (
-        <HouseIcon
-        />
-      ),
-    },
-    {
-      title: "Centro de decisiones",
-      url: "/centro-de-decisiones",
-      icon: <GoalIcon />,
-      globalOnly: true,
-    },
-    {
-      title: "Pregúntale al CRM",
-      url: "/preguntale-al-crm",
-      icon: <MessageCircleQuestionIcon />,
-      globalOnly: true,
-    },
-    {
-      title: "Próxima mejor acción",
-      url: "/next-best-action",
-      icon: <ListChecksIcon />,
-    },
-    {
-      title: "Experimentos comerciales",
-      url: "/experimentos-comerciales",
-      icon: <FlaskConicalIcon />,
-    },
-    {
-      title: "Inteligencia comercial",
-      url: "/inteligencia-comercial",
-      icon: <BrainCircuitIcon />,
-    },
-    {
-      title: "Playbooks que aprenden",
-      url: "/playbooks-que-aprenden",
-      icon: <BookOpenCheckIcon />,
-      globalOnly: true,
-    },
-    {
-      title: "Evidencia comercial",
-      url: "/evidencia-comercial",
-      icon: <FileChartColumnIcon />,
-    },
-    {
-      title: "Observatorio comercial",
-      url: "/observatorio-comercial",
-      icon: <ChartSplineIcon />,
-      globalOnly: true,
-    },
-    {
-      title: "Planificación comercial",
-      url: "/planificacion-comercial",
-      icon: <CalculatorIcon />,
-      globalOnly: true,
-    },
-    {
-      title: "Rentabilidad y verdad económica",
-      url: "/rentabilidad",
-      icon: <BadgeEuroIcon />,
-    },
-    /*  {
-       title: "Usuarios",
-       url: "/users",
-       icon: (
-         <UsersIcon
-         />
-       ),
-     }, */
-    {
-      title: "Leads generales",
-      url: "/general-leads",
-      icon: (
-        <DatabaseIcon
-        />
-      ),
-    },
-    {
-      title: "Leads VSL",
-      url: "/vsl-leads",
-      icon: (
-        <CalendarDaysIcon
-        />
-      ),
-    },
-    {
-      title: "Leads personales",
-      url: "/leads",
-      icon: (
-        <ChartBarIcon
-        />
-      ),
-    },
-    {
-      title: "Alertas",
-      url: "/alerts",
-      icon: (
-        <CircleAlertIcon
-        />
-      ),
-    },
-    {
-      title: "Agendas",
-      url: "/agendas",
-      icon: <CalendarDaysIcon />,
-    },
-    {
-      title: "Calendario",
-      url: "/calendar",
-      icon: <CalendarDaysIcon />,
-    },
-    {
-      title: "Mensajes",
-      url: "/messages",
-      icon: <MessageSquareIcon />,
-    },
-    {
-      title: "Rankings",
-      url: "/rankings",
-      icon: <TrophyIcon />,
-    },
-    {
-      title: "Estadísticas personales",
-      url: "/personal-statistics",
-      icon: <ChartNoAxesCombinedIcon />,
-    },
-    {
-      title: "Estadísticas de feedback",
-      url: "/feedback-statistics",
-      icon: <FileChartColumnIcon />,
-    },
-    /*  {
-       title: "Analitica",
-       url: "/analytical",
-       icon: (
-         <ChartColumnIcon
-         />
-       ),
-     },
-     {
-       title: "Campañas",
-       url: "/campaigns",
-       icon: (
-         <FlameIcon
-         />
-       ),
-     }, */
-    /*  {
-       title: "Calendario",
-       url: "/calendar",
-       icon: (
-         <CalendarIcon
-         />
-       ),
-     },
-     {
-       title: "Ranking",
-       url: "/ranking",
-       icon: (
-         <TrophyIcon
-         />
-       ),
-     },
-     {
-       title: "Tickets",
-       url: "/tickets",
-       icon: (
-         <MessageSquareIcon
-         />
-       ),
-     }, */
-  ],
+  navMain: PRIMARY_NAVIGATION_ITEMS.map((item) => ({
+    ...item,
+    icon: NAVIGATION_ICONS[item.id],
+  })),
   navClouds: [
     {
       title: "Capture",
@@ -258,32 +114,6 @@ const data = {
       ],
     },
   ],
-  navSecondary: [
-    {
-      title: "Settings",
-      url: "#",
-      icon: (
-        <Settings2Icon
-        />
-      ),
-    },
-    {
-      title: "Get Help",
-      url: "#",
-      icon: (
-        <CircleHelpIcon
-        />
-      ),
-    },
-    {
-      title: "Search",
-      url: "#",
-      icon: (
-        <SearchIcon
-        />
-      ),
-    },
-  ],
   documents: [
     {
       name: "Data Library",
@@ -316,6 +146,7 @@ export function AppSidebar({
   currentPathname,
   user,
   onSignOut,
+  navigationVisibility,
   ...props
 }: React.ComponentProps<typeof Sidebar> & {
   LinkComponent?: React.ComponentType<any> | string
@@ -326,8 +157,10 @@ export function AppSidebar({
     avatar: string
   }
   onSignOut?: () => void
+  navigationVisibility?: NavigationVisibilityConfiguration
 }) {
   const permissions = usePermissions()
+  const role = useRole()
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -345,18 +178,13 @@ export function AppSidebar({
       </SidebarHeader>
       <SidebarContent>
         <NavMain
-          items={data.navMain.filter((item) => canViewNavigationItem(item, permissions))}
+          items={data.navMain
+            .filter((item) => canViewConfiguredNavigationItem(item, role?.id, permissions, navigationVisibility))
+            .map((item) => item.url === "/observatorio-comercial" ? { ...item, url: observatoryNavigationUrl(permissions) } : item)}
           LinkComponent={LinkComponent}
           currentPathname={currentPathname}
         />
         {/* <NavDocuments items={data.documents} /> */}
-
-        <NavSecondary
-          items={data.navSecondary}
-          LinkComponent={LinkComponent}
-          currentPathname={currentPathname}
-          className="mt-auto"
-        />
       </SidebarContent>
       {user ? <SidebarFooter>
         <NavUser user={user} onSignOut={onSignOut} />

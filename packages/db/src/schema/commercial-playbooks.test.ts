@@ -82,7 +82,7 @@ describe("commercial playbook schema", () => {
     const proposal = snapshot.tables["public.commercial_playbook_proposal_versions"];
     const library = snapshot.tables["public.commercial_library_versions"];
 
-    expect(journal.entries.at(-1)).toMatchObject({ idx: 29, tag: "0029_commercial_playbook_proposals" });
+    expect(journal.entries.find((entry) => entry.idx === 29)).toMatchObject({ idx: 29, tag: "0029_commercial_playbook_proposals" });
     expect(proposal?.columns).toHaveProperty("evidence_snapshot");
     expect(proposal?.foreignKeys).toHaveProperty("commercial_playbook_proposal_versions_published_library_version_id_commercial_library_versions_id_fk");
     expect(proposal?.checkConstraints).toHaveProperty("commercial_playbook_proposals_decision_check");

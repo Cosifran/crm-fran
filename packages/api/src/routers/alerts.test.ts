@@ -53,7 +53,7 @@ describe("alerts router", () => {
     return input;
   }
 
-  async function insertLead(input: { id: string; callerId?: string }) {
+  async function insertLead(input: { id: string; callerId?: string; closerId?: string }) {
     created.leadIds.push(input.id);
     await db.insert(leads).values({
       id: input.id,
@@ -62,6 +62,7 @@ describe("alerts router", () => {
       phone: "123456789",
       state: LEAD_STATE.SIN_ASIGNAR,
       callerId: input.callerId ?? null,
+      closerId: input.closerId ?? null,
     });
     return input;
   }
@@ -165,6 +166,63 @@ describe("alerts router", () => {
       id: closerId,
       name: "Closer A",
     });
+  });
+
+  it("rejects a work mode outside the authenticated role", async () => {
+    const callerId = crypto.randomUUID();
+    await insertUser({ id: callerId, name: "Caller mode", email: `caller-mode-${callerId}@test.com`, roleId: "role-caller" });
+    const caller = createCaller(callerId, "role-caller", ["alerts:read"]);
+
+    await expect(caller.alerts.listNextBestActions({ mode: "closer" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("resolves caller, closer, multi-role, and wildcard admin modes from authenticated responsibility", async () => {
+    const callerId = crypto.randomUUID();
+    const closerId = crypto.randomUUID();
+    const multiRoleId = crypto.randomUUID();
+    const adminId = crypto.randomUUID();
+    await insertUser({ id: callerId, name: "Caller", email: `caller-${callerId}@test.com`, roleId: "role-caller" });
+    await insertUser({ id: closerId, name: "Closer", email: `closer-${closerId}@test.com`, roleId: "role-closer" });
+    await insertUser({ id: multiRoleId, name: "Multi", email: `multi-${multiRoleId}@test.com`, roleId: "role-caller" });
+    await insertUser({ id: adminId, name: "Admin", email: `admin-${adminId}@test.com`, roleId: "role-admin" });
+    await insertLead({ id: crypto.randomUUID(), callerId: multiRoleId, closerId: multiRoleId });
+
+    await expect(createCaller(callerId, "role-caller", ["alerts:read"]).alerts.getNextBestActionModes()).resolves.toEqual(["caller"]);
+    await expect(createCaller(closerId, "role-closer", ["alerts:read"]).alerts.getNextBestActionModes()).resolves.toEqual(["closer"]);
+    await expect(createCaller(multiRoleId, "role-caller", ["alerts:read"]).alerts.getNextBestActionModes()).resolves.toEqual(["caller", "closer"]);
+    await expect(createCaller(adminId, "role-admin", ["*"]).alerts.getNextBestActionModes()).resolves.toEqual(["caller", "closer"]);
+  });
+
+  it("isolates the caller queue by authenticated user even when a foreign lead targets that user", async () => {
+    const actorId = crypto.randomUUID();
+    const otherId = crypto.randomUUID();
+    const ownLeadId = crypto.randomUUID();
+    const foreignLeadId = crypto.randomUUID();
+    await insertUser({ id: actorId, name: "Caller A", email: `caller-a-${actorId}@test.com`, roleId: "role-caller" });
+    await insertUser({ id: otherId, name: "Caller B", email: `caller-b-${otherId}@test.com`, roleId: "role-caller" });
+    await insertLead({ id: ownLeadId, callerId: actorId });
+    await insertLead({ id: foreignLeadId, callerId: otherId });
+    await insertAlert({ leadId: ownLeadId, targetUserId: actorId, kind: ALERT_KIND.FUTURE_CALL });
+    await insertAlert({ leadId: foreignLeadId, targetUserId: actorId, kind: ALERT_KIND.FUTURE_CALL });
+
+    const result = await createCaller(actorId, "role-caller", ["alerts:read"]).alerts.listNextBestActions({ mode: "caller" });
+    expect(result.map(({ lead }) => lead.id)).toEqual([ownLeadId]);
+  });
+
+  it("isolates the closer queue by authenticated agenda ownership", async () => {
+    const actorId = crypto.randomUUID();
+    const otherId = crypto.randomUUID();
+    const ownLeadId = crypto.randomUUID();
+    const foreignLeadId = crypto.randomUUID();
+    await insertUser({ id: actorId, name: "Closer A", email: `closer-a-${actorId}@test.com`, roleId: "role-closer" });
+    await insertUser({ id: otherId, name: "Closer B", email: `closer-b-${otherId}@test.com`, roleId: "role-closer" });
+    await insertLead({ id: ownLeadId, closerId: actorId });
+    await insertLead({ id: foreignLeadId, closerId: otherId });
+    await insertAlert({ leadId: ownLeadId, targetUserId: actorId, kind: ALERT_KIND.APPOINTMENT });
+    await insertAlert({ leadId: foreignLeadId, targetUserId: actorId, kind: ALERT_KIND.APPOINTMENT });
+
+    const result = await createCaller(actorId, "role-closer", ["alerts:read"]).alerts.listNextBestActions({ mode: "closer" });
+    expect(result.map(({ lead }) => lead.id)).toEqual([ownLeadId]);
   });
 
   it("counts unresolved alerts for all users", async () => {

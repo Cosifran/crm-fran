@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { InfoIcon } from "lucide-react";
 import { Cell, Pie, PieChart } from "recharts";
 
 import { FEEDBACK_PROFILES, MOTIVATION_ANGLES } from "@crm-fran/api/call-feedback";
@@ -11,6 +12,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } f
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@crm-fran/ui/components/dialog";
 import { Field, FieldError, FieldLabel } from "@crm-fran/ui/components/field";
 import { Input } from "@crm-fran/ui/components/input";
+import { Popover, PopoverContent, PopoverDescription, PopoverHeader, PopoverTitle, PopoverTrigger } from "@crm-fran/ui/components/popover";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@crm-fran/ui/components/select";
 import { Skeleton } from "@crm-fran/ui/components/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@crm-fran/ui/components/table";
@@ -92,13 +94,23 @@ export function FeedbackStatisticsView() {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 pt-4 sm:pt-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Estadísticas de feedback</h1>
-        <p className="text-muted-foreground">
+    <section className="flex w-full min-w-0 flex-col gap-4">
+      <header className="flex flex-col gap-1">
+        <div className="flex items-center gap-1">
+          <h2 className="text-2xl font-semibold">Feedback</h2>
+          <Popover>
+            <PopoverTrigger render={<Button variant="ghost" size="icon-xs" className="size-11" aria-label="Información sobre las estadísticas de feedback" />}>
+              <InfoIcon aria-hidden="true" />
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-[min(92vw,32rem)]">
+              <PopoverHeader><PopoverTitle>Cómo interpretar Feedback</PopoverTitle><PopoverDescription>Los perfiles, ángulos, reacciones y embudos se calculan desde feedback confirmado. Los filtros y drilldowns conservan el caller, origen, campaña e intervalo seleccionados. Son asociaciones descriptivas: sirven para medir calidad y detectar segmentos, no para demostrar causalidad.</PopoverDescription></PopoverHeader>
+            </PopoverContent>
+          </Popover>
+        </div>
+        <p className="text-sm text-muted-foreground">
           Calidad, conversión y trazabilidad de perfiles, campañas y orígenes.
         </p>
-      </div>
+      </header>
 
       <Filters
         caller={caller}
@@ -170,7 +182,7 @@ export function FeedbackStatisticsView() {
       )}
 
       <DrilldownDialog drilldown={drilldown} onOpenChange={(open) => { if (!open) setDrilldown(null); }} />
-    </div>
+    </section>
   );
 }
 
@@ -193,32 +205,32 @@ type FiltersProps = {
 
 function Filters(props: FiltersProps) {
   return (
-    <Card>
-      <CardHeader><CardTitle>Filtros</CardTitle></CardHeader>
-      <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+    <Card size="sm">
+      <CardHeader className="pb-2"><CardTitle>Filtros</CardTitle></CardHeader>
+      <CardContent className="grid gap-3 p-3 pt-0 sm:grid-cols-2 xl:grid-cols-5">
         <Field>
           <FieldLabel htmlFor="feedback-caller">Caller</FieldLabel>
           <Select value={props.caller.id} onValueChange={(value) => props.onCallerChange(value ?? "all")}>
-            <SelectTrigger id="feedback-caller"><SelectValue>{props.caller.name}</SelectValue></SelectTrigger>
+            <SelectTrigger id="feedback-caller" className="h-9"><SelectValue>{props.caller.name}</SelectValue></SelectTrigger>
             <SelectContent><SelectGroup><SelectItem value="all">Todos los callers</SelectItem>{props.callers.map((caller) => <SelectItem key={caller.id} value={caller.id}>{caller.name}</SelectItem>)}</SelectGroup></SelectContent>
           </Select>
         </Field>
         <Field>
           <FieldLabel htmlFor="feedback-source">Origen</FieldLabel>
           <Select value={props.source} onValueChange={(value) => props.onSourceChange(value ?? "all")}>
-            <SelectTrigger id="feedback-source"><SelectValue>{props.source === "all" ? "Todos los orígenes" : props.source}</SelectValue></SelectTrigger>
+            <SelectTrigger id="feedback-source" className="h-9"><SelectValue>{props.source === "all" ? "Todos los orígenes" : props.source}</SelectValue></SelectTrigger>
             <SelectContent><SelectGroup><SelectItem value="all">Todos los orígenes</SelectItem>{props.sources.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectGroup></SelectContent>
           </Select>
         </Field>
         <Field>
           <FieldLabel htmlFor="feedback-campaign">Campaña</FieldLabel>
           <Select value={props.campaign} onValueChange={(value) => props.onCampaignChange(value ?? "all")}>
-            <SelectTrigger id="feedback-campaign"><SelectValue>{props.campaign === "all" ? "Todas las campañas" : props.campaign}</SelectValue></SelectTrigger>
+            <SelectTrigger id="feedback-campaign" className="h-9"><SelectValue>{props.campaign === "all" ? "Todas las campañas" : props.campaign}</SelectValue></SelectTrigger>
             <SelectContent><SelectGroup><SelectItem value="all">Todas las campañas</SelectItem>{props.campaigns.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectGroup></SelectContent>
           </Select>
         </Field>
-        <Field><FieldLabel htmlFor="feedback-from">Desde</FieldLabel><Input id="feedback-from" type="date" value={props.from} onChange={(event) => props.onFromChange(event.target.value)} /></Field>
-        <Field invalid={props.invalidInterval}><FieldLabel htmlFor="feedback-to">Hasta</FieldLabel><Input id="feedback-to" type="date" value={props.to} onChange={(event) => props.onToChange(event.target.value)} aria-invalid={props.invalidInterval} /><FieldError>{props.invalidInterval ? "La fecha final no puede ser anterior a la inicial" : ""}</FieldError></Field>
+        <Field><FieldLabel htmlFor="feedback-from">Desde</FieldLabel><Input className="h-9" id="feedback-from" type="date" value={props.from} onChange={(event) => props.onFromChange(event.target.value)} /></Field>
+        <Field invalid={props.invalidInterval}><FieldLabel htmlFor="feedback-to">Hasta</FieldLabel><Input className="h-9" id="feedback-to" type="date" value={props.to} onChange={(event) => props.onToChange(event.target.value)} aria-invalid={props.invalidInterval} /><FieldError>{props.invalidInterval ? "La fecha final no puede ser anterior a la inicial" : ""}</FieldError></Field>
       </CardContent>
     </Card>
   );
@@ -271,7 +283,7 @@ function FunnelSection({ title, groups, onSelect }: { title: string; groups: rea
   return (
     <Card>
       <CardHeader><CardTitle>{title}</CardTitle></CardHeader>
-      <CardContent className="overflow-x-auto">
+      <CardContent className="max-h-96 overflow-auto">
         <Table>
           <TableHeader><TableRow><TableHead>Valor</TableHead>{columns.map((column) => <TableHead key={column.key}>{column.label}</TableHead>)}<TableHead>Conversión total</TableHead></TableRow></TableHeader>
           <TableBody>
@@ -297,7 +309,7 @@ type AttributionRow = { value: string; total: number; appointmentRate: number; r
 
 function AttributionTable({ title, rows, onSelect }: { title: string; rows: readonly AttributionRow[]; onSelect: (value: string) => void }) {
   return (
-    <Card><CardHeader><CardTitle>{title}</CardTitle></CardHeader><CardContent><Table>
+    <Card><CardHeader><CardTitle>{title}</CardTitle></CardHeader><CardContent className="max-h-96 overflow-auto"><Table>
       <TableHeader><TableRow><TableHead>Valor</TableHead><TableHead>Total</TableHead><TableHead>Agenda</TableHead><TableHead>Conversión</TableHead><TableHead>No interesado</TableHead></TableRow></TableHeader>
       <TableBody>{rows.map((row) => <TableRow key={row.value} className="cursor-pointer" onClick={() => onSelect(row.value)}><TableCell className="font-medium">{row.value}</TableCell><TableCell>{row.total}</TableCell><TableCell>{row.reactions.appointment}</TableCell><TableCell>{row.appointmentRate}%</TableCell><TableCell>{row.reactions.not_interested}</TableCell></TableRow>)}{rows.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">Sin datos de atribución.</TableCell></TableRow>}</TableBody>
     </Table></CardContent></Card>
@@ -309,7 +321,7 @@ function DonutChart({ title, data, onSelect }: { title: string; data: readonly F
   return (
     <Card><CardHeader><CardTitle>{title}</CardTitle></CardHeader><CardContent>
       {total === 0 ? <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">Sin datos para mostrar</div> : <>
-        <ChartContainer config={chartConfig} className="mx-auto aspect-square h-64"><PieChart><ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} /><Pie data={data} dataKey="value" nameKey="name" innerRadius={58} outerRadius={92} paddingAngle={2} strokeWidth={2} onClick={(_, index) => { const item = data[index]; if (item) onSelect?.(item); }}>{data.map((item, index) => <Cell key={item.key} className={onSelect ? "cursor-pointer" : undefined} fill={chartColors[index % chartColors.length]} />)}</Pie></PieChart></ChartContainer>
+        <ChartContainer config={chartConfig} className="mx-auto aspect-square h-52"><PieChart><ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} /><Pie data={data} dataKey="value" nameKey="name" innerRadius={48} outerRadius={76} paddingAngle={2} strokeWidth={2} onClick={(_, index) => { const item = data[index]; if (item) onSelect?.(item); }}>{data.map((item, index) => <Cell key={item.key} className={onSelect ? "cursor-pointer" : undefined} fill={chartColors[index % chartColors.length]} />)}</Pie></PieChart></ChartContainer>
         <div className="flex flex-col gap-2">{data.map((item, index) => <button type="button" key={item.key} className="flex items-start justify-between gap-3 text-left text-sm" onClick={() => onSelect?.(item)}><span className="flex min-w-0 items-start gap-2"><span className="mt-1.5 size-2 shrink-0 rounded-full" style={{ backgroundColor: chartColors[index % chartColors.length] }} /><span>{item.name}</span></span><span className="shrink-0 font-medium">{item.value} · {Math.round((item.value / total) * 100)}%</span></button>)}</div>
       </>}
     </CardContent></Card>
@@ -317,11 +329,11 @@ function DonutChart({ title, data, onSelect }: { title: string; data: readonly F
 }
 
 function ProfileTable({ profiles }: { profiles: ReadonlyArray<{ profile: string; total: number; subProfiles: Array<{ profile: string; total: number }>; reactions: { appointment: number; future_call: number; not_interested: number; not_fit: number } }> }) {
-  return <Card><CardHeader><CardTitle>Reacción por perfil</CardTitle></CardHeader><CardContent><Table><TableHeader><TableRow><TableHead>Perfil</TableHead><TableHead>Subperfiles</TableHead><TableHead>Total</TableHead><TableHead>Agenda</TableHead><TableHead>Futuro</TableHead><TableHead>No interesado</TableHead><TableHead>No encaja</TableHead></TableRow></TableHeader><TableBody>{profiles.map((profile) => <TableRow key={profile.profile}><TableCell className="font-medium">{profileLabels[profile.profile] ?? profile.profile}</TableCell><TableCell>{profile.subProfiles.map((sub) => `${profileLabels[sub.profile] ?? sub.profile} (${sub.total})`).join(", ") || "—"}</TableCell><TableCell>{profile.total}</TableCell><TableCell>{profile.reactions.appointment}</TableCell><TableCell>{profile.reactions.future_call}</TableCell><TableCell>{profile.reactions.not_interested}</TableCell><TableCell>{profile.reactions.not_fit}</TableCell></TableRow>)}{profiles.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No hay feedbacks clasificados en este intervalo.</TableCell></TableRow>}</TableBody></Table></CardContent></Card>;
+  return <Card><CardHeader><CardTitle>Reacción por perfil</CardTitle></CardHeader><CardContent className="max-h-96 overflow-auto"><Table><TableHeader><TableRow><TableHead>Perfil</TableHead><TableHead>Subperfiles</TableHead><TableHead>Total</TableHead><TableHead>Agenda</TableHead><TableHead>Futuro</TableHead><TableHead>No interesado</TableHead><TableHead>No encaja</TableHead></TableRow></TableHeader><TableBody>{profiles.map((profile) => <TableRow key={profile.profile}><TableCell className="font-medium">{profileLabels[profile.profile] ?? profile.profile}</TableCell><TableCell>{profile.subProfiles.map((sub) => `${profileLabels[sub.profile] ?? sub.profile} (${sub.total})`).join(", ") || "—"}</TableCell><TableCell>{profile.total}</TableCell><TableCell>{profile.reactions.appointment}</TableCell><TableCell>{profile.reactions.future_call}</TableCell><TableCell>{profile.reactions.not_interested}</TableCell><TableCell>{profile.reactions.not_fit}</TableCell></TableRow>)}{profiles.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No hay feedbacks clasificados en este intervalo.</TableCell></TableRow>}</TableBody></Table></CardContent></Card>;
 }
 
 function AngleTable({ angles }: { angles: ReadonlyArray<{ angle: string; total: number; reactions: { appointment: number; future_call: number; not_interested: number; not_fit: number } }> }) {
-  return <Card><CardHeader><CardTitle>Ángulos de motivación</CardTitle></CardHeader><CardContent><Table><TableHeader><TableRow><TableHead>Ángulo</TableHead><TableHead>Total</TableHead><TableHead>Agenda</TableHead><TableHead>Futuro</TableHead><TableHead>No interesado</TableHead><TableHead>No encaja</TableHead></TableRow></TableHeader><TableBody>{angles.map((angle) => <TableRow key={angle.angle}><TableCell className="font-medium">{angleLabels[angle.angle] ?? angle.angle}</TableCell><TableCell>{angle.total}</TableCell><TableCell>{angle.reactions.appointment}</TableCell><TableCell>{angle.reactions.future_call}</TableCell><TableCell>{angle.reactions.not_interested}</TableCell><TableCell>{angle.reactions.not_fit}</TableCell></TableRow>)}{angles.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No hay ángulos registrados en este intervalo.</TableCell></TableRow>}</TableBody></Table></CardContent></Card>;
+  return <Card><CardHeader><CardTitle>Ángulos de motivación</CardTitle></CardHeader><CardContent className="max-h-96 overflow-auto"><Table><TableHeader><TableRow><TableHead>Ángulo</TableHead><TableHead>Total</TableHead><TableHead>Agenda</TableHead><TableHead>Futuro</TableHead><TableHead>No interesado</TableHead><TableHead>No encaja</TableHead></TableRow></TableHeader><TableBody>{angles.map((angle) => <TableRow key={angle.angle}><TableCell className="font-medium">{angleLabels[angle.angle] ?? angle.angle}</TableCell><TableCell>{angle.total}</TableCell><TableCell>{angle.reactions.appointment}</TableCell><TableCell>{angle.reactions.future_call}</TableCell><TableCell>{angle.reactions.not_interested}</TableCell><TableCell>{angle.reactions.not_fit}</TableCell></TableRow>)}{angles.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No hay ángulos registrados en este intervalo.</TableCell></TableRow>}</TableBody></Table></CardContent></Card>;
 }
 
 function DrilldownDialog({ drilldown, onOpenChange }: { drilldown: Drilldown; onOpenChange: (open: boolean) => void }) {

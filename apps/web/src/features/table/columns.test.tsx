@@ -22,11 +22,15 @@ function getColumn(header: string) {
     throw new Error(`Column ${header} does not expose a cell renderer`);
   }
 
-  return column;
+  return { column, cell: column.cell };
 }
 
 function renderCell(header: string, row: LeadRow) {
-  return getColumn(header).cell!({ row: { original: row } } as never);
+  return getColumn(header).cell({ row: { original: row } } as never);
+}
+
+function getAccessorKey(column: ReturnType<typeof createLeadColumns>[number] | undefined) {
+  return column && "accessorKey" in column ? column.accessorKey : undefined;
 }
 
 describe("Lead user columns", () => {
@@ -84,9 +88,9 @@ describe("Lead user columns", () => {
     );
 
     expect(headers).toContain("Actualizado en");
-    expect(dateColumn?.accessorKey).toBe("updatedAt");
+    expect(getAccessorKey(dateColumn)).toBe("updatedAt");
     expect(timeColumn?.id).toBe("updatedAtTime");
-    expect(timeColumn?.accessorKey).toBeUndefined();
+    expect(getAccessorKey(timeColumn)).toBeUndefined();
     expect(renderCell("Hora de actualización", row)).toBe(
       updatedAt.toLocaleTimeString([], {
         hour: "2-digit",

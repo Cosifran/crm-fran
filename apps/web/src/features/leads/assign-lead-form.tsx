@@ -29,12 +29,8 @@ import { Skeleton } from "@crm-fran/ui/components/skeleton";
 import { Textarea } from "@crm-fran/ui/components/textarea";
 import { Checkbox } from "@crm-fran/ui/components/checkbox";
 import { CallRecordingPanel } from "./call-recording-panel";
-
-type CallerOutcome =
-  | "future_call"
-  | "not_fit"
-  | "not_interested"
-  | "appointment";
+import { CALLER_FEEDBACK_OPTIONS } from "./caller-feedback";
+import type { CallerOutcome } from "@crm-fran/api/caller-outcome";
 
 type AlertSeverity = "urgent" | "warning" | "info";
 
@@ -80,12 +76,7 @@ interface AssignLeadFormProps {
   allowedOutcomes?: CallerOutcome[];
 }
 
-const OUTCOME_OPTIONS: { value: CallerOutcome; label: string }[] = [
-  { value: "future_call", label: "Llamar a futuro" },
-  { value: "not_fit", label: "No encaja" },
-  { value: "not_interested", label: "No interesado" },
-  { value: "appointment", label: "Agenda" },
-];
+const OUTCOME_OPTIONS = CALLER_FEEDBACK_OPTIONS;
 
 const SEVERITY_OPTIONS: { value: AlertSeverity; label: string }[] = [
   { value: "urgent", label: "Alta" },
@@ -93,12 +84,9 @@ const SEVERITY_OPTIONS: { value: AlertSeverity; label: string }[] = [
   { value: "info", label: "Baja" },
 ];
 
-const OUTCOME_BY_LABEL: Record<string, CallerOutcome> = {
-  "Llamar a futuro": "future_call",
-  "No encaja": "not_fit",
-  "No interesado": "not_interested",
-  Agenda: "appointment",
-};
+const OUTCOME_BY_LABEL = Object.fromEntries(
+  CALLER_FEEDBACK_OPTIONS.map(({ value, label }) => [label, value]),
+) as Record<string, CallerOutcome>;
 
 const defaultValues: FormValue = {
   isContacted: "",

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { UserRoundPlus } from "lucide-react";
+import { SearchIcon, UserRoundPlus } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 
 import { Badge } from "@crm-fran/ui/components/badge";
@@ -26,6 +26,8 @@ import {
   DialogTrigger,
 } from "@crm-fran/ui/components/dialog";
 import { Empty } from "@crm-fran/ui/components/empty";
+import { Field, FieldLabel } from "@crm-fran/ui/components/field";
+import { Input } from "@crm-fran/ui/components/input";
 import {
   Select,
   SelectContent,
@@ -114,24 +116,30 @@ export function LeadAssignmentQueue({
   });
 
   return (
-    <section className="mx-auto flex w-full max-w-6xl min-w-0 flex-col gap-6 py-4 md:py-6">
-      <div className="flex flex-col gap-1 px-4 lg:px-6">
-        <h1 data-slot="lead-queue-heading" className="text-2xl font-bold tracking-tight">
+    <section className="dashboard-arc-theme flex min-h-full w-full min-w-0 flex-col gap-4 bg-background p-4 text-foreground sm:p-6">
+      <header className="flex flex-col gap-1">
+        <h1 data-slot="lead-queue-heading" className="text-3xl font-bold tracking-tight">
           {title}
         </h1>
-        <p className="text-muted-foreground">{description}</p>
-      </div>
+        <p className="max-w-3xl text-sm text-muted-foreground">{description}</p>
+      </header>
+
+      <section aria-label="Resumen de pools de leads" className="grid gap-3 sm:grid-cols-3">
+        {[{ label: "Nuevos", value: newLeads.data?.length ?? 0 }, { label: "Por contactar", value: recoveredLeads.data?.length ?? 0 }, { label: "Descartados", value: discardedLeads.data?.length ?? 0 }].map((item) => (
+          <Card size="sm" key={item.label}><CardHeader className="pb-1"><CardDescription>{item.label}</CardDescription><CardTitle className="text-2xl">{item.value}</CardTitle></CardHeader></Card>
+        ))}
+      </section>
 
       <Tabs defaultValue="new">
-        <TabsList variant="line" className="mx-4 lg:mx-6">
-          <TabsTrigger value="new">
+        <TabsList className="flex h-auto w-fit max-w-full flex-wrap gap-1 rounded-lg border bg-muted/40 p-1">
+          <TabsTrigger value="new" className="h-11! min-h-11! data-active:bg-background">
             Nuevos <Badge variant="secondary">{newLeads.data?.length ?? 0}</Badge>
           </TabsTrigger>
-          <TabsTrigger value="recovered">
+          <TabsTrigger value="recovered" className="h-11! min-h-11! data-active:bg-background">
             Por contactar
             <Badge variant="secondary">{recoveredLeads.data?.length ?? 0}</Badge>
           </TabsTrigger>
-          <TabsTrigger value="discarded">
+          <TabsTrigger value="discarded" className="h-11! min-h-11! data-active:bg-background">
             Descartados
             <Badge variant="secondary">{discardedLeads.data?.length ?? 0}</Badge>
           </TabsTrigger>
@@ -176,7 +184,7 @@ export function LeadAssignmentQueue({
 }
 
 type PoolQuery = {
-  data?: Array<{ id: string }>;
+  data?: Array<{ id: string; name?: string; email?: string; phone?: string; state?: string; createdAt?: Date | string; updatedAt?: Date | string }>;
   isLoading: boolean;
   isError: boolean;
 };
@@ -198,38 +206,42 @@ function LeadPoolCard({
   query: PoolQuery;
   columns: ColumnDef<any>[];
 }) {
+  const [search, setSearch] = useState("");
   const count = query.data?.length ?? 0;
+  const normalizedSearch = search.trim().toLocaleLowerCase("es");
+  const filteredLeads = normalizedSearch
+    ? query.data?.filter((lead) => [lead.name, lead.email, lead.phone, lead.state].some((value) => value?.toLocaleLowerCase("es").includes(normalizedSearch))) ?? []
+    : query.data ?? [];
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        <CardDescription>
-          {description}. {count === 1 ? "1 lead" : `${count} leads`}.
-        </CardDescription>
+    <Card size="sm">
+      <CardHeader className="gap-3 pb-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-1"><CardTitle>{title}</CardTitle><CardDescription>{description}. {count === 1 ? "1 lead" : `${count} leads`}.</CardDescription></div>
+        <Field className="w-full sm:w-72">
+          <FieldLabel htmlFor={`lead-pool-search-${poolStatus}`}>Buscar leads</FieldLabel>
+          <div className="relative"><SearchIcon aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input id={`lead-pool-search-${poolStatus}`} className="h-11 pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nombre, correo, teléfono o estado" /></div>
+        </Field>
       </CardHeader>
       <CardContent className="px-0">
         {query.isLoading ? (
           <div className="flex flex-col gap-3 px-4 lg:px-6">
             <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-64 w-full" />
+            <Skeleton className="h-52 w-full" />
           </div>
         ) : query.isError ? (
-          <p className="px-4 text-destructive lg:px-6">
-            Error al cargar los leads.
-          </p>
-        ) : query.data?.length ? (
-          <div className="min-w-0 overflow-x-auto">
+          <div className="px-4 lg:px-6"><Empty heading="Error al cargar los leads" description="Reintenta cuando vuelva la conexión." /></div>
+        ) : query.data?.length && filteredLeads.length ? (
+          <div className="max-h-[36rem] min-w-0 overflow-auto">
             <DataTable
               key={`${poolStatus}-${type}-${columns.length}`}
-              data={query.data}
+              data={filteredLeads}
               columns={columns}
               getRowId={(row) => row.id}
             />
           </div>
         ) : (
           <div className="px-4 lg:px-6">
-            <Empty heading={emptyHeading} />
+            <Empty heading={search && query.data?.length ? "Sin coincidencias" : emptyHeading} description={search && query.data?.length ? "No hay leads que coincidan con la búsqueda." : undefined} />
           </div>
         )}
       </CardContent>
@@ -305,7 +317,7 @@ function AssignLeadDialog({ leadId }: { leadId: string }) {
           </Button>
         }
       />
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="dashboard-arc-theme sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Confirmar asignación</DialogTitle>
           <DialogDescription>

@@ -99,6 +99,21 @@ describe("commercial observatory", () => {
     ];
     const result = buildCommercialObservatory({ observations: rows, from: at("2026-01-01T00:00:00Z"), to: at("2026-02-10T00:00:00Z"), asOf: at("2026-02-10T00:00:00Z") });
     expect(result.bridge.economic.status).toBe("currency_required");
+    expect(result.resolvedCurrency).toBeNull();
+    expect(result.bridge.economic.rule).toContain("varias monedas");
+    expect(result.bridge.economic.rule).not.toContain("Selecciona");
+  });
+
+  it("resolves the only observed currency server-side without implicit FX", () => {
+    const rows = [
+      observation("eur", "2026-01-01T10:00:00Z", { financialEvents: [{ id: "eur-payment", kind: "payment_received", amountCents: 100, currency: "EUR", reversalOfId: null, occurredAt: at("2026-01-02T10:00:00Z") }] }),
+    ];
+
+    const result = buildCommercialObservatory({ observations: rows, from: at("2026-01-01T00:00:00Z"), to: at("2026-02-10T00:00:00Z"), asOf: at("2026-02-10T00:00:00Z") });
+
+    expect(result.resolvedCurrency).toBe("EUR");
+    expect(result.bridge.economic.status).toBe("available");
+    expect(result.risk.currency).toBe("EUR");
   });
 
   it("calculates concentration from absolute exposure and classifies HHI thresholds", () => {
