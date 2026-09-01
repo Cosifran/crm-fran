@@ -1,5 +1,6 @@
-import { db, eq, asc } from "@crm-fran/db";
+import { db, inArray, asc } from "@crm-fran/db";
 import { user } from "@crm-fran/db/schema/index";
+import { CLOSER_ROLE_IDS } from "@crm-fran/db/schema/auth";
 
 export async function listClosers() {
 	return await db
@@ -9,6 +10,6 @@ export async function listClosers() {
 			email: user.email,
 		})
 		.from(user)
-		.where(eq(user.roleId, "role-closer"))
+		.where(inArray(user.roleId, [...CLOSER_ROLE_IDS]))
 		.orderBy(asc(user.name));
 }

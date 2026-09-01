@@ -88,6 +88,23 @@ describe("AssignLeadForm", () => {
     });
   });
 
+  it("sends a missing phone number directly to the discarded path", async () => {
+    const user = userEvent.setup();
+    render(<AssignLeadForm leadId="lead-1" />);
+
+    await chooseOption(user, "isContacted-trigger", "Número no existe");
+
+    expect(screen.queryByTestId("outcome-trigger")).not.toBeInTheDocument();
+    await user.click(appendSubmitButton());
+
+    await waitFor(() => {
+      expect(mocks.mutate).toHaveBeenCalledWith(
+        { leadId: "lead-1", isContacted: "No", phoneStatus: "invalid" },
+        expect.any(Object),
+      );
+    });
+  });
+
   it.each([
     ["No encaja", "not_fit"],
     ["No interesado", "not_interested"],

@@ -31,6 +31,7 @@ export const createLeadInput = z.object({
   ad: z.string().trim().min(1).max(200).optional(),
   creative: z.string().trim().min(1).max(200).optional(),
   acquisitionAngle: z.string().trim().min(1).max(200).optional(),
+  utmContent: z.string().trim().min(1).max(300).optional(),
   type: z.enum(["maestra", "vsl"]).default("maestra"),
 });
 const updateLeadInput = createLeadInput.partial().extend({ id: z.string() });
@@ -167,6 +168,11 @@ export const assignLeadInput = z.union([
       }),
     ),
     extraNotes: z.string().optional(),
+  }),
+  z.object({
+    leadId: z.string().min(1),
+    isContacted: z.literal("No"),
+    phoneStatus: z.literal("invalid"),
   }),
   z.object({
     leadId: z.string().min(1),

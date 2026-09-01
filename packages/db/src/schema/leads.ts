@@ -72,6 +72,8 @@ export const leads = pgTable("leads", {
       .default(LEAD_POOL_STATUS.NEW)
       .notNull(),
     noContactImpactCount: integer("no_contact_impact_count").default(0).notNull(),
+    whatsappSentAt: timestamp("whatsapp_sent_at", { withTimezone: true }),
+    whatsappSentById: text("whatsapp_sent_by_id").references(() => user.id, { onDelete: "set null" }),
     response: text("response").default("sin asignar").notNull(),
     feedback: text("feedback").default("sin asignar").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -89,6 +91,10 @@ export const leads = pgTable("leads", {
     "leads_no_contact_impact_count_check",
     sql`${table.noContactImpactCount} BETWEEN 0 AND 3`,
   ),
+	check(
+    "leads_whatsapp_sent_pair_check",
+    sql`${table.whatsappSentAt} IS NOT NULL OR ${table.whatsappSentById} IS NULL`,
+  ),
 ])
 
 export const leadsRelations = relations(leads, ({ one }) => ({
@@ -101,5 +107,10 @@ export const leadsRelations = relations(leads, ({ one }) => ({
         fields: [leads.closerId],
         references: [user.id],
         relationName: "closer"
+    }),
+    whatsappSentBy: one(user, {
+        fields: [leads.whatsappSentById],
+        references: [user.id],
+        relationName: "whatsappSentBy"
     }),
 }))

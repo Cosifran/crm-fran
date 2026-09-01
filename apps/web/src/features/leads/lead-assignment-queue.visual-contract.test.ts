@@ -9,4 +9,10 @@ describe("general leads Arc visual contract", () => {
     expect(source).not.toContain('variant="line"');
     expect(source).not.toMatch(/(?:bg|text|border)-(?:blue|red|green|yellow|gray|slate|zinc|neutral|stone)-\d{2,3}/);
   });
+
+  it("shows separate VSL tabs for exhausted impacts and wrong numbers", () => {
+    expect(source).toContain("3 impactos");
+    expect(source).toContain("Número erróneo");
+    expect(source).toContain('type === "vsl"');
+  });
 });

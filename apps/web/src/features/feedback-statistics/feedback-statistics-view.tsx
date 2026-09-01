@@ -7,6 +7,7 @@ import { Cell, Pie, PieChart } from "recharts";
 
 import { FEEDBACK_PROFILES, MOTIVATION_ANGLES } from "@crm-fran/api/call-feedback";
 import { Button } from "@crm-fran/ui/components/button";
+import { Badge } from "@crm-fran/ui/components/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@crm-fran/ui/components/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@crm-fran/ui/components/chart";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@crm-fran/ui/components/dialog";
@@ -16,9 +17,10 @@ import { Popover, PopoverContent, PopoverDescription, PopoverHeader, PopoverTitl
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@crm-fran/ui/components/select";
 import { Skeleton } from "@crm-fran/ui/components/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@crm-fran/ui/components/table";
+import { Tabs, TabsList, TabsTrigger } from "@crm-fran/ui/components/tabs";
 
 import { trpc } from "@/utils/trpc";
-import { buildFeedbackChartData, type FeedbackChartItem } from "./feedback-statistics-charts";
+import { buildFeedbackChartData, buildReactionChartData, type FeedbackChartItem } from "./feedback-statistics-charts";
 import { filterFeedbackDetails, type FeedbackDrilldownFilter } from "./feedback-statistics-drilldown";
 import { selectFeedbackCaller } from "./feedback-statistics-filters";
 
@@ -65,6 +67,7 @@ export function FeedbackStatisticsView() {
   const [campaign, setCampaign] = useState("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [dataOrigin, setDataOrigin] = useState<"legacy" | "exact">("legacy");
   const [drilldown, setDrilldown] = useState<Drilldown>(null);
   const invalidInterval = Boolean(from && to && from > to);
   const statistics = useQuery({
@@ -77,11 +80,12 @@ export function FeedbackStatisticsView() {
     }),
     enabled: !invalidInterval,
   });
+  const displayedStatistics = dataOrigin === "legacy" ? statistics.data?.legacy : statistics.data;
   const chartData = buildFeedbackChartData({
-    profiles: statistics.data?.profiles ?? [],
-    angles: statistics.data?.angles ?? [],
-    sources: statistics.data?.sources ?? [],
-    campaigns: statistics.data?.campaigns ?? [],
+    profiles: displayedStatistics?.profiles ?? [],
+    angles: displayedStatistics?.angles ?? [],
+    sources: displayedStatistics?.sources ?? [],
+    campaigns: displayedStatistics?.campaigns ?? [],
     profileLabels,
     angleLabels,
   });
@@ -89,7 +93,7 @@ export function FeedbackStatisticsView() {
   const openFeedbackDrilldown = (title: string, filter: FeedbackDrilldownFilter) => {
     setDrilldown({
       title,
-      items: filterFeedbackDetails(statistics.data?.feedbacks ?? [], filter),
+      items: filterFeedbackDetails(displayedStatistics?.feedbacks ?? [], filter),
     });
   };
 
@@ -129,6 +133,16 @@ export function FeedbackStatisticsView() {
         onToChange={setTo}
       />
 
+      <div className="flex flex-col gap-2">
+        <Tabs value={dataOrigin} onValueChange={(value) => setDataOrigin(value as "legacy" | "exact")}>
+          <TabsList className="h-auto w-fit max-w-full"><TabsTrigger value="legacy">Datos heredados del CSV</TabsTrigger><TabsTrigger value="exact">Actividad exacta</TabsTrigger></TabsList>
+        </Tabs>
+        <Card size="sm"><CardContent className="flex flex-wrap items-center gap-2 p-3">
+          <Badge variant="outline">{dataOrigin === "legacy" ? "Dato heredado" : "Dato exacto"}</Badge>
+          <p className="text-sm text-muted-foreground">{dataOrigin === "legacy" ? "Se usa la columna FEEDBACK y el resultado importado. La fecha corresponde al alta del lead y nunca se mezcla con eventos reales." : "Solo incluye feedback registrado dentro del CRM con su fecha y autor reales."}</p>
+        </CardContent></Card>
+      </div>
+
       {statistics.isLoading ? (
         <div className="grid gap-4 md:grid-cols-3">
           <Skeleton className="h-28" /><Skeleton className="h-28" /><Skeleton className="h-28" />
@@ -138,19 +152,19 @@ export function FeedbackStatisticsView() {
       ) : (
         <>
           <div className="grid gap-4 md:grid-cols-3">
-            <Metric title="Feedbacks" value={statistics.data?.totalFeedbacks ?? 0} />
-            <Metric title="Con perfil" value={statistics.data?.classifiedFeedbacks ?? 0} />
-            <Metric title="Conversión a agenda" value={`${statistics.data?.appointmentRate ?? 0}%`} />
+            <Metric title="Feedbacks" value={displayedStatistics?.totalFeedbacks ?? 0} />
+            <Metric title="Con perfil" value={displayedStatistics?.classifiedFeedbacks ?? 0} />
+            <Metric title="Conversión a agenda" value={`${displayedStatistics?.appointmentRate ?? 0}%`} />
           </div>
 
           <DataQualityPanel
-            quality={statistics.data?.dataQuality}
+            quality={displayedStatistics?.dataQuality}
             onSelect={(field, label) =>
               openFeedbackDrilldown(`Feedbacks sin ${label.toLowerCase()}`, { kind: "missing", value: field })
             }
           />
 
-          <FunnelSection
+          {dataOrigin === "exact" ? <><FunnelSection
             title="Embudo por origen"
             groups={statistics.data?.funnels.sources ?? []}
             onSelect={(title, leads) => setDrilldown({ title, items: leads })}
@@ -159,7 +173,7 @@ export function FeedbackStatisticsView() {
             title="Embudo por campaña"
             groups={statistics.data?.funnels.campaigns ?? []}
             onSelect={(title, leads) => setDrilldown({ title, items: leads })}
-          />
+          /></> : <Card><CardHeader><CardTitle>Embudo histórico no mezclado</CardTitle></CardHeader><CardContent className="text-sm text-muted-foreground">El CSV conserva el resultado final, pero no una secuencia temporal completa. Por eso sus feedbacks se analizan aparte y no se convierten en un embudo de eventos inventados.</CardContent></Card>}
 
           <div className="grid gap-4 lg:grid-cols-2">
             <DonutChart title="Distribución por origen" data={chartData.sources} onSelect={(item) => openFeedbackDrilldown(`Origen: ${item.name}`, { kind: "source", value: item.key })} />
@@ -171,13 +185,15 @@ export function FeedbackStatisticsView() {
             <DonutChart title="Ángulos de motivación" data={chartData.angles} onSelect={(item) => openFeedbackDrilldown(`Ángulo: ${item.name}`, { kind: "angle", value: item.key })} />
           </div>
 
+          <DonutChart title="Reacciones generales" data={buildReactionChartData(displayedStatistics?.reactions)} onSelect={(item) => openFeedbackDrilldown(`Reacción: ${item.name}`, { kind: "reaction", value: item.key })} />
+
           <div className="grid gap-4 xl:grid-cols-2">
-            <AttributionTable title="Calidad por origen" rows={statistics.data?.sources ?? []} onSelect={(value) => openFeedbackDrilldown(`Origen: ${value}`, { kind: "source", value })} />
-            <AttributionTable title="Calidad por campaña" rows={statistics.data?.campaigns ?? []} onSelect={(value) => openFeedbackDrilldown(`Campaña: ${value}`, { kind: "campaign", value })} />
+            <AttributionTable title="Calidad por origen" rows={displayedStatistics?.sources ?? []} onSelect={(value) => openFeedbackDrilldown(`Origen: ${value}`, { kind: "source", value })} />
+            <AttributionTable title="Calidad por campaña" rows={displayedStatistics?.campaigns ?? []} onSelect={(value) => openFeedbackDrilldown(`Campaña: ${value}`, { kind: "campaign", value })} />
           </div>
 
-          <ProfileTable profiles={statistics.data?.profiles ?? []} />
-          <AngleTable angles={statistics.data?.angles ?? []} />
+          <ProfileTable profiles={displayedStatistics?.profiles ?? []} />
+          <AngleTable angles={displayedStatistics?.angles ?? []} />
         </>
       )}
 

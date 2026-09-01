@@ -10,6 +10,8 @@ export type Alert = {
 			lead: {
 				id: string;
 				name: string;
+				phone: string;
+				closerId: string | null;
 			caller: { id: string; name: string } | null;
 			closer: { id: string; name: string } | null;
 				questions: Array<{
@@ -47,6 +49,8 @@ export function useAlerts(
 							? {
 									id: alert.lead.id,
 									name: alert.lead.name,
+									phone: alert.lead.phone,
+									closerId: alert.lead.closerId,
 									caller: alert.lead.caller
 									? {
 											id: alert.lead.caller.id,

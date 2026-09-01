@@ -4,6 +4,7 @@ import {
   leadActivityEvents,
   leads,
   user,
+  type LeadQASession,
 } from "@crm-fran/db/schema/index";
 
 import type { FeedbackProfile, MotivationAngle } from "../../call-feedback";
@@ -39,6 +40,18 @@ type FeedbackStatisticsInput = {
   to?: string;
 };
 
+type LegacyFeedbackLead = {
+  id: string;
+  name: string;
+  callerId: string | null;
+  callerName: string | null;
+  source: string | null;
+  campaign: string | null;
+  feedback: string;
+  createdAt: Date;
+  questions: LeadQASession;
+};
+
 const REACTION_BY_OUTCOME: Record<string, FeedbackReaction> = {
   Agenda: "appointment",
   "Llamar a futuro": "future_call",
@@ -47,6 +60,57 @@ const REACTION_BY_OUTCOME: Record<string, FeedbackReaction> = {
 };
 const profileValues = new Set<string>(FEEDBACK_PROFILES.map(({ value }) => value));
 const angleValues = new Set<string>(MOTIVATION_ANGLES.map(({ value }) => value));
+
+const LEGACY_REACTION_BY_IMPACT: Record<string, string> = {
+  "Agenda llamada": "Agenda",
+  Reagendado: "Agenda",
+  "Llamar futuro": "Llamar a futuro",
+  "No interesad@": "No interesado",
+  "No encaja": "No encaja",
+};
+
+function latestAnswer(questions: LeadQASession, key: string) {
+  return [...questions].reverse().find((question) => question.questionKey === key)?.answer;
+}
+
+export function buildLegacyFeedbackRows(
+  leadRows: readonly LegacyFeedbackLead[],
+  exactFeedbackLeadIds: ReadonlySet<string>,
+): FeedbackRow[] {
+  return leadRows.flatMap((lead) => {
+    if (exactFeedbackLeadIds.has(lead.id)) return [];
+    if (!latestAnswer(lead.questions, "csvSourceState")) return [];
+    const outcome = latestAnswer(lead.questions, "callerOutcome")
+      ?? LEGACY_REACTION_BY_IMPACT[latestAnswer(lead.questions, "csvImpactOutcome") ?? ""]
+      ?? null;
+    const questions = [
+      ...lead.questions,
+      {
+        questionKey: "summary",
+        question: "Feedback heredado del CSV",
+        answer: lead.feedback === "sin asignar" ? "" : lead.feedback,
+        authorRole: "caller" as const,
+        authorId: lead.callerId,
+      },
+    ];
+    return [{
+      leadId: lead.id,
+      leadName: lead.name,
+      actorId: lead.callerId,
+      actorName: lead.callerName,
+      actorRole: "caller",
+      source: lead.source,
+      campaign: lead.campaign,
+      description: outcome,
+      occurredAt: lead.createdAt,
+      metadata: {
+        dataOrigin: "legacy_csv_snapshot",
+        dateBasis: "lead_created_at",
+        questions,
+      },
+    }];
+  });
+}
 
 function emptyReactions(): Record<FeedbackReaction, number> {
   return { appointment: 0, future_call: 0, not_interested: 0, not_fit: 0, unknown: 0 };
@@ -257,10 +321,12 @@ export function buildFeedbackStatistics(rows: readonly FeedbackRow[]) {
   let missingSource = 0;
   let missingCampaign = 0;
   let missingOutcome = 0;
+  const reactions = emptyReactions();
   const feedbacks = [];
 
   for (const row of feedbackRows) {
     const reaction = REACTION_BY_OUTCOME[row.description ?? ""] ?? "unknown";
+    reactions[reaction] += 1;
     const answers = readAnswers(row.metadata);
     const facts = parseConfirmedFacts([...answers].map(([questionKey, answer]) => ({ questionKey, answer })));
     const profile = facts.primaryProfile.kind === "value" && profileValues.has(facts.primaryProfile.value)
@@ -317,6 +383,9 @@ export function buildFeedbackStatistics(rows: readonly FeedbackRow[]) {
       angles: readAngles(answers.get("motivationAngles")),
       summary: answers.get("summary") ?? "",
       occurredAt: row.occurredAt,
+      dataOrigin: row.metadata.dataOrigin === "legacy_csv_snapshot"
+        ? "legacy_csv_snapshot" as const
+        : "exact_activity" as const,
     });
   }
 
@@ -324,6 +393,7 @@ export function buildFeedbackStatistics(rows: readonly FeedbackRow[]) {
     totalFeedbacks: feedbackRows.length,
     classifiedFeedbacks,
     appointmentRate: classifiedFeedbacks === 0 ? 0 : Math.round((classifiedAppointments / classifiedFeedbacks) * 1_000) / 10,
+    reactions,
     profiles: [...profiles.values()]
       .map(({ subProfiles, ...entry }) => ({ ...entry, subProfiles: [...subProfiles.values()].sort((a, b) => b.total - a.total) }))
       .sort((a, b) => b.total - a.total),
@@ -355,7 +425,8 @@ function endOfDay(value: string) {
 export async function getFeedbackStatistics(input: FeedbackStatisticsInput) {
   const rankingCaller = alias(user, "feedback_ranking_caller");
   const rankingCloser = alias(user, "feedback_ranking_closer");
-  const [rows, funnelLeadRows, rankingAssignmentRows] = await Promise.all([
+  const legacyCaller = alias(user, "feedback_legacy_caller");
+  const [rows, funnelLeadRows, rankingAssignmentRows, legacyLeadRows] = await Promise.all([
     db
     .select({
       leadId: leadActivityEvents.leadId,
@@ -423,10 +494,39 @@ export async function getFeedbackStatistics(input: FeedbackStatisticsInput) {
         input.campaign ? eq(leads.campaign, input.campaign) : undefined,
       ))
       .orderBy(asc(leadActivityEvents.occurredAt)),
+    db
+      .select({
+        id: leads.id,
+        name: leads.name,
+        callerId: leads.callerId,
+        callerName: legacyCaller.name,
+        source: leads.source,
+        campaign: leads.campaign,
+        feedback: leads.feedback,
+        createdAt: leads.createdAt,
+        questions: leads.questions,
+      })
+      .from(leads)
+      .leftJoin(legacyCaller, eq(legacyCaller.id, leads.callerId))
+      .where(and(
+        input.from ? gte(leads.createdAt, startOfDay(input.from)) : undefined,
+        input.to ? lte(leads.createdAt, endOfDay(input.to)) : undefined,
+      )),
   ]);
 
   const allStatistics = buildFeedbackStatistics(rows);
   const filteredStatistics = buildFeedbackStatistics(rows.filter((row) => {
+    if (input.callerId && row.actorId !== input.callerId) return false;
+    if (input.source && row.source !== input.source) return false;
+    if (input.campaign && row.campaign !== input.campaign) return false;
+    return true;
+  }));
+  const legacyRows = buildLegacyFeedbackRows(
+    legacyLeadRows,
+    new Set(rows.map((row) => row.leadId)),
+  );
+  const allLegacyStatistics = buildFeedbackStatistics(legacyRows);
+  const filteredLegacyStatistics = buildFeedbackStatistics(legacyRows.filter((row) => {
     if (input.callerId && row.actorId !== input.callerId) return false;
     if (input.source && row.source !== input.source) return false;
     if (input.campaign && row.campaign !== input.campaign) return false;
@@ -497,10 +597,17 @@ export async function getFeedbackStatistics(input: FeedbackStatisticsInput) {
 
   return {
     ...filteredStatistics,
-    callers: allStatistics.callers,
+    callers: [...new Map(
+      [...allStatistics.callers, ...allLegacyStatistics.callers].map((caller) => [caller.id, caller]),
+    ).values()].sort((first, second) => first.name.localeCompare(second.name)),
     availableSources,
     availableCampaigns,
     funnels,
     callerQuality,
+    legacy: {
+      ...filteredLegacyStatistics,
+      dataOrigin: "legacy_csv_snapshot" as const,
+      dateBasis: "lead_created_at" as const,
+    },
   };
 }

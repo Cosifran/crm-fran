@@ -1,3 +1,5 @@
+import { isCallerRoleId, isCloserRoleId } from "@/lib/role-capabilities";
+
 export type NextBestActionWorkMode = "caller" | "closer";
 
 export function availableWorkModes(
@@ -5,9 +7,10 @@ export function availableWorkModes(
   permissions: readonly string[],
 ): NextBestActionWorkMode[] {
   if (permissions.includes("*")) return ["caller", "closer"];
-  if (roleId === "role-caller") return ["caller"];
-  if (roleId === "role-closer") return ["closer"];
-  return [];
+  const modes: NextBestActionWorkMode[] = [];
+  if (isCallerRoleId(roleId)) modes.push("caller");
+  if (isCloserRoleId(roleId)) modes.push("closer");
+  return modes;
 }
 
 export function normalizeWorkMode(

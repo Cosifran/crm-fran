@@ -4,9 +4,11 @@ import { db } from "@crm-fran/db";
 import {
   leads,
   LEAD_ACTIVITY_KIND,
+  MARKETING_ATTRIBUTION_MATCH_KIND,
   type LeadType,
 } from "@crm-fran/db/schema/index";
 import { appendLeadActivity } from "./lead-activity";
+import { resolveLeadMarketingAttribution } from "../../marketing-attribution/service";
 
 export type CreateLeadInput = {
   name: string;
@@ -17,6 +19,7 @@ export type CreateLeadInput = {
   ad?: string;
   creative?: string;
   acquisitionAngle?: string;
+  utmContent?: string;
   type: LeadType;
 };
 
@@ -27,6 +30,7 @@ export function leadCreatedAttributionMetadata(
     ad?: string | null;
     creative?: string | null;
     acquisitionAngle?: string | null;
+    utmContent?: string | null;
   },
 ) {
   return {
@@ -35,6 +39,7 @@ export function leadCreatedAttributionMetadata(
     ad: lead.ad ?? null,
     creative: lead.creative ?? null,
     acquisitionAngle: lead.acquisitionAngle ?? null,
+    utmContent: lead.utmContent ?? null,
   };
 }
 
@@ -52,6 +57,18 @@ export async function createLead(input: CreateLeadInput) {
       });
     }
 
+    const attribution = await resolveLeadMarketingAttribution(
+      tx,
+      {
+        id: lead.id,
+        source: lead.source,
+        utmContent: lead.utmContent,
+        createdAt: lead.createdAt,
+      },
+      { matchKind: MARKETING_ATTRIBUTION_MATCH_KIND.AUTOMATIC },
+    );
+    const resolvedLead = attribution ? { ...lead, ...attribution } : lead;
+
     await appendLeadActivity(tx, {
       leadId: lead.id,
       kind: LEAD_ACTIVITY_KIND.LEAD_CREATED,
@@ -59,12 +76,12 @@ export async function createLead(input: CreateLeadInput) {
       description: `Lead ${lead.name} incorporado al CRM`,
 	      metadata: {
 	        type: lead.type,
-	        ...leadCreatedAttributionMetadata(lead),
+	        ...leadCreatedAttributionMetadata(resolvedLead),
 	      },
       dedupeKey: `lead_created:${lead.id}`,
       occurredAt: lead.createdAt,
     });
 
-    return lead;
+    return resolvedLead;
   });
 }

@@ -7,6 +7,7 @@ import {
   type LeadActivityMetadata,
   type LeadType,
 } from "@crm-fran/db/schema/index";
+import { COMMERCIAL_ROLE_IDS, isCallerRoleId, isCloserRoleId } from "@crm-fran/db/schema/auth";
 
 import {
   buildConversionFunnel,
@@ -69,7 +70,7 @@ export async function getConversionFunnel(input: ConversionFunnelInput) {
     db
       .select({ id: user.id, name: user.name, roleId: user.roleId })
       .from(user)
-      .where(inArray(user.roleId, ["role-caller", "role-closer"]))
+      .where(inArray(user.roleId, [...COMMERCIAL_ROLE_IDS]))
       .orderBy(asc(user.name)),
   ]);
 
@@ -132,10 +133,10 @@ export async function getConversionFunnel(input: ConversionFunnelInput) {
   return {
     ...buildConversionFunnel(cohort),
     callers: people
-      .filter((person) => person.roleId === "role-caller")
+      .filter((person) => isCallerRoleId(person.roleId))
       .map(({ id, name }) => ({ id, name })),
     closers: people
-      .filter((person) => person.roleId === "role-closer")
+      .filter((person) => isCloserRoleId(person.roleId))
       .map(({ id, name }) => ({ id, name })),
     supportsSource: false,
     cohortDefinition: "Leads con asignación registrada dentro del intervalo seleccionado",

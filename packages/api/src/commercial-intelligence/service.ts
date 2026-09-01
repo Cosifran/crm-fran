@@ -1,6 +1,6 @@
 import { and, db, eq, gte, inArray, lte, or } from "@crm-fran/db";
 import { alerts, leadActivityEvents, leads, LEAD_ACTIVITY_KIND, user, type LeadQASession } from "@crm-fran/db/schema/index";
-import type { Permission } from "@crm-fran/db/schema/auth";
+import { COMMERCIAL_ROLE_IDS, isCallerRoleId, isCloserRoleId, type Permission } from "@crm-fran/db/schema/auth";
 
 import { buildCommercialIntelligence, type IntelligenceLead, type IntelligenceObservation, type IntelligencePerson, type Outcome, type RecommendationOccurrence } from "./insights";
 import { confirmedProfileValue, parseConfirmedFacts } from "../commercial-evidence/facts";
@@ -130,7 +130,7 @@ export async function getCommercialIntelligence(input: CommercialIntelligenceInp
   const leadIds = rows.map((row) => row.id);
   const [allEvents, userRows, alertRows] = await Promise.all([
     leadIds.length ? db.select({ id: leadActivityEvents.id, leadId: leadActivityEvents.leadId, actorId: leadActivityEvents.actorId, actorRole: leadActivityEvents.actorRole, kind: leadActivityEvents.kind, description: leadActivityEvents.description, metadata: leadActivityEvents.metadata, occurredAt: leadActivityEvents.occurredAt }).from(leadActivityEvents).where(and(inArray(leadActivityEvents.leadId, leadIds), lte(leadActivityEvents.occurredAt, input.to))) : Promise.resolve([]),
-    db.select({ id: user.id, name: user.name, roleId: user.roleId }).from(user).where(inArray(user.roleId, ["role-caller", "role-closer"])),
+    db.select({ id: user.id, name: user.name, roleId: user.roleId }).from(user).where(inArray(user.roleId, [...COMMERCIAL_ROLE_IDS])),
     leadIds.length ? db.select({ id: alerts.id, leadId: alerts.leadId, kind: alerts.kind, nextShowAt: alerts.nextShowAt, resolvedAt: alerts.resolvedAt, dismissedAt: alerts.dismissedAt, expiredAt: alerts.expiredAt }).from(alerts).where(inArray(alerts.leadId, leadIds)) : Promise.resolve([]),
   ]);
   const events = allEvents.map((event) => ({ ...event, metadata: event.metadata as Record<string, unknown> } satisfies Activity));
@@ -160,7 +160,12 @@ export async function getCommercialIntelligence(input: CommercialIntelligenceInp
   });
   const people: IntelligencePerson[] = userRows
     .filter((person) => global || person.id === input.actorId)
-    .map((person) => ({ id: person.id, name: person.name, role: person.roleId === "role-caller" ? "caller" as const : "closer" as const, workload: workload.get(person.id) ?? 0, capacity: 10, observations: observations.get(person.id) ?? [] }));
+    .flatMap((person) => {
+      const roles: Array<"caller" | "closer"> = [];
+      if (isCallerRoleId(person.roleId)) roles.push("caller");
+      if (isCloserRoleId(person.roleId)) roles.push("closer");
+      return roles.map((role) => ({ id: person.id, name: person.name, role, workload: workload.get(person.id) ?? 0, capacity: 10, observations: observations.get(person.id) ?? [] }));
+    });
 
   const recommendations: RecommendationOccurrence[] = [];
   for (const lead of intelligenceLeads) {

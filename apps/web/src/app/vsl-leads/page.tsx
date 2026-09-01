@@ -10,7 +10,7 @@ export default function VslLeadsPage() {
       <Can permission="leads:read">
         <div
           data-slot="vsl-leads-view"
-          className="mx-auto flex w-full max-w-6xl min-w-0 flex-col gap-2 pb-6"
+          className="flex w-full min-w-0 flex-col gap-2 pb-6"
         >
           <LeadAssignmentQueue
             type="vsl"

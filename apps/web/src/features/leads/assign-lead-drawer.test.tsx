@@ -174,6 +174,23 @@ describe("AssignLeadDrawer — orquesta submitFormId por rol", () => {
     ).toBeInTheDocument();
   });
 
+  it("opens post-assignment feedback immediately without rendering another trigger", () => {
+    setupRole("role-caller");
+
+    render(
+      <AssignLeadDrawer
+        lead={baseLead}
+        mode="post-assignment-feedback"
+        defaultOpen
+        hideTrigger
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: /abrir drawer/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Añadir feedback" })).toBeInTheDocument();
+    expect(screen.getByTestId("assign-lead-form")).toBeInTheDocument();
+  });
+
   it("admin: opens the real closer feedback form from Agendas", async () => {
     setupRole("role-admin");
     const user = userEvent.setup();

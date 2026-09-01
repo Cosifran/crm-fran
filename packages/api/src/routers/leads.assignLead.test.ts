@@ -8,6 +8,7 @@ import {
   user,
   ALERT_KIND,
   ALERT_SEVERITY,
+  LEAD_POOL_STATUS,
 } from "@crm-fran/db/schema/index";
 import { LEAD_STATE } from "@crm-fran/db/schema/state";
 import { LEAD_QA_ROLE, type LeadQASessionItem } from "@crm-fran/db/schema/index";
@@ -204,6 +205,46 @@ describe("assignLead service", () => {
     );
     expect(callerContactedItems).toHaveLength(1);
     expect(callerContactedItems[0]?.answer).toBe("No");
+  });
+
+  it("discards and unassigns a lead when its phone number does not exist", async () => {
+    const callerId = crypto.randomUUID();
+    const leadId = crypto.randomUUID();
+
+    await insertUser({ id: callerId, name: "Caller", email: "wrong-number@test.com", roleId: "role-caller" });
+    await insertLead({ id: leadId });
+
+    const result = await assignLead({
+      callerId,
+      input: { leadId, isContacted: "No", phoneStatus: "invalid" },
+    });
+
+    expect(result.leadId).toBe(leadId);
+
+    const updated = await db.query.leads.findFirst({ where: (table, { eq }) => eq(table.id, leadId) });
+    expect(updated?.state).toBe(LEAD_STATE.NUMERO_ERRONEO);
+    expect(updated?.poolStatus).toBe(LEAD_POOL_STATUS.DISCARDED);
+    expect(updated?.callerId).toBeNull();
+    expect(updated?.closerId).toBeNull();
+    expect(updated?.questions).toEqual([
+      {
+        questionKey: "isContacted",
+        question: "¿Fué contactado?",
+        answer: "No",
+        authorRole: LEAD_QA_ROLE.CALLER,
+        authorId: callerId,
+      },
+      {
+        questionKey: "phoneStatus",
+        question: "Estado del número",
+        answer: "Número no existe",
+        authorRole: LEAD_QA_ROLE.CALLER,
+        authorId: callerId,
+      },
+    ]);
+
+    const alertRows = await db.select().from(alerts).where(eq(alerts.leadId, leadId));
+    expect(alertRows).toHaveLength(0);
   });
 
   it("preserves closer items when caller resubmits with Si", async () => {
@@ -634,6 +675,13 @@ describe("assignLead service", () => {
       isContacted: "No",
     });
     expect(resultNo.success).toBe(true);
+
+    const resultWrongNumber = assignLeadInput.safeParse({
+      leadId: "test",
+      isContacted: "No",
+      phoneStatus: "invalid",
+    });
+    expect(resultWrongNumber.success).toBe(true);
 
     const resultOldYes = assignLeadInput.safeParse({
       leadId: "test",

@@ -10,6 +10,29 @@ import {
 } from "drizzle-orm/pg-core";
 import { leads } from "./leads";
 
+export const ROLE_ID = {
+  CALLER: "role-caller",
+  CLOSER: "role-closer",
+  COMBINED: "role-caller-closer",
+  ADMIN: "role-admin",
+} as const;
+
+export const CALLER_ROLE_IDS = [ROLE_ID.CALLER, ROLE_ID.COMBINED] as const;
+export const CLOSER_ROLE_IDS = [ROLE_ID.CLOSER, ROLE_ID.COMBINED] as const;
+export const COMMERCIAL_ROLE_IDS = [
+  ROLE_ID.CALLER,
+  ROLE_ID.CLOSER,
+  ROLE_ID.COMBINED,
+] as const;
+
+export function isCallerRoleId(roleId: string | null | undefined) {
+  return roleId === ROLE_ID.CALLER || roleId === ROLE_ID.COMBINED;
+}
+
+export function isCloserRoleId(roleId: string | null | undefined) {
+  return roleId === ROLE_ID.CLOSER || roleId === ROLE_ID.COMBINED;
+}
+
 export type Permission =
   | "leads:read"
   | "leads:write"
@@ -31,6 +54,9 @@ export type Permission =
   | "alerts:*"
   | "settings:read"
   | "settings:write"
+  | "sales:read"
+  | "sales:write"
+  | "sales:*"
   | "*";
 
 export type ResolvedRole = {
@@ -47,7 +73,7 @@ export const user = pgTable("user", {
   image: text("image"),
   roleId: text("role_id")
     .references(() => roles.id)
-    .$default(() => "role-caller")
+    .$default(() => ROLE_ID.CALLER)
     .notNull(),
   leadActive: text("lead_active"),
   scoring: integer("scoring"),

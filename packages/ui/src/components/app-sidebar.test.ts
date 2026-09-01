@@ -32,6 +32,16 @@ describe("app sidebar decision-center visibility", () => {
     expect(source).not.toContain("NavSecondary");
     expect(source).toContain("<NavUser user={user} onSignOut={onSignOut} />");
   });
+  it("uses Aurea as the visible product name", () => {
+    const source = readFileSync(new URL("./app-sidebar.tsx", import.meta.url), "utf8");
+    expect(source).toContain(">Aurea</span>");
+    expect(source).not.toContain("CRM-FRAN");
+  });
+  it("exposes the simple WhatsApp queue as a lead module", () => {
+    expect(navigationSource).toContain('id: "whatsapp"');
+    expect(navigationSource).toContain('title: "WhatsApp"');
+    expect(navigationSource).toContain('url: "/whatsapp"');
+  });
   it("keeps Intelligence and Feedback inside Observatory instead of duplicating them", () => {
     const source = navigationSource;
     expect(source).not.toContain('title: "Inteligencia comercial"');

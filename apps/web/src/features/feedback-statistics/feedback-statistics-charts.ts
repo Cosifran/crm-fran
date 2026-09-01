@@ -23,6 +23,13 @@ const reactionLabels: Record<keyof Reactions, string> = {
   unknown: "Sin resultado",
 };
 
+export function buildReactionChartData(reactions?: Reactions) {
+  if (!reactions) return [];
+  return (Object.entries(reactions) as [keyof Reactions, number][])
+    .filter(([, value]) => value > 0)
+    .map(([key, value]) => ({ key, name: reactionLabels[key], value }));
+}
+
 export type FeedbackChartItem = {
   key: string;
   name: string;
@@ -60,9 +67,7 @@ export function buildFeedbackChartData({
       name: profileLabels[profile] ?? profile,
       value: total,
     })),
-    reactions: (Object.entries(reactions) as [keyof Reactions, number][])
-      .filter(([, value]) => value > 0)
-      .map(([key, value]) => ({ key, name: reactionLabels[key], value })),
+    reactions: buildReactionChartData(reactions),
     angles: angles.map(({ angle, total }) => ({
       key: angle,
       name: angleLabels[angle] ?? angle,

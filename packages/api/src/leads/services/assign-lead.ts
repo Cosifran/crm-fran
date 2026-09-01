@@ -30,6 +30,7 @@ type LegacyAssignLeadInput = {
 	leadId: string;
 	sourceAlertId?: string;
 	isContacted: "Si" | "No";
+	phoneStatus?: "invalid";
 	closerId?: string;
 	scheduledDate?: string;
 	scheduledTime?: string;
@@ -61,6 +62,10 @@ export async function assignLead({
   const isLegacyInput = !isOutcomeInput;
   const isAppointment = isOutcomeInput && input.outcome === "appointment";
   const isFutureCall = isOutcomeInput && input.outcome === "future_call";
+  const isWrongNumber =
+    isLegacyInput &&
+    input.isContacted === "No" &&
+    input.phoneStatus === "invalid";
 
   if (isOutcomeInput) {
     const validationErrors = validateCallerOutcomeInput(input);
@@ -264,7 +269,8 @@ export async function assignLead({
 			const preservedItems = existingItems.filter(
 				(item) =>
 					!(
-						item.questionKey === "isContacted" &&
+						(item.questionKey === "isContacted" ||
+							(isWrongNumber && item.questionKey === "phoneStatus")) &&
 						item.authorRole === authorRole &&
 						item.authorId === callerId
 					),
@@ -279,6 +285,15 @@ export async function assignLead({
 					authorId: callerId,
 				},
 			];
+			if (isWrongNumber) {
+				updatedQuestions.push({
+					questionKey: "phoneStatus",
+					question: "Estado del número",
+					answer: "Número no existe",
+					authorRole,
+					authorId: callerId,
+				});
+			}
 		}
 
 		if (
@@ -296,10 +311,16 @@ export async function assignLead({
 		const [updated] = await tx
 			.update(leads)
 			.set({
-				state: LEAD_STATE.ASIGNADO,
-				callerId:
-					authorRole === LEAD_QA_ROLE.CLOSER ? lead.callerId : callerId,
-				closerId: closerId ?? lead.closerId,
+				state: isWrongNumber ? LEAD_STATE.NUMERO_ERRONEO : LEAD_STATE.ASIGNADO,
+				callerId: isWrongNumber
+					? null
+					: authorRole === LEAD_QA_ROLE.CLOSER
+						? lead.callerId
+						: callerId,
+				closerId: isWrongNumber ? null : closerId ?? lead.closerId,
+				poolStatus: isWrongNumber
+					? LEAD_POOL_STATUS.DISCARDED
+					: lead.poolStatus,
 				questions: updatedQuestions,
 			})
 			.where(eq(leads.id, leadId))
@@ -362,6 +383,24 @@ export async function assignLead({
 					});
 				}
 
+				if (isWrongNumber) {
+					await appendLeadActivity(tx, {
+						leadId,
+						actorId: callerId,
+						actorRole: authorRole,
+						kind: LEAD_ACTIVITY_KIND.LEAD_DISCARDED,
+						title: "Lead descartado",
+						description: "El número de teléfono no existe",
+						metadata: {
+							reason: "wrong_number",
+							previousCallerId: lead.callerId ?? callerId,
+							poolStatus: LEAD_POOL_STATUS.DISCARDED,
+						},
+						dedupeKey: `lead_discarded:${leadId}:wrong_number:${activityOccurredAt.toISOString()}`,
+						occurredAt: activityOccurredAt,
+					});
+				}
+
 				if (updated.callerId && lead.callerId !== updated.callerId) {
 					await appendLeadActivity(tx, {
 						leadId,
@@ -404,7 +443,9 @@ export async function assignLead({
 							: "Feedback del caller registrado",
 					description: isOutcomeInput
 						? OUTCOME_LABELS[input.outcome]
-						: input.isContacted === "Si"
+						: isWrongNumber
+							? "Número no existe"
+							: input.isContacted === "Si"
 							? "Lead contactado"
 							: "Lead no contactado",
 					metadata: {
@@ -547,7 +588,7 @@ export async function assignLead({
 						.returning({ id: alerts.id });
 					alertId = alert?.id;
 				}
-		} else if (isLegacyInput && input.isContacted === "No") {
+		} else if (isLegacyInput && input.isContacted === "No" && !isWrongNumber) {
 			const config = ALERT_KIND_CONFIG[ALERT_KIND.NO_CONTACT];
 			const [alert] = await tx
 				.insert(alerts)

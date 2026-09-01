@@ -38,6 +38,7 @@ describe("createLeadInput", () => {
       ad: "Vídeo 03",
       creative: "UGC testimonio",
       acquisitionAngle: "Libertad de tiempo",
+      utmContent: "video-03-hook-a",
     });
 
     expect(result.success).toBe(true);
@@ -48,6 +49,7 @@ describe("createLeadInput", () => {
       ad: "Vídeo 03",
       creative: "UGC testimonio",
       acquisitionAngle: "Libertad de tiempo",
+      utmContent: "video-03-hook-a",
     });
   });
 

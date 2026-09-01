@@ -7,6 +7,8 @@ import { Badge } from "@crm-fran/ui/components/badge";
 import { Button } from "@crm-fran/ui/components/button";
 import { cn } from "@crm-fran/ui/lib/utils";
 
+import AssignLeadDrawer from "@/features/leads/assign-lead-drawer";
+
 import {
   formatAlertCountdown,
   getAlertRemaining,
@@ -72,12 +74,26 @@ export function AlertCard({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0 flex flex-col gap-1">
             <CardTitle>{alert.lead?.name ?? "Lead"}</CardTitle>
-            <CardDescription>
-              Caller: {alert.lead?.caller?.name ?? "Sin caller"}
+            <CardDescription className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span>Caller: {alert.lead?.caller?.name ?? "Sin caller"}</span>
+              {alert.lead?.phone ? (
+                <a className="font-medium text-foreground underline-offset-4 hover:underline" href={`tel:${alert.lead.phone}`}>
+                  Teléfono: {alert.lead.phone}
+                </a>
+              ) : (
+                <span>Teléfono: Sin teléfono</span>
+              )}
             </CardDescription>
           </div>
           <div className="flex flex-col items-end gap-1">
             <div className="flex flex-wrap items-center justify-end gap-2">
+              {alert.lead ? (
+                <AssignLeadDrawer
+                  lead={alert.lead}
+                  mode="post-assignment-feedback"
+                  triggerLabel="Registrar gestión"
+                />
+              ) : null}
               <Button
                 variant="outline"
                 size="sm"

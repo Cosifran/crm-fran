@@ -7,6 +7,7 @@ import {
   user,
   type LeadActivityMetadata,
 } from "@crm-fran/db/schema/index";
+import { COMMERCIAL_ROLE_IDS, isCallerRoleId, isCloserRoleId } from "@crm-fran/db/schema/auth";
 
 import {
   buildQualityControls,
@@ -105,7 +106,7 @@ export async function getQualityControls(input: QualityControlsInput) {
     db
       .select({ id: user.id, name: user.name, roleId: user.roleId })
       .from(user)
-      .where(inArray(user.roleId, ["role-caller", "role-closer"]))
+      .where(inArray(user.roleId, [...COMMERCIAL_ROLE_IDS]))
       .orderBy(asc(user.name)),
     getQualitySettings({
       initialize: input.initializeSettings !== false,
@@ -187,10 +188,10 @@ export async function getQualityControls(input: QualityControlsInput) {
     ...buildQualityControls(cohort, settings),
     settings,
     callers: people
-      .filter((person) => person.roleId === "role-caller")
+      .filter((person) => isCallerRoleId(person.roleId))
       .map(({ id, name }) => ({ id, name })),
     closers: people
-      .filter((person) => person.roleId === "role-closer")
+      .filter((person) => isCloserRoleId(person.roleId))
       .map(({ id, name }) => ({ id, name })),
   };
 }

@@ -36,8 +36,8 @@ describe("VslLeadsPage", () => {
       }),
       undefined,
     );
-    expect(container.querySelector('[data-slot="vsl-leads-view"]')).toHaveClass(
-      "max-w-6xl",
-    );
+    const view = container.querySelector('[data-slot="vsl-leads-view"]');
+    expect(view).toHaveClass("w-full");
+    expect(view).not.toHaveClass("max-w-6xl");
   });
 });

@@ -11,10 +11,12 @@ export default function AssignLeadButton({
   children,
   leadId,
   closeDialog,
+  onSuccess,
 }: {
   children: React.ReactNode;
   leadId: string;
   closeDialog: () => void;
+  onSuccess?: () => void;
 }) {
   const queryClient = useQueryClient();
 
@@ -41,6 +43,7 @@ export default function AssignLeadButton({
             queryKey: trpc.leads.listByUserId.queryKey(),
           });
           closeDialog();
+          onSuccess?.();
         },
       },
     );

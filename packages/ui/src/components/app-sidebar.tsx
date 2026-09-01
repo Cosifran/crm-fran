@@ -13,7 +13,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@crm-fran/ui/components/sidebar"
-import { CircleAlertIcon, HouseIcon, ChartBarIcon, CalendarDaysIcon, ChartNoAxesCombinedIcon, CameraIcon, FileTextIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, CommandIcon, MessageSquareIcon, ListChecksIcon, BadgeEuroIcon, GoalIcon, ChartSplineIcon, UsersIcon } from "lucide-react"
+import { CircleAlertIcon, HouseIcon, ChartBarIcon, CalendarDaysIcon, ChartNoAxesCombinedIcon, CameraIcon, FileTextIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, CommandIcon, MessageSquareIcon, ListChecksIcon, BadgeEuroIcon, GoalIcon, ChartSplineIcon, UsersIcon, HandshakeIcon, MessageCircleIcon } from "lucide-react"
 import { usePermissions, useRole } from "@crm-fran/ui/permissions"
 import type { Permission } from "@crm-fran/db/schema/auth"
 import {
@@ -44,6 +44,8 @@ const NAVIGATION_ICONS: Record<PrimaryNavigationItem["id"], React.ReactNode> = {
   "general-leads": <DatabaseIcon />,
   "vsl-leads": <CalendarDaysIcon />,
   "personal-leads": <ChartBarIcon />,
+  whatsapp: <MessageCircleIcon />,
+  "closer-sales": <HandshakeIcon />,
   alerts: <CircleAlertIcon />,
   agendas: <CalendarDaysIcon />,
   calendar: <CalendarDaysIcon />,
@@ -171,7 +173,7 @@ export function AppSidebar({
               render={<LinkComponent href="#" />}
             >
               <CommandIcon className="size-5!" />
-              <span className="text-base font-semibold">CRM-FRAN</span>
+              <span className="text-base font-semibold">Aurea</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

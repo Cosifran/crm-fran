@@ -57,9 +57,12 @@ import {
 import { trpc } from "@/utils/trpc";
 import { AdIntelligenceSection } from "./ad-intelligence-section";
 import { FinancialTruthSection } from "./financial-truth-section";
+import { resolveSpendDates, type SpendEntryMode } from "./spend-entry";
 
 type SpendForm = {
   id?: string;
+  mode: SpendEntryMode;
+  date: string;
   source: string;
   campaign: string;
   periodStart: string;
@@ -94,9 +97,11 @@ ninetyDaysAgo.setDate(today.getDate() - 89);
 const day = (date: Date | string) =>
   (typeof date === "string" ? new Date(date) : date).toISOString().slice(0, 10);
 const initialForm: SpendForm = {
+  mode: "daily",
+  date: day(today),
   source: "",
   campaign: "",
-  periodStart: day(ninetyDaysAgo),
+  periodStart: day(today),
   periodEnd: day(today),
   spendEuros: "",
   referenceSaleValueEuros: "",
@@ -294,11 +299,16 @@ export default function ProfitabilityPage() {
 
   const data = overview.data;
   const submit = () => {
+    const dates = resolveSpendDates({
+      mode: form.mode,
+      date: form.date,
+      from: form.periodStart,
+      to: form.periodEnd,
+    });
     const value = {
       source: form.source,
       campaign: form.campaign,
-      periodStart: form.periodStart,
-      periodEnd: form.periodEnd,
+      ...dates,
       spendEuros: Number(form.spendEuros),
       referenceSaleValueEuros: Number(form.referenceSaleValueEuros),
       currency: form.currency,
@@ -308,6 +318,8 @@ export default function ProfitabilityPage() {
   const edit = (period: (typeof data.spendPeriods)[number]) =>
     setForm({
       id: period.id,
+      mode: day(period.periodStart) === day(period.periodEnd) ? "daily" : "period",
+      date: day(period.periodStart),
       source: period.source,
       campaign: period.campaign,
       periodStart: day(period.periodStart),
@@ -361,7 +373,7 @@ export default function ProfitabilityPage() {
         <TabsContent value="team" className="flex flex-col gap-4"><Card><CardHeader><SectionTitle title="Rentabilidad atribuida a callers" information="El coste se reparte entre los leads asignados. Sirve para comparar operación, no para calcular comisiones ni demostrar causalidad individual." /></CardHeader><CardContent><MetricsTable rows={data.callers} identity="name" currency={data.currency} /></CardContent></Card><Card><CardHeader><SectionTitle title="Rentabilidad atribuida a closers" information="Las ventas y el coste de los leads se atribuyen a la última asignación registrada disponible dentro del periodo." /></CardHeader><CardContent><MetricsTable rows={data.closers} identity="name" currency={data.currency} /></CardContent></Card></TabsContent>
         <TabsContent value="profiles"><Card><CardHeader><SectionTitle title="Rentabilidad por perfil" information="Compara perfiles usando la clasificación guardada en la conversación y el mismo reparto de gasto por lead." /></CardHeader><CardContent><MetricsTable rows={data.profiles} identity="name" currency={data.currency} /></CardContent></Card></TabsContent>
         <TabsContent value="spend" className="flex flex-col gap-4">
-          <Card><CardHeader><SectionTitle title={form.id ? "Editar gasto" : "Registrar gasto"} information="Cada fuente y campaña puede tener varios periodos, pero no se permiten fechas solapadas para evitar contar el mismo lead y el mismo gasto dos veces." /><CardDescription>Importes manuales. No existe conexión con APIs publicitarias.</CardDescription></CardHeader><CardContent><FieldGroup><Field><FieldLabel htmlFor="spend-source">Fuente</FieldLabel><Input id="spend-source" list="profitability-sources" value={form.source} onChange={(event) => setForm({ ...form, source: event.target.value })} /><datalist id="profitability-sources">{[...new Set(data.campaignOptions.map((option) => option.source))].map((source) => <option key={source} value={source} />)}</datalist></Field><Field><FieldLabel htmlFor="spend-campaign">Campaña</FieldLabel><Input id="spend-campaign" list="profitability-campaigns" value={form.campaign} onChange={(event) => setForm({ ...form, campaign: event.target.value })} /><datalist id="profitability-campaigns">{data.campaignOptions.filter((option) => !form.source || option.source === form.source).map((option) => <option key={`${option.source}-${option.campaign}`} value={option.campaign} />)}</datalist></Field><Field><FieldLabel htmlFor="spend-start">Inicio</FieldLabel><Input id="spend-start" type="date" value={form.periodStart} onChange={(event) => setForm({ ...form, periodStart: event.target.value })} /></Field><Field><FieldLabel htmlFor="spend-end">Fin</FieldLabel><Input id="spend-end" type="date" value={form.periodEnd} onChange={(event) => setForm({ ...form, periodEnd: event.target.value })} /></Field><Field><FieldLabel htmlFor="spend-form-currency">Moneda ISO</FieldLabel><Input id="spend-form-currency" list="profitability-currencies" maxLength={3} value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value.toUpperCase() })} /><datalist id="profitability-currencies">{data.availableCurrencies.map((option) => <option key={option} value={option} />)}</datalist></Field><Field><FieldLabel htmlFor="spend-amount">Gasto publicitario ({form.currency})</FieldLabel><Input id="spend-amount" type="number" min="0.01" step="0.01" value={form.spendEuros} onChange={(event) => setForm({ ...form, spendEuros: event.target.value })} /></Field><Field><FieldLabel htmlFor="sale-value">Valor de referencia por venta ({form.currency})</FieldLabel><Input id="sale-value" type="number" min="0.01" step="0.01" value={form.referenceSaleValueEuros} onChange={(event) => setForm({ ...form, referenceSaleValueEuros: event.target.value })} /><FieldDescription>Se usa para estimar ingreso; no equivale necesariamente a dinero cobrado.</FieldDescription></Field><div className="flex flex-wrap gap-2"><Button onClick={submit} disabled={save.isPending || !form.source || !form.campaign || !form.spendEuros || !form.referenceSaleValueEuros}>{form.id ? "Guardar cambios" : "Registrar gasto"}</Button>{form.id ? <Button variant="outline" onClick={() => setForm(initialForm)}>Cancelar edición</Button> : null}</div></FieldGroup></CardContent></Card>
+          <Card><CardHeader><SectionTitle title={form.id ? "Editar gasto" : "Registrar gasto publicitario"} information="El modo diario guarda un único día por campaña. El modo periodo permite cargar un total acumulado; nunca se permiten fechas solapadas para la misma fuente y campaña." /><CardDescription>Introduce cuánto gastó cada campaña. No existe conexión con APIs publicitarias.</CardDescription></CardHeader><CardContent><FieldGroup><Field><FieldLabel htmlFor="spend-mode">Tipo de gasto</FieldLabel><Select value={form.mode} onValueChange={(value) => value && setForm({ ...form, mode: value as SpendEntryMode })}><SelectTrigger id="spend-mode"><SelectValue>{form.mode === "daily" ? "Gasto diario" : "Periodo acumulado"}</SelectValue></SelectTrigger><SelectContent><SelectGroup><SelectItem value="daily">Gasto diario</SelectItem><SelectItem value="period">Periodo acumulado</SelectItem></SelectGroup></SelectContent></Select><FieldDescription>Usa gasto diario para registrar cada campaña día a día.</FieldDescription></Field><Field><FieldLabel htmlFor="spend-source">Fuente</FieldLabel><Input id="spend-source" list="profitability-sources" value={form.source} onChange={(event) => setForm({ ...form, source: event.target.value })} /><datalist id="profitability-sources">{[...new Set(data.campaignOptions.map((option) => option.source))].map((source) => <option key={source} value={source} />)}</datalist></Field><Field><FieldLabel htmlFor="spend-campaign">Campaña</FieldLabel><Input id="spend-campaign" list="profitability-campaigns" value={form.campaign} onChange={(event) => setForm({ ...form, campaign: event.target.value })} /><datalist id="profitability-campaigns">{data.campaignOptions.filter((option) => !form.source || option.source === form.source).map((option) => <option key={`${option.source}-${option.campaign}`} value={option.campaign} />)}</datalist></Field>{form.mode === "daily" ? <Field><FieldLabel htmlFor="spend-date">Fecha del gasto</FieldLabel><Input id="spend-date" type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} /></Field> : <><Field><FieldLabel htmlFor="spend-start">Inicio</FieldLabel><Input id="spend-start" type="date" value={form.periodStart} onChange={(event) => setForm({ ...form, periodStart: event.target.value })} /></Field><Field><FieldLabel htmlFor="spend-end">Fin</FieldLabel><Input id="spend-end" type="date" value={form.periodEnd} onChange={(event) => setForm({ ...form, periodEnd: event.target.value })} /></Field></>}<Field><FieldLabel htmlFor="spend-form-currency">Moneda ISO</FieldLabel><Input id="spend-form-currency" list="profitability-currencies" maxLength={3} value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value.toUpperCase() })} /><datalist id="profitability-currencies">{data.availableCurrencies.map((option) => <option key={option} value={option} />)}</datalist></Field><Field><FieldLabel htmlFor="spend-amount">{form.mode === "daily" ? "Gasto de ese día" : "Gasto total del periodo"} ({form.currency})</FieldLabel><Input id="spend-amount" type="number" min="0.01" step="0.01" value={form.spendEuros} onChange={(event) => setForm({ ...form, spendEuros: event.target.value })} /></Field><Field><FieldLabel htmlFor="sale-value">Valor de referencia por venta ({form.currency})</FieldLabel><Input id="sale-value" type="number" min="0.01" step="0.01" value={form.referenceSaleValueEuros} onChange={(event) => setForm({ ...form, referenceSaleValueEuros: event.target.value })} /><FieldDescription>Se usa para estimar ingreso; no equivale necesariamente a dinero cobrado.</FieldDescription></Field><div className="flex flex-wrap gap-2"><Button onClick={submit} disabled={save.isPending || !form.source || !form.campaign || !form.spendEuros || !form.referenceSaleValueEuros || (form.mode === "daily" ? !form.date : !form.periodStart || !form.periodEnd)}>{form.id ? "Guardar cambios" : form.mode === "daily" ? "Registrar gasto diario" : "Registrar periodo"}</Button>{form.id ? <Button variant="outline" onClick={() => setForm(initialForm)}>Cancelar edición</Button> : null}</div></FieldGroup></CardContent></Card>
           <Card><CardHeader><SectionTitle title="Historial de gastos" information="Conserva el criterio económico aplicado a cada cohorte. Editar un periodo recalcula toda la vista; eliminarlo retira su atribución." /></CardHeader><CardContent>{data.spendPeriods.length === 0 ? <Empty heading="Sin gastos registrados" description="Introduce el primer periodo para comenzar el análisis." /> : <div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Fuente y campaña</TableHead><TableHead>Periodo</TableHead><TableHead>Gasto</TableHead><TableHead>Valor por venta</TableHead><TableHead>Acciones</TableHead></TableRow></TableHeader><TableBody>{data.spendPeriods.map((period) => <TableRow key={period.id}><TableCell>{period.source} · {period.campaign}</TableCell><TableCell>{day(period.periodStart)} — {day(period.periodEnd)}</TableCell><TableCell>{money(period.spendCents, period.currency)}</TableCell><TableCell>{money(period.referenceSaleValueCents, period.currency)}</TableCell><TableCell><div className="flex gap-2"><Button variant="outline" size="icon-sm" aria-label="Editar gasto" onClick={() => edit(period)}><PencilIcon data-icon="inline-start" /></Button><Button variant="outline" size="icon-sm" aria-label="Eliminar gasto" onClick={() => remove.mutate({ id: period.id })} disabled={remove.isPending}><Trash2Icon data-icon="inline-start" /></Button></div></TableCell></TableRow>)}</TableBody></Table></div>}</CardContent></Card>
         </TabsContent>
       </Tabs>

@@ -225,6 +225,34 @@
       "when": 1788226359183,
       "tag": "0031_lush_black_panther",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1788274128137,
+      "tag": "0032_dashing_scarlet_witch",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1788279223920,
+      "tag": "0033_marvelous_colossus",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1788284592530,
+      "tag": "0034_left_masque",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1788303801907,
+      "tag": "0035_sturdy_mockingbird",
+      "breakpoints": true
     }
   ]
 }

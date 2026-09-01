@@ -33,9 +33,10 @@ import { CALLER_FEEDBACK_OPTIONS } from "./caller-feedback";
 import type { CallerOutcome } from "@crm-fran/api/caller-outcome";
 
 type AlertSeverity = "urgent" | "warning" | "info";
+type ContactStatus = "" | "Si" | "No" | "Numero no existe";
 
 type FormValue = {
-  isContacted: "" | "Si" | "No";
+  isContacted: ContactStatus;
   outcome: CallerOutcome | "";
   primaryProfile: FeedbackProfile | "";
   subProfile: FeedbackProfile | "";
@@ -123,6 +124,7 @@ function getInitialValues(
   const outcome = outcomeAnswer ? OUTCOME_BY_LABEL[outcomeAnswer] ?? "" : "";
   const severity = byKey.get("alertSeverity");
   const legacyContacted = byKey.get("isContacted");
+  const phoneStatus = byKey.get("phoneStatus");
   const primaryProfileAnswer = byKey.get("primaryProfile");
   const subProfileAnswer = byKey.get("subProfile");
   const isFeedbackProfile = (value: string | undefined): value is FeedbackProfile =>
@@ -148,7 +150,9 @@ function getInitialValues(
 
   return {
     isContacted:
-      outcome || legacyContacted === "Si"
+      phoneStatus === "Número no existe"
+        ? "Numero no existe"
+        : outcome || legacyContacted === "Si"
         ? "Si"
         : legacyContacted === "No"
           ? "No"
@@ -184,7 +188,7 @@ function validateForm(value: FormValue) {
     return { fields };
   }
 
-  if (value.isContacted === "No") {
+  if (value.isContacted === "No" || value.isContacted === "Numero no existe") {
     return undefined;
   }
 
@@ -218,6 +222,15 @@ function validateForm(value: FormValue) {
 
 function buildPayload(value: FormValue, leadId: string, sourceAlertId?: string) {
   const sourceAlert = sourceAlertId ? { sourceAlertId } : {};
+
+  if (value.isContacted === "Numero no existe") {
+    return {
+      leadId,
+      ...sourceAlert,
+      isContacted: "No" as const,
+      phoneStatus: "invalid" as const,
+    };
+  }
 
   if (value.isContacted === "No") {
     return { leadId, ...sourceAlert, isContacted: "No" as const };
@@ -314,7 +327,7 @@ export default function AssignLeadForm({
         ? { ...option, label: appointmentOutcomeLabel }
         : option,
     );
-  const [isContacted, setIsContacted] = useState<"" | "Si" | "No">(
+  const [isContacted, setIsContacted] = useState<ContactStatus>(
     initialValues.isContacted,
   );
   const [outcome, setOutcome] = useState<CallerOutcome | "">(
@@ -377,7 +390,10 @@ export default function AssignLeadForm({
   const handleContactedChange = (value: string) => {
     clearConditionalFields();
     clearPreviousQuestions();
-    const nextValue = value === "Si" || value === "No" ? value : "";
+    const nextValue: ContactStatus =
+      value === "Si" || value === "No" || value === "Numero no existe"
+        ? value
+        : "";
     setIsContacted(nextValue);
     setOutcome("");
     form.setFieldValue("isContacted", nextValue);
@@ -461,6 +477,9 @@ export default function AssignLeadForm({
                   <SelectGroup>
                     <SelectItem value="Si">Si</SelectItem>
                     <SelectItem value="No">No</SelectItem>
+                    <SelectItem value="Numero no existe">
+                      Número no existe
+                    </SelectItem>
                   </SelectGroup>
                 </SelectContent>
               </Select>

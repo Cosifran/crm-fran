@@ -16,6 +16,9 @@ import { commercialObservatoryRouter } from "./commercial-observatory";
 import { commercialPlanningRouter } from "./commercial-planning";
 import { commercialPlaybooksRouter } from "./commercial-playbooks";
 import { askCrmRouter } from "./ask-crm";
+import { marketingAttributionRouter } from "./marketing-attribution";
+import { closerSalesRouter } from "./closer-sales";
+import { whatsappRouter } from "./whatsapp";
 import { permittedProcedure } from "@crm-fran/api/trpc/trpc";
 import { publicProcedure, router } from "../index";
 
@@ -56,5 +59,8 @@ export const appRouter = router({
   commercialPlanning: commercialPlanningRouter,
   commercialPlaybooks: commercialPlaybooksRouter,
   askCrm: askCrmRouter,
+  marketingAttribution: marketingAttributionRouter,
+  closerSales: closerSalesRouter,
+  whatsapp: whatsappRouter,
 });
 export type AppRouter = typeof appRouter;

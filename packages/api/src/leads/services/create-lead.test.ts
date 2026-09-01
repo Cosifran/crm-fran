@@ -10,12 +10,14 @@ describe("lead creation attribution metadata", () => {
       ad: "Vídeo 1",
       creative: "UGC",
       acquisitionAngle: "Libertad",
+      utmContent: "video-01",
     })).toEqual({
       source: "Meta",
       campaign: "Agosto",
       ad: "Vídeo 1",
       creative: "UGC",
       acquisitionAngle: "Libertad",
+      utmContent: "video-01",
     });
   });
 
@@ -26,6 +28,7 @@ describe("lead creation attribution metadata", () => {
       ad: null,
       creative: null,
       acquisitionAngle: null,
+      utmContent: null,
     });
   });
 });

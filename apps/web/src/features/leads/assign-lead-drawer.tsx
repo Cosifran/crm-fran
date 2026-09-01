@@ -38,9 +38,11 @@ export interface Lead {
 }
 
 interface AssignLeadDrawerProps {
-    lead: Lead;
+    lead: Pick<Lead, "id" | "closerId" | "questions">;
     triggerLabel?: string;
-    mode?: "default" | "agenda-feedback";
+    mode?: "default" | "agenda-feedback" | "post-assignment-feedback";
+    defaultOpen?: boolean;
+    hideTrigger?: boolean;
 		onOpen?: () => void | Promise<void>;
 		onCompleted?: () => void | Promise<void>;
 }
@@ -68,10 +70,12 @@ export default function AssignLeadDrawer({
     lead,
     triggerLabel,
     mode = "default",
+    defaultOpen = false,
+    hideTrigger = false,
 		onOpen,
 		onCompleted,
 }: AssignLeadDrawerProps) {
-    const [open, setOpen] = useState(false);
+    const [open, setOpen] = useState(defaultOpen);
     const [closerSubmitLabel, setCloserSubmitLabel] = useState("Guardar");
     const [callerSubmitLabel, setCallerSubmitLabel] = useState("Guardar");
 		const [businessCompleted, setBusinessCompleted] = useState(false);
@@ -88,6 +92,7 @@ export default function AssignLeadDrawer({
         (session?.user as { roleId?: string } | undefined)?.roleId,
     );
     const isAgendaFeedback = mode === "agenda-feedback";
+    const isPostAssignmentFeedback = mode === "post-assignment-feedback";
 		const isAssignedCloser = session?.user?.id === lead.closerId;
 		const completeRecommendation = async () => {
 			setCompletionState("pending");
@@ -137,6 +142,11 @@ export default function AssignLeadDrawer({
           title: "Feedback de agenda",
           description: "Registra qué ha ocurrido con esta agenda.",
         }
+      : isPostAssignmentFeedback
+        ? {
+            title: "Añadir feedback",
+            description: "El lead ya es tuyo. Registra ahora qué ha sucedido sin cambiar de pestaña.",
+          }
       : titleByRole[role];
 
     if (isAgendaFeedback && !showsCloserFeedback) {
@@ -145,20 +155,22 @@ export default function AssignLeadDrawer({
 
     return (
       <>
-        <Button
-          variant="outline"
-		  onClick={() => {
-				if (businessCompleted) return;
-				setCompletionState("idle");
-				setCompletionError(null);
-				setOpen(true);
-				void Promise.resolve(onOpen?.()).catch(() => undefined);
-			}}
-          aria-label={triggerLabel ?? "Abrir drawer"}
-        >
-          <UserRoundPlus />
-          {triggerLabel}
-        </Button>
+        {!hideTrigger && (
+          <Button
+            variant="outline"
+            onClick={() => {
+              if (businessCompleted) return;
+              setCompletionState("idle");
+              setCompletionError(null);
+              setOpen(true);
+              void Promise.resolve(onOpen?.()).catch(() => undefined);
+            }}
+            aria-label={triggerLabel ?? "Abrir drawer"}
+          >
+            <UserRoundPlus />
+            {triggerLabel}
+          </Button>
+        )}
 
         <LeadDrawer
           open={open}

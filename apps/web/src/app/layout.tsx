@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "crm-fran",
-  description: "crm-fran",
+  title: "Aurea",
+  description: "Aurea",
 };
 
 export default function RootLayout({

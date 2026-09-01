@@ -6,6 +6,8 @@ const ROUTE_MAP: Record<string, string> = {
     "/users": "Usuarios",
     "/leads": "Leads personales",
     "/leads-personales": "Leads personales",
+    "/ventas-closer": "Ventas closer",
+    "/whatsapp": "WhatsApp",
     "/leads-generales": "Leads generales",
     "/estadisticas-personales": "Estadísticas personales",
     "/estadisticas-personales/rankings": "Rankings",
@@ -22,5 +24,5 @@ const ROUTE_MAP: Record<string, string> = {
 }
 export function ActiveTitle() {
     const pathname = usePathname()
-    return <>{ROUTE_MAP[pathname] ?? "CRM"}</>
+    return <>{ROUTE_MAP[pathname] ?? "Aurea"}</>
 }

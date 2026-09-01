@@ -1,6 +1,7 @@
 export type NavigationPermission =
   | "leads:read"
   | "alerts:read"
+  | "sales:read"
   | "*";
 
 export type PrimaryNavigationItem = {
@@ -13,6 +14,8 @@ export type PrimaryNavigationItem = {
     | "general-leads"
     | "vsl-leads"
     | "personal-leads"
+    | "whatsapp"
+    | "closer-sales"
     | "alerts"
     | "agendas"
     | "calendar"
@@ -39,6 +42,8 @@ export const PRIMARY_NAVIGATION_ITEMS = [
   { id: "general-leads", title: "Leads generales", url: "/leads-generales", requiredPermission: "leads:read" },
   { id: "vsl-leads", title: "Leads VSL", url: "/vsl-leads", requiredPermission: "leads:read" },
   { id: "personal-leads", title: "Leads personales", url: "/leads-personales", requiredPermission: "leads:read" },
+  { id: "whatsapp", title: "WhatsApp", url: "/whatsapp", requiredPermission: "leads:read" },
+  { id: "closer-sales", title: "Ventas closer", url: "/ventas-closer", requiredPermission: "sales:read" },
   { id: "alerts", title: "Alertas", url: "/alerts", requiredPermission: "alerts:read" },
   { id: "agendas", title: "Agendas", url: "/agendas", requiredPermission: "leads:read" },
   { id: "calendar", title: "Calendario", url: "/calendar", requiredPermission: "leads:read" },

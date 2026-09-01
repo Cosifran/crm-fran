@@ -1,5 +1,5 @@
 import { db } from "@crm-fran/db";
-import type { Permission } from "@crm-fran/db/schema/auth";
+import { isCallerRoleId, isCloserRoleId, type Permission } from "@crm-fran/db/schema/auth";
 
 import { listAlerts } from "./list-alerts";
 import {
@@ -71,8 +71,8 @@ export function availableNextBestActionModes({
 }): NextBestActionMode[] {
   if (permissions.includes("*")) return ["caller", "closer"];
   const modes = new Set<NextBestActionMode>();
-  if (roleId === "role-caller" || ownsCallerWork) modes.add("caller");
-  if (roleId === "role-closer" || ownsCloserWork) modes.add("closer");
+  if (isCallerRoleId(roleId) || ownsCallerWork) modes.add("caller");
+  if (isCloserRoleId(roleId) || ownsCloserWork) modes.add("closer");
   return [...modes];
 }
 

@@ -356,6 +356,42 @@ function endOfDay(value: string): Date {
   return date;
 }
 
+function isImportedLegacyLead(lead: LeadForStatistics) {
+  return lead.questions.some(
+    (question) => question.questionKey === "csvSourceState",
+  );
+}
+
+function mergeStatisticsAggregates(
+  historical: {
+    total: number;
+    counts: Record<string, number>;
+    discarded?: number;
+  },
+  legacy: {
+    total: number;
+    counts: Record<string, number>;
+    discarded?: number;
+  },
+) {
+  return {
+    total: historical.total + legacy.total,
+    counts: Object.fromEntries(
+      Object.keys(historical.counts).map((condition) => [
+        condition,
+        (historical.counts[condition] ?? 0) +
+          (legacy.counts[condition] ?? 0),
+      ]),
+    ),
+    ...(historical.discarded !== undefined || legacy.discarded !== undefined
+      ? {
+          discarded:
+            (historical.discarded ?? 0) + (legacy.discarded ?? 0),
+        }
+      : {}),
+  };
+}
+
 export async function getPersonalStatistics(input: PersonalStatisticsInput) {
   const rows = await selectLeadWithUsers();
   const from = input.from ? startOfDay(input.from) : undefined;
@@ -399,16 +435,41 @@ export async function getPersonalStatistics(input: PersonalStatisticsInput) {
         )
         .orderBy(asc(leadActivityEvents.occurredAt))
     : [];
-  const aggregate = hasHistoricalInterval
-    ? aggregateHistoricalConditions(historicalEvents, {
-        mode,
-        userId: input.closerId ?? input.callerId,
-        from,
-        to,
-      })
-    : mode === "closer"
+  const historicalLeadIds = new Set(
+    historicalEvents.map((event) => event.leadId),
+  );
+  const legacyRows = hasHistoricalInterval
+    ? filteredRows.filter(
+        (lead) =>
+          isImportedLegacyLead(lead) &&
+          !historicalLeadIds.has(lead.id) &&
+          (!from || lead.createdAt >= from) &&
+          (!to || lead.createdAt <= to),
+      )
+    : [];
+  const aggregate = !hasHistoricalInterval
+    ? mode === "closer"
       ? aggregateCloserConditions(filteredRows)
-      : aggregateLeadConditions(filteredRows);
+      : aggregateLeadConditions(filteredRows)
+    : mode === "closer"
+      ? mergeStatisticsAggregates(
+          aggregateHistoricalConditions(historicalEvents, {
+            mode,
+            userId: input.closerId,
+            from,
+            to,
+          }),
+          aggregateCloserConditions(legacyRows),
+        )
+      : mergeStatisticsAggregates(
+          aggregateHistoricalConditions(historicalEvents, {
+            mode,
+            userId: input.callerId,
+            from,
+            to,
+          }),
+          aggregateLeadConditions(legacyRows),
+        );
 
   return {
     ...aggregate,

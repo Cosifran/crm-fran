@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildAttributionFunnels,
   buildFeedbackStatistics,
+  buildLegacyFeedbackRows,
 } from "./feedback-statistics";
 
 function feedback({
@@ -52,6 +53,46 @@ function feedback({
 }
 
 describe("feedback statistics", () => {
+  it("keeps CSV snapshots separate and exposes their raw feedback as inherited data", () => {
+    const rows = buildLegacyFeedbackRows([
+      {
+        id: "legacy-1",
+        name: "Lead heredado",
+        callerId: "caller-1",
+        callerName: "Caller 1",
+        source: null,
+        campaign: null,
+        feedback: "Pidió información y quedó agendado",
+        createdAt: new Date("2026-08-01T10:00:00.000Z"),
+        questions: [
+          { questionKey: "csvSourceState", question: "Origen", answer: "Asignado", authorRole: "caller", authorId: null },
+          { questionKey: "callerOutcome", question: "Resultado", answer: "Agenda", authorRole: "caller", authorId: null },
+        ],
+      },
+      {
+        id: "exact-1",
+        name: "Lead con evento",
+        callerId: "caller-1",
+        callerName: "Caller 1",
+        source: null,
+        campaign: null,
+        feedback: "No debe duplicarse",
+        createdAt: new Date("2026-08-02T10:00:00.000Z"),
+        questions: [{ questionKey: "csvSourceState", question: "Origen", answer: "Asignado", authorRole: "caller", authorId: null }],
+      },
+    ], new Set(["exact-1"]));
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      leadId: "legacy-1",
+      description: "Agenda",
+      metadata: { dataOrigin: "legacy_csv_snapshot" },
+    });
+    expect(buildFeedbackStatistics(rows).feedbacks[0]).toMatchObject({
+      summary: "Pidió información y quedó agendado",
+    });
+  });
+
   it("groups every historical feedback by profile, subprofile, angle and reaction", () => {
     const result = buildFeedbackStatistics([
       feedback({

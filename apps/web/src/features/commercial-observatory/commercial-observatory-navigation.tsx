@@ -7,6 +7,7 @@ import {
   FileChartColumnIcon,
   FlaskConicalIcon,
   MessagesSquareIcon,
+  MegaphoneIcon,
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -20,6 +21,7 @@ const OBSERVATORY_TABS = [
   { value: "intelligence", label: "Inteligencia", route: "/observatorio-comercial/inteligencia", permission: "leads:read", icon: BrainCircuitIcon },
   { value: "evidence", label: "Evidencia", route: "/observatorio-comercial/evidencia-comercial", permission: "leads:read", icon: FileChartColumnIcon },
   { value: "feedback", label: "Feedback", route: "/observatorio-comercial/feedback", permission: "leads:read", icon: MessagesSquareIcon },
+  { value: "marketing-library", label: "Biblioteca publicitaria", route: "/observatorio-comercial/biblioteca-publicitaria", permission: "*", icon: MegaphoneIcon },
   { value: "planning", label: "Planificación", route: "/observatorio-comercial/planificacion", permission: "*", icon: CalculatorIcon },
 ] as const satisfies readonly {
   value: string;
@@ -53,11 +55,11 @@ export function CommercialObservatoryNavigation() {
         const destination = tabs.find((tab) => tab.value === value);
         if (destination) router.push(destination.route);
       }}
-      className="w-full gap-0"
+      className="w-full gap-0 pb-1"
     >
       <TabsList
         aria-label="Secciones del observatorio comercial"
-        className="flex h-auto w-full max-w-full flex-nowrap items-stretch justify-start gap-1 rounded-lg border bg-background p-1 sm:w-fit"
+        className="flex h-auto w-full max-w-full flex-wrap items-stretch justify-start gap-1 rounded-lg border bg-background p-1 sm:w-fit"
       >
         {tabs.map((tab) => {
           const Icon = tab.icon;
@@ -65,7 +67,7 @@ export function CommercialObservatoryNavigation() {
             <TabsTrigger
               key={tab.value}
               value={tab.value}
-              className="h-12! min-h-12! flex-none rounded-md px-4 py-2 text-sm font-medium data-active:bg-accent data-active:text-accent-foreground after:hidden"
+              className="h-12! min-h-12! min-w-32 flex-1 rounded-md px-4 py-2 text-sm font-medium data-active:bg-accent data-active:text-accent-foreground after:hidden"
             >
               <Icon data-icon="inline-start" aria-hidden="true" />
               {tab.label}

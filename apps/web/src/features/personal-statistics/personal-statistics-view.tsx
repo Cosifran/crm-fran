@@ -242,7 +242,9 @@ export function PersonalStatisticsView() {
                 aria-invalid={invalidInterval}
                 onChange={(event) => setFrom(event.target.value)}
               />
-              <FieldDescription>Fecha de última modificación.</FieldDescription>
+              <FieldDescription>
+                Actividad registrada; los importados usan la fecha del lead.
+              </FieldDescription>
             </Field>
 
             <Field invalid={invalidInterval}>

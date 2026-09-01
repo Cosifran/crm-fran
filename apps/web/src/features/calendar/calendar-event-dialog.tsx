@@ -17,6 +17,7 @@ import {
 } from "@crm-fran/ui/components/dialog";
 import { Field, FieldGroup, FieldLabel } from "@crm-fran/ui/components/field";
 import { Input } from "@crm-fran/ui/components/input";
+import { isCallerRoleId, isCloserRoleId } from "@/lib/role-capabilities";
 import {
   Select,
   SelectContent,
@@ -46,8 +47,8 @@ export function CalendarEventDialog({
   const [callerId, setCallerId] = useState("none");
   const [closerId, setCloserId] = useState("none");
   const createEvent = useCreateCalendarEvent();
-  const callers = assignees.filter((person) => person.roleId === "role-caller");
-  const closers = assignees.filter((person) => person.roleId === "role-closer");
+  const callers = assignees.filter((person) => isCallerRoleId(person.roleId));
+  const closers = assignees.filter((person) => isCloserRoleId(person.roleId));
   const durationValue = Number(duration);
   const invalid =
     !title.trim() ||

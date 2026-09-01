@@ -13,6 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@crm-fran/ui/components/card";
+import { isCallerRoleId, isCloserRoleId } from "@/lib/role-capabilities";
 import { Field, FieldGroup, FieldLabel } from "@crm-fran/ui/components/field";
 import {
   Select,
@@ -112,8 +113,8 @@ export function CalendarView() {
 
   const agendaDuration = preferencesQuery.data?.agendaDurationMinutes ?? 60;
   const assignees = assigneesQuery.data ?? [];
-  const callers = assignees.filter((person) => person.roleId === "role-caller");
-  const closers = assignees.filter((person) => person.roleId === "role-closer");
+  const callers = assignees.filter((person) => isCallerRoleId(person.roleId));
+  const closers = assignees.filter((person) => isCloserRoleId(person.roleId));
   const agendaEntries: CalendarEntry[] = filterAgendaLeads(
     leadsQuery.data ?? [],
   ).map((lead) => ({

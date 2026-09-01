@@ -7,6 +7,11 @@ import {
   calendarPreferences,
   user,
 } from "@crm-fran/db/schema/index";
+import {
+  COMMERCIAL_ROLE_IDS,
+  isCallerRoleId,
+  isCloserRoleId,
+} from "@crm-fran/db/schema/auth";
 
 import { permittedProcedure } from "../trpc/trpc";
 import { router } from "../index";
@@ -51,7 +56,7 @@ export const calendarRouter = router({
     db
       .select({ id: user.id, name: user.name, roleId: user.roleId })
       .from(user)
-      .where(inArray(user.roleId, ["role-caller", "role-closer"]))
+      .where(inArray(user.roleId, [...COMMERCIAL_ROLE_IDS]))
       .orderBy(asc(user.name)),
   ),
 
@@ -108,8 +113,8 @@ export const calendarRouter = router({
       );
 
       if (
-        (input.callerId && rolesById.get(input.callerId) !== "role-caller") ||
-        (input.closerId && rolesById.get(input.closerId) !== "role-closer")
+        (input.callerId && !isCallerRoleId(rolesById.get(input.callerId))) ||
+        (input.closerId && !isCloserRoleId(rolesById.get(input.closerId)))
       ) {
         throw new TRPCError({
           code: "BAD_REQUEST",
