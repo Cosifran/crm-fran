@@ -11,7 +11,7 @@ export interface QualityActivityEvent {
 export interface QualityLead {
   id: string;
   name: string;
-  email: string;
+  email: string | null;
   callerId: string | null;
   callerName: string | null;
   closerId: string | null;
@@ -32,7 +32,7 @@ export interface QualitySettings {
 export interface QualityLeadIssue {
   leadId: string;
   leadName: string;
-  leadEmail: string;
+  leadEmail: string | null;
   userId: string;
   userName: string;
   referenceAt: Date;

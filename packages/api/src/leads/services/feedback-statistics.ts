@@ -121,7 +121,7 @@ function qualityMetric(count: number, total: number) {
 type AttributionFunnelLead = {
   id: string;
   name: string;
-  email: string;
+  email: string | null;
   phone: string;
   type: "maestra" | "vsl";
   callerId: string | null;

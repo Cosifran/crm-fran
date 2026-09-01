@@ -50,6 +50,12 @@ describe("commercial observatory Arc visual contract", () => {
     expect(navigation).toContain("h-12!");
   });
 
+  it("keeps repeated assignment explanations as distinct React children", () => {
+    expect(intelligence).toContain("item.reasons.map((reason, reasonIndex)");
+    expect(intelligence).toContain("key={`${item.leadId}:${reasonIndex}:${reason}`}");
+    expect(intelligence).not.toContain("key={reason}");
+  });
+
   it("keeps seasonality legible across mobile and desktop without exposing long rules inline", () => {
     expect(observatory).toContain('aria-label="Resumen de evidencia estacional"');
     expect(observatory).toContain('aria-label="Señales estacionales por día"');

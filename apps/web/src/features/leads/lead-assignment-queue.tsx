@@ -184,7 +184,7 @@ export function LeadAssignmentQueue({
 }
 
 type PoolQuery = {
-  data?: Array<{ id: string; name?: string; email?: string; phone?: string; state?: string; createdAt?: Date | string; updatedAt?: Date | string }>;
+  data?: Array<{ id: string; name?: string; email?: string | null; phone?: string; state?: string; createdAt?: Date | string; updatedAt?: Date | string }>;
   isLoading: boolean;
   isError: boolean;
 };

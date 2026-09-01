@@ -16,7 +16,7 @@ import CloserQAForm from "./closer-qa-form";
 export interface Lead {
     id: string;
     name: string;
-    email: string;
+    email: string | null;
 	phone: string;
 	type: "maestra" | "vsl";
 	state: string;

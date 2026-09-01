@@ -37,7 +37,7 @@ export function attributionChanges(
 function attributionLeadDto(lead: {
   id: string;
   name: string;
-  email: string;
+  email: string | null;
 } & AcquisitionAttribution) {
   return {
     id: lead.id,

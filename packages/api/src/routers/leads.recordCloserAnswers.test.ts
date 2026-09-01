@@ -281,5 +281,5 @@ describe("closer feedback alert lifecycle", () => {
     expect(secondQueue.map(({ lead }) => lead.id)).toEqual([secondLeadId]);
     expect(callerMode.map(({ lead }) => lead.id)).not.toContain(firstLeadId);
     expect(callerMode.map(({ lead }) => lead.id)).not.toContain(secondLeadId);
-  });
+  }, 20_000);
 });

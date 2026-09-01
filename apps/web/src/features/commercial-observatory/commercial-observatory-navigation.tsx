@@ -11,6 +11,7 @@ import {
 import { usePathname, useRouter } from "next/navigation";
 
 import { Tabs, TabsList, TabsTrigger } from "@crm-fran/ui/components/tabs";
+import { canAccessNavigationItem } from "@crm-fran/ui/lib/navigation-policy";
 import { usePermissionState } from "@crm-fran/ui/permissions";
 
 const OBSERVATORY_TABS = [
@@ -29,7 +30,11 @@ const OBSERVATORY_TABS = [
 }[];
 
 export function commercialObservatoryTabsForPermissions(permissions: readonly string[]) {
-  return OBSERVATORY_TABS.filter((tab) => permissions.includes("*") || permissions.includes(tab.permission));
+  return OBSERVATORY_TABS.filter((tab) =>
+    tab.permission === "*"
+      ? permissions.includes("*")
+      : canAccessNavigationItem({ requiredPermission: tab.permission }, permissions),
+  );
 }
 
 export function CommercialObservatoryNavigation() {

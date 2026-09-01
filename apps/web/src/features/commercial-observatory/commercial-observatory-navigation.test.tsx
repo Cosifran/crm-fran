@@ -54,6 +54,15 @@ describe("CommercialObservatoryNavigation", () => {
     expect(screen.queryByRole("tab", { name: "Planificación" })).not.toBeInTheDocument();
   });
 
+  it("shows lead tabs to roles with the domain wildcard permission", () => {
+    mocks.permissions = ["leads:*"];
+    render(<CommercialObservatoryNavigation />);
+
+    expect(screen.getByRole("tab", { name: "Inteligencia" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Evidencia" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Feedback" })).toBeInTheDocument();
+  });
+
   it("restores intelligence and feedback from their subroutes", () => {
     mocks.pathname = "/observatorio-comercial/inteligencia";
     render(<CommercialObservatoryNavigation />);

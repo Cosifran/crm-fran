@@ -39,7 +39,7 @@ type CallerQualityEvent = FunnelLead["events"][number];
 export type CallerQualityLead = {
   id: string;
   name: string;
-  email: string;
+  email: string | null;
   phone: string;
   type: "maestra" | "vsl";
   callerId: string;

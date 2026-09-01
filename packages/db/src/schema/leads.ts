@@ -45,13 +45,14 @@ export type LeadQASession = LeadQASessionItem[];
 export const leads = pgTable("leads", {
     id: text("id").primaryKey(),
     name: text("name").notNull(),
-    email: text("email").notNull().unique(),
+	    email: text("email"),
 	    phone: text("phone").notNull(),
 	    source: text("source"),
 	    campaign: text("campaign"),
 	    ad: text("ad"),
 	    creative: text("creative"),
 	    acquisitionAngle: text("acquisition_angle"),
+	    utmContent: text("utm_content"),
 	type: text("type")
 		.$type<LeadType>()
 		.default(LEAD_TYPE.MAESTRA)

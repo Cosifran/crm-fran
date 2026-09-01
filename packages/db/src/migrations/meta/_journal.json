@@ -218,6 +218,13 @@
       "when": 1787877824571,
       "tag": "0030_absent_wasp",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1788226359183,
+      "tag": "0031_lush_black_panther",
+      "breakpoints": true
     }
   ]
 }

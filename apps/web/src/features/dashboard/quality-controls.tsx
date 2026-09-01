@@ -61,7 +61,7 @@ type QualitySettings = {
 type LeadIssue = {
   leadId: string;
   leadName: string;
-  leadEmail: string;
+  leadEmail: string | null;
   userName: string;
   referenceAt: string;
   elapsedHours: number;

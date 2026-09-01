@@ -28,6 +28,7 @@ describe("leads schema", () => {
 
 	it("allows LeadQASessionItem with authorRole and authorId", () => {
 		const item: LeadQASessionItem = {
+			questionKey: "question-1",
 			question: "Q",
 			answer: "A",
 			authorRole: LEAD_QA_ROLE.CALLER,
@@ -38,8 +39,8 @@ describe("leads schema", () => {
 
 	it("allows LeadQASession array", () => {
 		const session: LeadQASession = [
-			{ question: "Q1", answer: "A1", authorRole: LEAD_QA_ROLE.CALLER, authorId: "u1" },
-			{ question: "Q2", answer: "A2", authorRole: LEAD_QA_ROLE.CLOSER, authorId: "u2" },
+			{ questionKey: "question-1", question: "Q1", answer: "A1", authorRole: LEAD_QA_ROLE.CALLER, authorId: "u1" },
+			{ questionKey: "question-2", question: "Q2", answer: "A2", authorRole: LEAD_QA_ROLE.CLOSER, authorId: "u2" },
 		];
 		expect(session).toHaveLength(2);
 	});
@@ -68,6 +69,13 @@ describe("leads schema", () => {
 		expect(leads.ad.notNull).toBe(false);
 		expect(leads.creative.notNull).toBe(false);
 		expect(leads.acquisitionAngle.notNull).toBe(false);
+	});
+
+	it("allows imported leads without a unique email and stores hidden UTM content", () => {
+		expect(leads.email.notNull).toBe(false);
+		expect(leads.email.isUnique).toBe(false);
+		expect(leads.utmContent).toBeDefined();
+		expect(leads.utmContent.notNull).toBe(false);
 	});
 
 	it("generates attribution columns and widens the activity-kind constraint", () => {

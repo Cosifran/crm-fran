@@ -28,7 +28,7 @@ type FunnelEvent = {
 export type FunnelLead = {
   id: string;
   name: string;
-  email: string;
+  email: string | null;
   phone: string;
   type: "maestra" | "vsl";
   callerId: string;

@@ -51,7 +51,7 @@ type FeedbackDetail = {
 type FunnelLead = {
   id: string;
   name: string;
-  email: string;
+  email: string | null;
   phone: string;
   source: string | null;
   campaign: string | null;
