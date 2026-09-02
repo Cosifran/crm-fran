@@ -1,5 +1,6 @@
 # Dependencies
 node_modules
+.pnpm-store/
 .pnp
 .pnp.js
 
@@ -52,5 +53,6 @@ coverage
 .cache
 tmp
 temp
+.data/
 # Local Pi runtime state
 .atl/

@@ -1,7 +1,8 @@
 import { TRPCError } from "@trpc/server";
 import { db, eq } from "@crm-fran/db";
-import { alerts } from "@crm-fran/db/schema/index";
+import { alerts, LEAD_ACTIVITY_KIND } from "@crm-fran/db/schema/index";
 import type { Permission } from "@crm-fran/db/schema/auth";
+import { appendLeadActivity } from "../../leads/services/lead-activity";
 
 export type DismissAlertInput = {
 	id: string;
@@ -18,7 +19,8 @@ function isAdmin(permissions: Permission[]) {
 }
 
 export async function dismissAlert(input: DismissAlertInput) {
-	const alert = await db.query.alerts.findFirst({
+	return db.transaction(async (tx) => {
+	const alert = await tx.query.alerts.findFirst({
 		where: (table, { eq }) => eq(table.id, input.id),
 	});
 
@@ -43,7 +45,7 @@ export async function dismissAlert(input: DismissAlertInput) {
 		});
 	}
 
-	const [updated] = await db
+	const [updated] = await tx
 		.update(alerts)
 		.set({
 			dismissedAt: new Date(),
@@ -59,5 +61,17 @@ export async function dismissAlert(input: DismissAlertInput) {
 		});
 	}
 
+	await appendLeadActivity(tx, {
+		leadId: updated.leadId,
+		actorId: input.actorId,
+		kind: LEAD_ACTIVITY_KIND.ALERT_DISMISSED,
+		title: "Alerta descartada",
+		description: updated.message,
+		metadata: { alertId: updated.id, alertKind: updated.kind },
+		dedupeKey: `alert_dismissed:${updated.id}`,
+		occurredAt: updated.dismissedAt ?? new Date(),
+	});
+
 	return updated;
+	});
 }

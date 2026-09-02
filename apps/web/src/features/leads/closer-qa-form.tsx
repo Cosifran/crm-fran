@@ -6,12 +6,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import type { QASessionItem } from "@/app/types";
 import { trpc } from "@/utils/trpc";
+import { requiresScheduledContact } from "./closer-follow-up";
 import { useTrpcMutationWithToast } from "@/lib/use-trpc-mutation-with-toast";
 import { Input } from "@crm-fran/ui/components/input";
 import { Textarea } from "@crm-fran/ui/components/textarea";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -31,6 +33,8 @@ const formSchema = z.object({
   productFit: z.string(),
   urgencyReason: z.string(),
   extraInfo: z.string(),
+  closerOutcome: z.string(),
+  closerFeedback: z.string(),
   scheduledDate: z.string(),
   scheduledTime: z.string(),
 });
@@ -45,6 +49,8 @@ const defaultValues = {
   productFit: "",
   urgencyReason: "",
   extraInfo: "",
+  closerOutcome: "",
+  closerFeedback: "",
   scheduledDate: "",
   scheduledTime: "",
 };
@@ -60,11 +66,13 @@ const conditionalFieldNames: FieldName[] = [
   "scheduledDate",
   "scheduledTime",
   "extraInfo",
+  "closerOutcome",
 ];
 
 interface CloserQAFormProps {
   leadId: string;
   leadQuestions: QASessionItem[];
+  currentCloserId?: string | null;
   onCancel?: () => void;
   onSuccess?: () => void;
   onSubmitLabelChange?: (label: string) => void;
@@ -73,6 +81,7 @@ interface CloserQAFormProps {
 export default function CloserQAForm({
   leadId,
   leadQuestions,
+  currentCloserId,
   onSuccess,
   onSubmitLabelChange,
 }: CloserQAFormProps) {
@@ -95,6 +104,9 @@ export default function CloserQAForm({
    const [branch, setBranch] = useState<"" | "Si" | "No">(
      () => (parsedDefaults.isContacted as "" | "Si" | "No") || "",
    );
+  const [closerOutcome, setCloserOutcome] = useState(
+    () => parsedDefaults.closerOutcome,
+  );
 
   const toastMessages = hasCloserAnswers
     ? {
@@ -115,6 +127,13 @@ export default function CloserQAForm({
     trpc.leads.recordCloserAnswers.mutationOptions(),
     toastMessages,
   );
+  const rescheduleMutation = useTrpcMutationWithToast(
+    trpc.leads.assignLead.mutationOptions(),
+    {
+      success: "Reagenda guardada correctamente",
+      error: "Error al guardar la reagenda",
+    },
+  );
 
   const form = useForm({
     defaultValues: parsedDefaults,
@@ -126,14 +145,39 @@ export default function CloserQAForm({
     },
     onSubmit: async ({ value }) => {
       const payload = buildPayload(leadId, value as FormValue);
-      mutation.mutate(payload, {
+      const mutationOptions = {
         onSuccess: () => {
           onSuccess?.();
           queryClient.invalidateQueries({
             queryKey: trpc.leads.listByUserId.queryKey(),
           });
+          queryClient.invalidateQueries({
+            queryKey: trpc.leads.listAll.queryKey(),
+          });
         },
-      });
+      };
+
+      if (
+        value.closerOutcome === "Reagenda" &&
+        payload.isContacted === "Si" &&
+        currentCloserId
+      ) {
+        rescheduleMutation.mutate(
+          {
+            leadId,
+            isContacted: "Si",
+            outcome: "appointment",
+            closerId: currentCloserId,
+            scheduledDate: value.scheduledDate,
+            scheduledTime: value.scheduledTime,
+            questions: payload.questions,
+          },
+          mutationOptions,
+        );
+        return;
+      }
+
+      mutation.mutate(payload, mutationOptions);
     },
   });
 
@@ -143,11 +187,19 @@ export default function CloserQAForm({
     }
   };
 
-  const handleIsContactedChange = (value: string) => {
-    setBranch(value as "Si" | "No" | "");
-    if (value === "No" || value === "Si") {
-      resetConditionalFields();
+  const handleCloserOutcomeChange = (value: string) => {
+    resetConditionalFields();
+    setCloserOutcome(value);
+    form.setFieldValue("closerOutcome", value);
+
+    if (value === "No-show") {
+      setBranch("No");
+      form.setFieldValue("isContacted", "No");
+      return;
     }
+
+    setBranch("Si");
+    form.setFieldValue("isContacted", "Si");
   };
 
   return (
@@ -161,40 +213,80 @@ export default function CloserQAForm({
       }}
     >
       <FieldGroup>
-        <form.Field name="isContacted">
+        <form.Field name="closerOutcome">
           {(field) => (
             <Field invalid={field.state.meta.errors.length > 0}>
-              <FieldLabel htmlFor="isContacted">¿Fué contactado?</FieldLabel>
+              <FieldLabel htmlFor="closerOutcome">¿Qué ha ocurrido?</FieldLabel>
               <Select
                 value={field.state.value}
-                onValueChange={(value) => {
-                  field.handleChange(value ?? "");
-                  handleIsContactedChange(value ?? "");
-                }}
+                onValueChange={(value) =>
+                  handleCloserOutcomeChange(value ?? "")
+                }
               >
                 <SelectTrigger
-                  id="isContacted"
-                  data-testid="isContacted-trigger"
-                  className="h-11"
+                  id="closerOutcome"
+                  aria-invalid={field.state.meta.errors.length > 0}
                 >
-                  <SelectValue placeholder="Seleccione una opción" />
+                  <SelectValue placeholder="Seleccione un resultado" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Si">Si</SelectItem>
-                  <SelectItem value="No">No</SelectItem>
+                  <SelectGroup>
+                    <SelectItem value="Agenda">Agenda</SelectItem>
+                    <SelectItem value="Reagenda">Reagenda</SelectItem>
+                    <SelectItem value="Seguimiento">Seguimiento</SelectItem>
+                    <SelectItem value="Venta">Venta</SelectItem>
+                    <SelectItem value="No interesado">No interesado</SelectItem>
+                    <SelectItem value="No-show">No-show</SelectItem>
+                  </SelectGroup>
                 </SelectContent>
               </Select>
               <FieldError>
                 {field.state.meta.errors
-                  .map((error) => (typeof error === "string" ? error : ""))
+                  .map((error) =>
+                    typeof error === "string" ? error : "",
+                  )
                   .join(" ")}
               </FieldError>
             </Field>
           )}
         </form.Field>
 
+        {branch === "No" && (
+          <form.Field name="closerFeedback">
+            {(field) => (
+              <Field>
+                <FieldLabel htmlFor="closerFeedback">
+                  Feedback del closer
+                </FieldLabel>
+                <Textarea
+                  id="closerFeedback"
+                  value={field.state.value}
+                  className="min-h-24 resize-none"
+                  onChange={(event) => field.handleChange(event.target.value)}
+                />
+              </Field>
+            )}
+          </form.Field>
+        )}
+
         {branch === "Si" && (
           <>
+            <form.Field name="closerFeedback">
+              {(field) => (
+                <Field>
+                  <FieldLabel htmlFor="closerFeedback">
+                    Feedback del closer
+                  </FieldLabel>
+                  <Textarea
+                    id="closerFeedback"
+                    value={field.state.value}
+                    className="min-h-24 resize-none"
+                    onChange={(event) => field.handleChange(event.target.value)}
+                  />
+                </Field>
+              )}
+            </form.Field>
+
             <form.Field name="isDecisionMaker">
               {(field) => (
                 <Field invalid={field.state.meta.errors.length > 0}>
@@ -334,11 +426,16 @@ export default function CloserQAForm({
               )}
             </form.Field>
 
+            {requiresScheduledContact(closerOutcome) && (
             <div className="grid grid-cols-2 gap-4">
               <form.Field name="scheduledDate">
                 {(field) => (
                   <Field invalid={field.state.meta.errors.length > 0}>
-                    <FieldLabel htmlFor="scheduledDate">Fecha</FieldLabel>
+                    <FieldLabel htmlFor="scheduledDate">
+                      {closerOutcome === "Seguimiento"
+                        ? "Fecha del próximo contacto"
+                        : "Fecha"}
+                    </FieldLabel>
                     <Input
                       id="scheduledDate"
                       type="date"
@@ -379,6 +476,7 @@ export default function CloserQAForm({
                 )}
               </form.Field>
             </div>
+            )}
           </>
         )}
       </FieldGroup>
@@ -389,8 +487,8 @@ export default function CloserQAForm({
 function validateCloserAnswers(value: FormValue) {
   const fieldErrors: Record<string, string[]> = {};
 
-  if (value.isContacted !== "Si" && value.isContacted !== "No") {
-    fieldErrors.isContacted = ["Seleccione una opción"];
+  if (value.closerOutcome === "") {
+    fieldErrors.closerOutcome = ["Seleccione un resultado"];
   }
 
   if (value.isContacted === "Si") {
@@ -410,10 +508,10 @@ function validateCloserAnswers(value: FormValue) {
       fieldErrors.urgencyReason = ["Requerido"];
     }
 
-    if (value.scheduledDate === "") {
+    if (requiresScheduledContact(value.closerOutcome) && value.scheduledDate === "") {
       fieldErrors.scheduledDate = ["Requerido"];
     }
-    if (value.scheduledTime === "") {
+    if (requiresScheduledContact(value.closerOutcome) && value.scheduledTime === "") {
       fieldErrors.scheduledTime = ["Requerido"];
     }
   }
@@ -427,58 +525,87 @@ function buildPayload(
   leadId: string,
   value: FormValue,
 ):
-  | { leadId: string; isContacted: "No" }
+  | {
+      leadId: string;
+      isContacted: "No";
+      questions: { questionKey: string; question: string; answer: string }[];
+    }
   | {
       leadId: string;
       isContacted: "Si";
       questions: { questionKey: string; question: string; answer: string }[];
-      scheduledDate: string;
-      scheduledTime: string;
+      scheduledDate?: string;
+      scheduledTime?: string;
       extraNotes: string;
     } {
   if (value.isContacted === "No") {
-    return { leadId, isContacted: "No" };
-  }
-
-  return {
-    leadId,
-    isContacted: "Si",
-    questions: [
+    const questions = [
       {
         questionKey: "isContacted",
-        question: "¿Fué contactado?",
-        answer: "Si",
+        question: "¿Fue contactado?",
+        answer: "No",
       },
       {
-        questionKey: "isDecisionMaker",
-        question: "¿Es el decisor?",
-        answer: value.isDecisionMaker === "Si" ? "Si" : "No",
+        questionKey: "closerOutcome",
+        question: "Resultado de la agenda",
+        answer: "No-show",
       },
-      {
-        questionKey: "decisionMakerName",
-        question: "¿Quién es la persona correcta?",
-        answer: value.decisionMakerName,
-      },
-      {
-        questionKey: "financialSource",
-        question: "¿De dónde sale su capacidad económica?",
-        answer: value.financialSource,
-      },
-      {
-        questionKey: "productFit",
-        question: "Producto recomendado",
-        answer: value.productFit,
-      },
-      {
-        questionKey: "urgencyReason",
-        question: "¿De dónde sale la urgencia?",
-        answer: value.urgencyReason,
-      },
-      {
-        questionKey: "extraInfo",
-        question: "Información extra",
-        answer: value.extraInfo,
-      },
+    ];
+    if (value.closerFeedback.trim() !== "") {
+      questions.push({
+        questionKey: "closerFeedback",
+        question: "Feedback del closer",
+        answer: value.closerFeedback,
+      });
+    }
+    return { leadId, isContacted: "No", questions };
+  }
+
+  const questions = [
+    {
+      questionKey: "isContacted",
+      question: "¿Fué contactado?",
+      answer: "Si",
+    },
+    {
+      questionKey: "closerOutcome",
+      question: "Resultado de la agenda",
+      answer: value.closerOutcome,
+    },
+    {
+      questionKey: "isDecisionMaker",
+      question: "¿Es el decisor?",
+      answer: value.isDecisionMaker === "Si" ? "Si" : "No",
+    },
+    {
+      questionKey: "decisionMakerName",
+      question: "¿Quién es la persona correcta?",
+      answer: value.decisionMakerName,
+    },
+    {
+      questionKey: "financialSource",
+      question: "¿De dónde sale su capacidad económica?",
+      answer: value.financialSource,
+    },
+    {
+      questionKey: "productFit",
+      question: "Producto recomendado",
+      answer: value.productFit,
+    },
+    {
+      questionKey: "urgencyReason",
+      question: "¿De dónde sale la urgencia?",
+      answer: value.urgencyReason,
+    },
+    {
+      questionKey: "extraInfo",
+      question: "Información extra",
+      answer: value.extraInfo,
+    },
+  ];
+
+  if (value.scheduledDate !== "" && value.scheduledTime !== "") {
+    questions.push(
       {
         questionKey: "scheduledDate",
         question: "Fecha",
@@ -489,9 +616,27 @@ function buildPayload(
         question: "Hora",
         answer: value.scheduledTime,
       },
-    ],
-    scheduledDate: value.scheduledDate,
-    scheduledTime: value.scheduledTime,
+    );
+  }
+
+  if (value.closerFeedback.trim() !== "") {
+    questions.push({
+      questionKey: "closerFeedback",
+      question: "Feedback del closer",
+      answer: value.closerFeedback,
+    });
+  }
+
+  return {
+    leadId,
+    isContacted: "Si",
+    questions,
+    ...(value.scheduledDate !== "" && value.scheduledTime !== ""
+      ? {
+          scheduledDate: value.scheduledDate,
+          scheduledTime: value.scheduledTime,
+        }
+      : {}),
     extraNotes: value.extraInfo,
   };
 }

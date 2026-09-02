@@ -17,7 +17,12 @@ await db
     {
       id: "role-closer",
       name: "Closer",
-      permissions: ["leads:*", "alerts:*"],
+      permissions: ["leads:*", "alerts:*", "sales:*"],
+    },
+    {
+      id: "role-caller-closer",
+      name: "Caller + Closer",
+      permissions: ["leads:*", "alerts:*", "users:read", "sales:*"],
     },
     {
       id: "role-admin",

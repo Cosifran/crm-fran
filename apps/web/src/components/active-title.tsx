@@ -4,7 +4,16 @@ const ROUTE_MAP: Record<string, string> = {
     "/": "Dashboard",
     "/alerts": "Alertas",
     "/users": "Usuarios",
-    "/leads": "Leads",
+    "/leads": "Leads personales",
+    "/leads-personales": "Leads personales",
+    "/ventas-closer": "Ventas closer",
+    "/whatsapp": "WhatsApp",
+    "/leads-generales": "Leads generales",
+    "/estadisticas-personales": "Estadísticas personales",
+    "/estadisticas-personales/rankings": "Rankings",
+    "/usuarios-accesos": "Usuarios y accesos",
+    "/observatorio-comercial/inteligencia": "Inteligencia",
+    "/observatorio-comercial/feedback": "Feedback",
     "/analytical": "Analitica",
     "/campaigns": "Campañas",
     "/calendar": "Calendario",
@@ -15,5 +24,5 @@ const ROUTE_MAP: Record<string, string> = {
 }
 export function ActiveTitle() {
     const pathname = usePathname()
-    return <>{ROUTE_MAP[pathname] ?? "CRM"}</>
+    return <>{ROUTE_MAP[pathname] ?? "Aurea"}</>
 }

@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeAll, afterEach } from "vitest";
-import { db, inArray } from "@crm-fran/db";
+import { db, desc, eq, inArray } from "@crm-fran/db";
 import {
+	leadActivityEvents,
 	leads,
 	roles,
 	user,
 	type LeadQASessionItem,
-	LEAD_QA_ROLE,
 } from "@crm-fran/db/schema/index";
 import type { Context } from "../../context";
 
@@ -88,17 +88,30 @@ describe("adminEditLeadQASession", () => {
 		await insertUser({ id: adminId, name: "Admin", email: `${adminId}@test.com`, roleId: "role-admin" });
 		await insertLead({ id: leadId });
 
-		const items: LeadQASessionItem[] = [
-			{ question: "Q1", answer: "A1", authorRole: LEAD_QA_ROLE.CALLER, authorId: "u1" },
-			{ question: "Q2", answer: "A2", authorRole: LEAD_QA_ROLE.CLOSER, authorId: "u2" },
+		const questions = [
+			{ questionKey: "q1", question: "Q1", answer: "A1" },
+			{ questionKey: "q2", question: "Q2", answer: "A2" },
 		];
 
 		const updated = await adminEditLeadQASession({
 			ctx: buildContext(adminId, "role-admin", adminPermissions),
-			input: { leadId, items },
+			input: { leadId, isContacted: "Si", questions },
 		});
 
-		expect(updated.questions).toEqual(items);
+		expect(updated.questions).toEqual(questions);
+		const stored = await db.query.leads.findFirst({ where: (table, { eq }) => eq(table.id, leadId) });
+		expect(stored?.questions).toEqual(questions.map((question) => ({ ...question, authorRole: "caller", authorId: adminId })));
+		const [administrativeEvent] = await db
+			.select({ kind: leadActivityEvents.kind, actorRole: leadActivityEvents.actorRole, metadata: leadActivityEvents.metadata })
+			.from(leadActivityEvents)
+			.where(eq(leadActivityEvents.leadId, leadId))
+			.orderBy(desc(leadActivityEvents.occurredAt))
+			.limit(1);
+		expect(administrativeEvent).toMatchObject({
+			kind: "caller_feedback",
+			actorRole: "admin",
+			metadata: { activitySource: "administrative_qa_edit" },
+		});
 	});
 
 	it("rejects a caller without wildcard permission", async () => {
@@ -111,7 +124,7 @@ describe("adminEditLeadQASession", () => {
 		await expect(
 			adminEditLeadQASession({
 				ctx: buildContext(callerId, "role-caller", callerPermissions),
-				input: { leadId, items: [] },
+				input: { leadId, isContacted: "Si", questions: [] },
 			}),
 		).rejects.toMatchObject({ code: "FORBIDDEN" });
 
@@ -131,7 +144,7 @@ describe("adminEditLeadQASession", () => {
 		await expect(
 			adminEditLeadQASession({
 				ctx: buildContext(closerId, "role-closer", closerPermissions),
-				input: { leadId, items: [] },
+				input: { leadId, isContacted: "Si", questions: [] },
 			}),
 		).rejects.toMatchObject({ code: "FORBIDDEN" });
 

@@ -2,15 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
 import "../index.css";
-import Header from "@/components/header";
 import Providers from "@/components/providers";
-import { ActiveTitle } from "@/components/active-title";
-import { ModeToggle } from "@/components/mode-toggle";
-import { AlertButton } from "@/features/alerts/alert-button";
-
-import { SiteHeader } from "@crm-fran/ui/components/site-header";
-import { AppSidebar } from "@/components/app-sidebar";
-import { SidebarInset, SidebarProvider } from "@crm-fran/ui/components/sidebar";
+import { AppShell } from "@/components/app-shell";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -23,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "crm-fran",
-  description: "crm-fran",
+  title: "Aurea",
+  description: "Aurea",
 };
 
 export default function RootLayout({
@@ -33,27 +26,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning cz-shortcut-listen="true">
+    <html lang="es" suppressHydrationWarning cz-shortcut-listen="true">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <Providers>
-          <SidebarProvider
-            style={
-              {
-                "--sidebar-width": "calc(var(--spacing) * 72)",
-                "--header-height": "calc(var(--spacing) * 12)",
-              } as React.CSSProperties
-            }
-          >
-            <AppSidebar variant="inset" />
-            <SidebarInset>
-              <SiteHeader toggle={<ModeToggle />} alertButton={<AlertButton />}>
-                <ActiveTitle />
-              </SiteHeader>
-              <div className="flex flex-1 flex-col"> {children}</div>
-            </SidebarInset>
-          </SidebarProvider>
+          <AppShell>{children}</AppShell>
         </Providers>
       </body>
     </html>

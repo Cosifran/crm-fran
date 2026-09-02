@@ -6,7 +6,14 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@crm-fran/ui/components/sidebar"
+
+export function isNavigationItemActive(currentPathname: string | undefined, itemUrl: string) {
+  if (!currentPathname) return false
+  if (currentPathname === itemUrl) return true
+  return itemUrl !== "/" && currentPathname.startsWith(`${itemUrl}/`)
+}
 
 export function NavMain({
   items,
@@ -21,6 +28,8 @@ export function NavMain({
   LinkComponent?: React.ComponentType<any> | string
   currentPathname?: string
 }) {
+  const { isMobile, setOpenMobile } = useSidebar()
+
   return (
     <SidebarGroup>
       <SidebarGroupContent className="flex flex-col gap-2">
@@ -47,15 +56,16 @@ export function NavMain({
         </SidebarMenu> */}
         <SidebarMenu>
           {items.map((item) => {
-            const isActive =
-              currentPathname === item.url ||
-              (item.url !== "/" && currentPathname?.startsWith(item.url))
+            const isActive = isNavigationItemActive(currentPathname, item.url)
             return (
               <SidebarMenuItem key={item.title}>
                 <SidebarMenuButton
                   tooltip={item.title}
                   render={<LinkComponent href={item.url} />}
                   isActive={isActive}
+                  onClick={() => {
+                    if (isMobile) setOpenMobile(false)
+                  }}
                   className={isActive ? "bg-blue-100 text-blue-700 font-bold" : ""}
                 >
                   {item.icon}

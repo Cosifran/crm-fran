@@ -1,7 +1,8 @@
 import { TRPCError } from "@trpc/server";
 import { db, eq } from "@crm-fran/db";
-import { alerts } from "@crm-fran/db/schema/index";
+import { alerts, LEAD_ACTIVITY_KIND } from "@crm-fran/db/schema/index";
 import type { Permission } from "@crm-fran/db/schema/auth";
+import { appendLeadActivity } from "../../leads/services/lead-activity";
 
 export type ResolveAlertInput = {
 	id: string;
@@ -18,7 +19,8 @@ function isAdmin(permissions: Permission[]) {
 }
 
 export async function resolveAlert(input: ResolveAlertInput) {
-	const alert = await db.query.alerts.findFirst({
+	return db.transaction(async (tx) => {
+	const alert = await tx.query.alerts.findFirst({
 		where: (table, { eq }) => eq(table.id, input.id),
 	});
 
@@ -43,7 +45,7 @@ export async function resolveAlert(input: ResolveAlertInput) {
 		});
 	}
 
-	const [updated] = await db
+	const [updated] = await tx
 		.update(alerts)
 		.set({
 			resolvedAt: new Date(),
@@ -58,5 +60,17 @@ export async function resolveAlert(input: ResolveAlertInput) {
 		});
 	}
 
+	await appendLeadActivity(tx, {
+		leadId: updated.leadId,
+		actorId: input.actorId,
+		kind: LEAD_ACTIVITY_KIND.ALERT_RESOLVED,
+		title: "Alerta resuelta",
+		description: updated.message,
+		metadata: { alertId: updated.id, alertKind: updated.kind },
+		dedupeKey: `alert_resolved:${updated.id}`,
+		occurredAt: updated.resolvedAt ?? new Date(),
+	});
+
 	return updated;
+	});
 }

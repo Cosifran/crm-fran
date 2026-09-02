@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../index";
 import { permittedProcedure } from "@crm-fran/api/trpc/trpc";
 import {
@@ -6,10 +7,21 @@ import {
 	countAlerts,
 	dismissAlert,
 	listAlerts,
+	listLeadRiskQueue,
+	listNextBestActions,
+	resolveNextBestActionModes,
+	listRecommendationMetrics,
+	recordRecommendationEvent,
 	resolveAlert,
 	processRecurringAlerts,
+	getAlertPreferences,
+	updateAlertPreferences,
 } from "../alerts/services/index";
-import { ALERT_KIND, ALERT_SEVERITY } from "@crm-fran/db/schema/index";
+import {
+	ALERT_KIND,
+	ALERT_RELEVANCE_MODE,
+	ALERT_SEVERITY,
+} from "@crm-fran/db/schema/index";
 
 const createAlertInput = z.object({
 	leadId: z.string().min(1),
@@ -36,11 +48,55 @@ const alertIdInput = z.object({
 	id: z.string().min(1),
 });
 
+export const recommendationEventInput = z.object({
+	leadId: z.string().min(1),
+	recommendationKey: z.string().min(1),
+	actionType: z.string().min(1).max(100).optional(),
+	kind: z.enum(["recommendation_shown", "recommendation_opened", "recommendation_completed", "recommendation_skipped"]),
+	reason: z.string().trim().min(1).max(500).optional(),
+	reactionTimeMs: z.number().int().nonnegative().optional(),
+}).superRefine((value, ctx) => {
+	if (value.kind === "recommendation_skipped" && !value.reason) {
+		ctx.addIssue({ code: "custom", path: ["reason"], message: "Skip reason is required" });
+	}
+});
+
+export const nextBestActionModeInput = z.object({ mode: z.enum(["caller", "closer"]) });
+
+export const alertPreferencesInput = z
+	.object({
+		relevanceMode: z.nativeEnum(ALERT_RELEVANCE_MODE),
+		urgentThresholdHours: z.number().int().min(0).max(720),
+		warningThresholdHours: z.number().int().min(1).max(720),
+		noContactSeverity: z.nativeEnum(ALERT_SEVERITY),
+		followUpSeverity: z.nativeEnum(ALERT_SEVERITY),
+		futureCallSeverity: z.nativeEnum(ALERT_SEVERITY),
+		appointmentSeverity: z.nativeEnum(ALERT_SEVERITY),
+		rescheduledSeverity: z.nativeEnum(ALERT_SEVERITY),
+	})
+	.refine(
+		(value) => value.warningThresholdHours > value.urgentThresholdHours,
+		{
+			message: "Warning threshold must be greater than urgent threshold",
+			path: ["warningThresholdHours"],
+		},
+	);
+
 export const alertsRouter = router({
+	getPreferences: protectedProcedure.query(async ({ ctx }) => {
+		return await getAlertPreferences(ctx.session.user.id);
+	}),
+
+	updatePreferences: protectedProcedure
+		.input(alertPreferencesInput)
+		.mutation(async ({ ctx, input }) => {
+			return await updateAlertPreferences(ctx.session.user.id, input);
+		}),
+
 	createAlert: permittedProcedure(["alerts:write"])
 		.input(createAlertInput)
-		.mutation(async ({ input }) => {
-			return await createAlert(input);
+		.mutation(async ({ ctx, input }) => {
+			return await createAlert({ ...input, actorId: ctx.session.user.id });
 		}),
 
 	countAlerts: permittedProcedure(["alerts:read"]).query(async ({ ctx }) => {
@@ -63,6 +119,49 @@ export const alertsRouter = router({
 				limit: input?.limit,
 				offset: input?.offset,
 			});
+		}),
+
+	listLeadRiskQueue: permittedProcedure(["alerts:read"]).query(async ({ ctx }) => {
+		return await listLeadRiskQueue({
+			actorId: ctx.session.user.id,
+			permissions: ctx.permissions,
+		});
+	}),
+
+	getNextBestActionModes: permittedProcedure(["alerts:read"]).query(async ({ ctx }) => {
+		return await resolveNextBestActionModes({
+			actorId: ctx.session.user.id,
+			roleId: ctx.session.user.roleId,
+			permissions: ctx.permissions,
+		});
+	}),
+
+	listNextBestActions: permittedProcedure(["alerts:read"]).input(nextBestActionModeInput).query(async ({ ctx, input }) => {
+		const authorizedModes = await resolveNextBestActionModes({ actorId: ctx.session.user.id, roleId: ctx.session.user.roleId, permissions: ctx.permissions });
+		if (!authorizedModes.includes(input.mode)) {
+			throw new TRPCError({ code: "FORBIDDEN", message: "El modo de trabajo no corresponde al rol autenticado" });
+		}
+		return await listNextBestActions({
+			actorId: ctx.session.user.id,
+			permissions: ctx.permissions,
+			roleId: ctx.session.user.roleId,
+			mode: input.mode,
+			authorizedModes,
+		});
+	}),
+
+	getNextBestActionMetrics: permittedProcedure(["alerts:read"]).input(nextBestActionModeInput.optional()).query(async ({ ctx, input }) => {
+		const authorizedModes = await resolveNextBestActionModes({ actorId: ctx.session.user.id, roleId: ctx.session.user.roleId, permissions: ctx.permissions });
+		if (input && !authorizedModes.includes(input.mode)) {
+			throw new TRPCError({ code: "FORBIDDEN", message: "El modo de trabajo no corresponde al rol autenticado" });
+		}
+		return await listRecommendationMetrics({ actorId: ctx.session.user.id, permissions: ctx.permissions, mode: input?.mode });
+	}),
+
+	recordNextBestActionEvent: permittedProcedure(["alerts:write"])
+		.input(recommendationEventInput)
+		.mutation(async ({ ctx, input }) => {
+			return await recordRecommendationEvent({ ...input, actorId: ctx.session.user.id, permissions: ctx.permissions });
 		}),
 
 	dismissAlert: permittedProcedure(["alerts:write"])

@@ -1,7 +1,15 @@
 import { describe, expect, it, beforeAll, afterEach } from "vitest";
 import { TRPCError } from "@trpc/server";
 import { db, eq, inArray } from "@crm-fran/db";
-import { alerts, leads, roles, user } from "@crm-fran/db/schema/index";
+import {
+  alerts,
+  leads,
+  roles,
+  user,
+  ALERT_KIND,
+  ALERT_SEVERITY,
+  LEAD_POOL_STATUS,
+} from "@crm-fran/db/schema/index";
 import { LEAD_STATE } from "@crm-fran/db/schema/state";
 import { LEAD_QA_ROLE, type LeadQASessionItem } from "@crm-fran/db/schema/index";
 import { assignLead } from "../leads/services/assign-lead";
@@ -125,7 +133,15 @@ describe("assignLead service", () => {
     const updated = await db.query.leads.findFirst({ where: (table, { eq }) => eq(table.id, leadId) });
     expect(updated?.state).toBe(LEAD_STATE.ASIGNADO);
     expect(updated?.callerId).toBe(callerId);
-    expect(updated?.questions).toEqual([]);
+    expect(updated?.questions).toEqual([
+      {
+        questionKey: "isContacted",
+        question: "¿Fué contactado?",
+        answer: "No",
+        authorRole: LEAD_QA_ROLE.CALLER,
+        authorId: callerId,
+      },
+    ]);
 
     const alertRows = await db.select().from(alerts).where(eq(alerts.leadId, leadId));
     expect(alertRows).toHaveLength(1);
@@ -133,20 +149,24 @@ describe("assignLead service", () => {
     const alert = alertRows[0];
     created.alertIds.push(alert?.id ?? "");
     expect(alert?.kind).toBe("no_contact");
-    expect(alert?.severity).toBe("high");
+    expect(alert?.severity).toBe("urgent");
     expect(alert?.intervalMinutes).toBe(1440);
     expect(alert?.targetUserId).toBe(callerId);
     expect(alert?.nextShowAt).toBeInstanceOf(Date);
   });
 
-  it("preserves existing questions when isContacted is No", async () => {
+  it("replaces the caller's isContacted answer with No while preserving other questions", async () => {
     const callerId = crypto.randomUUID();
+    const otherCallerId = crypto.randomUUID();
     const leadId = crypto.randomUUID();
 
     await insertUser({ id: callerId, name: "Caller", email: "caller5@test.com", roleId: "role-caller" });
+    await insertUser({ id: otherCallerId, name: "Other Caller", email: "caller6@test.com", roleId: "role-caller" });
 
     const existingQuestions: LeadQASessionItem[] = [
       { questionKey: "isContacted", question: "Q1", answer: "A1", authorRole: LEAD_QA_ROLE.CALLER, authorId: callerId },
+      { questionKey: "budget", question: "Budget?", answer: "500", authorRole: LEAD_QA_ROLE.CALLER, authorId: callerId },
+      { questionKey: "isContacted", question: "Contacted?", answer: "Si", authorRole: LEAD_QA_ROLE.CALLER, authorId: otherCallerId },
       { questionKey: "budget", question: "Budget?", answer: "1000", authorRole: LEAD_QA_ROLE.CLOSER, authorId: "closer-1" },
     ];
 
@@ -164,7 +184,67 @@ describe("assignLead service", () => {
     expect(result.leadId).toBe(leadId);
 
     const updated = await db.query.leads.findFirst({ where: (table, { eq }) => eq(table.id, leadId) });
-    expect(updated?.questions).toEqual(existingQuestions);
+    expect(updated?.questions).toEqual([
+      existingQuestions[1],
+      existingQuestions[2],
+      existingQuestions[3],
+      {
+        questionKey: "isContacted",
+        question: "Q1",
+        answer: "No",
+        authorRole: LEAD_QA_ROLE.CALLER,
+        authorId: callerId,
+      },
+    ]);
+
+    const callerContactedItems = (updated?.questions as LeadQASessionItem[]).filter(
+      (item) =>
+        item.questionKey === "isContacted" &&
+        item.authorRole === LEAD_QA_ROLE.CALLER &&
+        item.authorId === callerId,
+    );
+    expect(callerContactedItems).toHaveLength(1);
+    expect(callerContactedItems[0]?.answer).toBe("No");
+  });
+
+  it("discards and unassigns a lead when its phone number does not exist", async () => {
+    const callerId = crypto.randomUUID();
+    const leadId = crypto.randomUUID();
+
+    await insertUser({ id: callerId, name: "Caller", email: "wrong-number@test.com", roleId: "role-caller" });
+    await insertLead({ id: leadId });
+
+    const result = await assignLead({
+      callerId,
+      input: { leadId, isContacted: "No", phoneStatus: "invalid" },
+    });
+
+    expect(result.leadId).toBe(leadId);
+
+    const updated = await db.query.leads.findFirst({ where: (table, { eq }) => eq(table.id, leadId) });
+    expect(updated?.state).toBe(LEAD_STATE.NUMERO_ERRONEO);
+    expect(updated?.poolStatus).toBe(LEAD_POOL_STATUS.DISCARDED);
+    expect(updated?.callerId).toBeNull();
+    expect(updated?.closerId).toBeNull();
+    expect(updated?.questions).toEqual([
+      {
+        questionKey: "isContacted",
+        question: "¿Fué contactado?",
+        answer: "No",
+        authorRole: LEAD_QA_ROLE.CALLER,
+        authorId: callerId,
+      },
+      {
+        questionKey: "phoneStatus",
+        question: "Estado del número",
+        answer: "Número no existe",
+        authorRole: LEAD_QA_ROLE.CALLER,
+        authorId: callerId,
+      },
+    ]);
+
+    const alertRows = await db.select().from(alerts).where(eq(alerts.leadId, leadId));
+    expect(alertRows).toHaveLength(0);
   });
 
   it("preserves closer items when caller resubmits with Si", async () => {
@@ -266,6 +346,321 @@ describe("assignLead service", () => {
     expect(callerAItems[0]?.answer).toBe("Si");
   });
 
+  it("creates one scheduled alert for a future call with selected severity", async () => {
+    const callerId = crypto.randomUUID();
+    const leadId = crypto.randomUUID();
+
+    await insertUser({ id: callerId, name: "Caller", email: "future-call@test.com", roleId: "role-caller" });
+    await insertLead({ id: leadId });
+
+    await assignLead({
+      callerId,
+      input: {
+        leadId,
+        isContacted: "Si",
+        outcome: "future_call",
+        scheduledDate: "2099-01-01",
+        scheduledTime: "10:00",
+        alertSeverity: "warning",
+      },
+    });
+
+    const alertRows = await db.select().from(alerts).where(eq(alerts.leadId, leadId));
+    expect(alertRows).toHaveLength(1);
+    expect(alertRows[0]?.kind).toBe(ALERT_KIND.FUTURE_CALL);
+    expect(alertRows[0]?.severity).toBe(ALERT_SEVERITY.WARNING);
+    expect(alertRows[0]?.maxOccurrences).toBe(1);
+    expect(alertRows[0]?.nextShowAt).toEqual(new Date("2099-01-01T10:00"));
+
+    const lead = await db.query.leads.findFirst({ where: (table, { eq }) => eq(table.id, leadId) });
+    expect(lead?.questions).toEqual([
+      expect.objectContaining({
+        questionKey: "callerOutcome",
+        answer: "Llamar a futuro",
+        authorId: callerId,
+      }),
+      expect.objectContaining({
+        questionKey: "scheduledDate",
+        answer: "2099-01-01",
+        authorId: callerId,
+      }),
+      expect.objectContaining({
+        questionKey: "scheduledTime",
+        answer: "10:00",
+        authorId: callerId,
+      }),
+      expect.objectContaining({
+        questionKey: "alertSeverity",
+        answer: "warning",
+        authorId: callerId,
+      }),
+    ]);
+  });
+
+  it("saves an appointment with its first schedule and a closer alert", async () => {
+    const callerId = crypto.randomUUID();
+    const closerId = crypto.randomUUID();
+    const leadId = crypto.randomUUID();
+
+    await insertUser({ id: callerId, name: "Caller", email: "appointment-caller@test.com", roleId: "role-caller" });
+    await insertUser({ id: closerId, name: "Closer", email: "appointment-closer@test.com", roleId: "role-closer" });
+    await insertLead({ id: leadId });
+
+    await assignLead({
+      callerId,
+      input: {
+        leadId,
+        isContacted: "Si",
+        outcome: "appointment",
+        closerId,
+        scheduledDate: "2099-01-01",
+        scheduledTime: "10:00",
+      },
+    });
+
+    const alertRows = await db.select().from(alerts).where(eq(alerts.leadId, leadId));
+    expect(alertRows).toHaveLength(1);
+    expect(alertRows[0]?.kind).toBe(ALERT_KIND.APPOINTMENT);
+    expect(alertRows[0]?.targetUserId).toBe(closerId);
+    expect(alertRows[0]?.nextShowAt).toEqual(new Date("2099-01-01T10:00"));
+
+    const lead = await db.query.leads.findFirst({ where: (table, { eq }) => eq(table.id, leadId) });
+    expect(lead?.closerId).toBe(closerId);
+    expect(lead?.questions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ questionKey: "callerOutcome", answer: "Agenda" }),
+        expect.objectContaining({ questionKey: "closerId", answer: closerId }),
+        expect.objectContaining({ questionKey: "scheduledDate", answer: "2099-01-01" }),
+        expect.objectContaining({ questionKey: "scheduledTime", answer: "10:00" }),
+        expect.objectContaining({ questionKey: "firstAppointmentDate", answer: "2099-01-01" }),
+        expect.objectContaining({ questionKey: "firstAppointmentTime", answer: "10:00" }),
+        expect.objectContaining({ questionKey: "appointmentRescheduled", answer: "No" }),
+      ]),
+    );
+  });
+
+  it("turns an appointment alert into a reschedule while preserving the first schedule", async () => {
+    const callerId = crypto.randomUUID();
+    const closerId = crypto.randomUUID();
+    const leadId = crypto.randomUUID();
+
+    await insertUser({ id: callerId, name: "Caller", email: "reschedule-caller@test.com", roleId: "role-caller" });
+    await insertUser({ id: closerId, name: "Closer", email: "reschedule-closer@test.com", roleId: "role-closer" });
+    await insertLead({ id: leadId });
+
+    await assignLead({
+      callerId,
+      input: {
+        leadId,
+        isContacted: "Si",
+        outcome: "appointment",
+        closerId,
+        scheduledDate: "2099-01-01",
+        scheduledTime: "10:00",
+      },
+    });
+
+    const [firstAlert] = await db.select().from(alerts).where(eq(alerts.leadId, leadId));
+
+    await assignLead({
+      callerId,
+      input: {
+        leadId,
+        isContacted: "Si",
+        outcome: "appointment",
+        closerId,
+        scheduledDate: "2099-01-02",
+        scheduledTime: "11:00",
+      },
+    });
+
+    const alertRows = await db.select().from(alerts).where(eq(alerts.leadId, leadId));
+    expect(alertRows).toHaveLength(1);
+    expect(alertRows[0]?.id).toBe(firstAlert?.id);
+    expect(alertRows[0]?.kind).toBe(ALERT_KIND.RESCHEDULED);
+    expect(alertRows[0]?.nextShowAt).toEqual(new Date("2099-01-02T11:00"));
+
+    const lead = await db.query.leads.findFirst({ where: (table, { eq }) => eq(table.id, leadId) });
+    expect(lead?.questions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ questionKey: "firstAppointmentDate", answer: "2099-01-01" }),
+        expect.objectContaining({ questionKey: "firstAppointmentTime", answer: "10:00" }),
+        expect.objectContaining({ questionKey: "appointmentRescheduled", answer: "Si" }),
+        expect.objectContaining({ questionKey: "appointmentRescheduledAt" }),
+        expect.objectContaining({
+          questionKey: "appointmentHistory",
+          answer: JSON.stringify([
+            { date: "2099-01-01", time: "10:00" },
+            { date: "2099-01-02", time: "11:00" },
+          ]),
+        }),
+      ]),
+    );
+  });
+
+  it("allows a closer to reschedule without replacing the original caller", async () => {
+    const callerId = crypto.randomUUID();
+    const closerId = crypto.randomUUID();
+    const leadId = crypto.randomUUID();
+
+    await insertUser({
+      id: callerId,
+      name: "Caller",
+      email: `caller-${callerId}@test.com`,
+      roleId: "role-caller",
+    });
+    await insertUser({
+      id: closerId,
+      name: "Closer",
+      email: `closer-${closerId}@test.com`,
+      roleId: "role-closer",
+    });
+    await insertLead({ id: leadId });
+
+    await assignLead({
+      callerId,
+      input: {
+        leadId,
+        isContacted: "Si",
+        outcome: "appointment",
+        closerId,
+        scheduledDate: "2099-01-01",
+        scheduledTime: "10:00",
+      },
+    });
+
+    const [firstAlert] = await db
+      .select()
+      .from(alerts)
+      .where(eq(alerts.leadId, leadId));
+    if (!firstAlert) throw new Error("Expected appointment alert");
+
+    await assignLead({
+      callerId: closerId,
+      authorRole: LEAD_QA_ROLE.CLOSER,
+      permissions: ["alerts:*", "leads:*"],
+      input: {
+        leadId,
+        sourceAlertId: firstAlert.id,
+        isContacted: "Si",
+        outcome: "appointment",
+        closerId,
+        scheduledDate: "2099-01-02",
+        scheduledTime: "11:00",
+      },
+    });
+
+    const lead = await db.query.leads.findFirst({
+      where: (table, { eq }) => eq(table.id, leadId),
+    });
+    const [updatedAlert] = await db
+      .select()
+      .from(alerts)
+      .where(eq(alerts.leadId, leadId));
+
+    expect(lead?.callerId).toBe(callerId);
+    expect(updatedAlert?.id).toBe(firstAlert?.id);
+    expect(updatedAlert?.kind).toBe(ALERT_KIND.RESCHEDULED);
+    expect(updatedAlert?.resolvedAt).toBeNull();
+    expect(lead?.questions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          questionKey: "scheduledDate",
+          answer: "2099-01-02",
+          authorRole: LEAD_QA_ROLE.CLOSER,
+          authorId: closerId,
+        }),
+        expect.objectContaining({
+          questionKey: "appointmentHistory",
+          answer: JSON.stringify([
+            { date: "2099-01-01", time: "10:00" },
+            { date: "2099-01-02", time: "11:00" },
+          ]),
+        }),
+      ]),
+    );
+  });
+
+  it("resolves the source alert when the recorded outcome is terminal", async () => {
+    const callerId = crypto.randomUUID();
+    const closerId = crypto.randomUUID();
+    const leadId = crypto.randomUUID();
+
+    await insertUser({
+      id: callerId,
+      name: "Caller",
+      email: `terminal-caller-${callerId}@test.com`,
+      roleId: "role-caller",
+    });
+    await insertUser({
+      id: closerId,
+      name: "Closer",
+      email: `terminal-closer-${closerId}@test.com`,
+      roleId: "role-closer",
+    });
+    await insertLead({ id: leadId });
+
+    await assignLead({
+      callerId,
+      input: {
+        leadId,
+        isContacted: "Si",
+        outcome: "appointment",
+        closerId,
+        scheduledDate: "2099-01-01",
+        scheduledTime: "10:00",
+      },
+    });
+
+    const [sourceAlert] = await db
+      .select()
+      .from(alerts)
+      .where(eq(alerts.leadId, leadId));
+    if (!sourceAlert) throw new Error("Expected appointment alert");
+
+    await assignLead({
+      callerId,
+      authorRole: LEAD_QA_ROLE.CALLER,
+      permissions: ["alerts:*", "leads:*"],
+      input: {
+        leadId,
+        sourceAlertId: sourceAlert.id,
+        isContacted: "Si",
+        outcome: "not_fit",
+      },
+    });
+
+    const resolved = await db.query.alerts.findFirst({
+      where: (table, { eq }) => eq(table.id, sourceAlert.id),
+    });
+    const lead = await db.query.leads.findFirst({
+      where: (table, { eq }) => eq(table.id, leadId),
+    });
+
+    expect(resolved?.resolvedAt).toBeInstanceOf(Date);
+    expect(lead?.callerId).toBe(callerId);
+  });
+
+  it.each([
+    ["not_fit", "No encaja"],
+    ["not_interested", "No interesado"],
+  ] as const)("saves %s without extra answers or alerts", async (outcome, label) => {
+    const callerId = crypto.randomUUID();
+    const leadId = crypto.randomUUID();
+
+    await insertUser({ id: callerId, name: "Caller", email: `${outcome}@test.com`, roleId: "role-caller" });
+    await insertLead({ id: leadId });
+
+    await assignLead({ callerId, input: { leadId, isContacted: "Si", outcome } });
+
+    const alertRows = await db.select().from(alerts).where(eq(alerts.leadId, leadId));
+    expect(alertRows).toHaveLength(0);
+    const lead = await db.query.leads.findFirst({ where: (table, { eq }) => eq(table.id, leadId) });
+    expect(lead?.questions).toEqual([
+      expect.objectContaining({ questionKey: "callerOutcome", answer: label }),
+    ]);
+  });
+
   it("rejects old yes/no encoding via Zod schema", () => {
     const resultSi = assignLeadInput.safeParse({
       leadId: "test",
@@ -280,6 +675,13 @@ describe("assignLead service", () => {
       isContacted: "No",
     });
     expect(resultNo.success).toBe(true);
+
+    const resultWrongNumber = assignLeadInput.safeParse({
+      leadId: "test",
+      isContacted: "No",
+      phoneStatus: "invalid",
+    });
+    expect(resultWrongNumber.success).toBe(true);
 
     const resultOldYes = assignLeadInput.safeParse({
       leadId: "test",

@@ -73,6 +73,7 @@ vi.mock("./assign-lead-form", () => ({
 
 const baseLead = {
   id: "lead-1",
+  type: "maestra" as const,
   name: "Test Lead",
   email: "test@example.com",
   phone: "+54 11 5555 5555",
@@ -163,37 +164,77 @@ describe("AssignLeadDrawer — orquesta submitFormId por rol", () => {
     expect(submitButton).toHaveAttribute("form", "closer-qa-form");
   });
 
-  it("admin: el form activo del footer refleja el activeTab inicial", async () => {
-    setupRole("role-admin");
-    const user = userEvent.setup();
+  it("shows a named Feedback trigger when used from Agendas", () => {
+    setupRole("role-closer");
 
-    render(<AssignLeadDrawer lead={baseLead} />);
-    await openDrawer(user);
+    render(<AssignLeadDrawer lead={baseLead} triggerLabel="Feedback" />);
 
-    expect(screen.getByTestId("admin-caller-form")).toBeInTheDocument();
-
-    const submitButton = screen.getByRole("button", { name: /guardar/i });
-    expect(submitButton).toHaveAttribute("form", "admin-caller-form");
+    expect(
+      screen.getByRole("button", { name: "Feedback" }),
+    ).toBeInTheDocument();
   });
 
-  it("admin: al cambiar de tab el submitFormId del footer se actualiza", async () => {
+  it("opens post-assignment feedback immediately without rendering another trigger", () => {
+    setupRole("role-caller");
+
+    render(
+      <AssignLeadDrawer
+        lead={baseLead}
+        mode="post-assignment-feedback"
+        defaultOpen
+        hideTrigger
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: /abrir drawer/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Añadir feedback" })).toBeInTheDocument();
+    expect(screen.getByTestId("assign-lead-form")).toBeInTheDocument();
+  });
+
+  it("admin: opens the real closer feedback form from Agendas", async () => {
+    setupRole("role-admin");
+    const user = userEvent.setup();
+
+    render(
+      <AssignLeadDrawer
+        lead={baseLead}
+        triggerLabel="Feedback"
+        mode="agenda-feedback"
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Feedback" }));
+
+    expect(screen.getByTestId("closer-qa-form")).toBeInTheDocument();
+    expect(screen.queryByTestId("admin-caller-form")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /guardar/i })).toHaveAttribute(
+      "form",
+      "closer-qa-form",
+    );
+  });
+
+  it("multi-role user can open closer feedback only for a lead assigned to their identity", async () => {
+    setupRole("role-caller");
+    const user = userEvent.setup();
+
+    render(<AssignLeadDrawer lead={{ ...baseLead, closerId: "user-1" }} triggerLabel="Gestionar ahora" mode="agenda-feedback" />);
+    await user.click(screen.getByRole("button", { name: "Gestionar ahora" }));
+
+    expect(screen.getByTestId("closer-qa-form")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /guardar/i })).toHaveAttribute("form", "closer-qa-form");
+  });
+
+  it("admin: muestra el formulario operativo de acciones del caller", async () => {
     setupRole("role-admin");
     const user = userEvent.setup();
 
     render(<AssignLeadDrawer lead={baseLead} />);
     await openDrawer(user);
 
-    expect(
-      screen.getByRole("button", { name: /guardar/i }),
-    ).toHaveAttribute("form", "admin-caller-form");
-
-    await user.click(screen.getByRole("tab", { name: /sesión del closer/i }));
-
-    expect(
-      screen.getByRole("button", { name: /guardar/i }),
-    ).toHaveAttribute("form", "admin-closer-form");
-    expect(screen.getByTestId("admin-closer-form")).toBeInTheDocument();
+    expect(screen.getByTestId("assign-lead-form")).toBeInTheDocument();
     expect(screen.queryByTestId("admin-caller-form")).not.toBeInTheDocument();
+
+    const submitButton = screen.getByRole("button", { name: /guardar/i });
+    expect(submitButton).toHaveAttribute("form", "assign-lead-form");
   });
 });
 

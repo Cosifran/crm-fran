@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@crm-fran/env": "workspace:*",
+    "csv-parse": "^7.0.2",
     "dotenv": "catalog:",
     "drizzle-orm": "^0.45.1",
     "pg": "^8.17.1",

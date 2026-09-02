@@ -18,10 +18,6 @@ export type AlertRow = Awaited<ReturnType<typeof listAlerts>>[number];
 export async function listAlerts(input: ListAlertsInput) {
 	const limit = Math.min(input.limit ?? 50, 100);
 	const offset = input.offset ?? 0;
-	const isAdmin =
-		input.permissions.includes("*") ||
-		input.permissions.includes("alerts:*") ||
-		input.permissions.includes("users:read");
 
 	const conditions: SQL<unknown>[] = [];
 
@@ -33,23 +29,20 @@ export async function listAlerts(input: ListAlertsInput) {
 		conditions.push(eq(alerts.targetUserId, input.targetUserId));
 	}
 
-	if (!isAdmin) {
-		conditions.push(eq(alerts.targetUserId, input.actorId));
-	}
+	conditions.push(isNull(alerts.dismissedAt));
+	conditions.push(isNull(alerts.resolvedAt));
+	conditions.push(isNull(alerts.expiredAt));
 
-	if (!input.includeDismissed) {
-		conditions.push(isNull(alerts.dismissedAt));
-	}
-
-	if (!input.includeResolved) {
-		conditions.push(isNull(alerts.resolvedAt));
-	}
-
-	return db.query.alerts.findMany({
-		with: {
-			lead: true,
-			targetUser: true,
-		},
+		return db.query.alerts.findMany({
+			with: {
+					lead: {
+						with: {
+							caller: true,
+							closer: true,
+						},
+				},
+				targetUser: true,
+			},
 		where: conditions.length > 0 ? (_fields, { and }) => and(...conditions) : undefined,
 		orderBy: asc(alerts.nextShowAt),
 		limit,

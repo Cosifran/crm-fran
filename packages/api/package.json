@@ -20,6 +20,7 @@
     "@trpc/server": "catalog:",
     "dotenv": "catalog:",
     "next": "catalog:",
+    "openai": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
